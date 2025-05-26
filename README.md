@@ -1,5 +1,7 @@
 # Gthulhu Project
 
+![](./assets/logo.png)
+
 ## Overview
 
 Gthulhu optimizes cloud-native workloads using the Linux Scheduler Extension for different application scenarios.
