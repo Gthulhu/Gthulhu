@@ -1,0 +1,3 @@
+[submodule "scx"]
+	path = scx
+	url = ./scx
