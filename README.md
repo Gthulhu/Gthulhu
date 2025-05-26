@@ -1,27 +1,12 @@
-# SCX GoLand Core
-
-A framework for building custom Linux schedulers using BPF and Go.
-
-> Current status: not ready for production use.
-
-## DEMO
-
-![](./assets/demo.gif)
+# Gthulhu Project
 
 ## Overview
 
-![](./assets/design.png)
-
-This scheduler is designed to prioritize interactive workloads over background CPU-intensive tasks. It's particularly suitable for:
-
-- Low-latency interactive applications
-- Gaming
-- Video conferencing
-- Live streaming
+Gthulhu optimizes cloud-native workloads using the Linux Scheduler Extension for different application scenarios.
 
 The scheduler consists of two main components:
 1. A BPF component that implements low-level sched-ext functionalities
-2. A user-space scheduler written in Go with scx_goland_core that implements the actual scheduling policy
+2. A user-space scheduler written in Go with [scx_goland_core](https://github.com/Gthulhu/scx_goland_core) that implements the actual scheduling policy
 
 ## Key Features
 
@@ -55,6 +40,12 @@ First, clone the required dependencies:
 
 ```bash
 make dep
+git submodule init
+git submodule sync
+git submodule update
+cd scx
+meson setup build --prefix ~
+meson compile -C build
 ```
 
 This will clone libbpf and the custom libbpfgo fork needed for the project.
@@ -112,3 +103,8 @@ This software is distributed under the terms of the GNU General Public License v
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+
+## Special Thanks
+
+- [scx](https://github.com/sched-ext/scx)
+- [libbpfgo](https://github.com/aquasecurity/libbpfgo)
