@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -14,8 +13,8 @@ import (
 
 const (
 	MAX_LATENCY_WEIGHT = 1000
-	SLICE_NS_DEFAULT   = 2000 * 1000 // 5ms
-	SLICE_NS_MIN       = 200 * 1000
+	SLICE_NS_DEFAULT   = 5000 * 1000 // 5ms
+	SLICE_NS_MIN       = 500 * 1000
 	SCX_ENQ_WAKEUP     = 1
 	NSEC_PER_SEC       = 1000000000 // 1 second in nanoseconds
 )
@@ -26,15 +25,18 @@ var taskPool = make([]core.QueuedTask, taskPoolSize)
 var taskPoolCount = 0
 var taskPoolHead, taskPoolTail int
 
-func DrainQueuedTask(s *core.Sched) {
+func DrainQueuedTask(s *core.Sched) int {
+	var count int
 	for (taskPoolTail+1)%taskPoolSize != taskPoolHead {
 		s.DequeueTask(&taskPool[taskPoolTail])
 		if taskPool[taskPoolTail].Pid == -1 {
-			return
+			return count
 		}
 		taskPoolTail = (taskPoolTail + 1) % taskPoolSize
 		taskPoolCount++
+		count++
 	}
+	return 0
 }
 
 func GetTaskFromPool() *core.QueuedTask {
@@ -94,7 +96,7 @@ func main() {
 		log.Panicf("bpfModule attach failed: %v", err)
 	}
 
-	fmt.Println("GetUserSchedPid:", core.GetUserSchedPid())
+	log.Printf("GetUserSchedPid: %v", core.GetUserSchedPid())
 
 	go func() {
 		var t *core.QueuedTask
@@ -107,10 +109,19 @@ func main() {
 		var info *TaskInfo
 		var exists bool
 
+		sleepCnt := time.Duration(1)
+
 		for true {
 			t = GetTaskFromPool()
 			if t == nil {
-				DrainQueuedTask(bpfModule)
+				if num := DrainQueuedTask(bpfModule); num == 0 {
+					// No tasks in the pool, wait for new tasks.
+					time.Sleep(100 * time.Microsecond)
+					sleepCnt++
+					continue
+				} else {
+					sleepCnt = 1
+				}
 			} else {
 				task = core.NewDispatchedTask(t)
 				err, cpu = bpfModule.SelectCPU(t)
@@ -200,6 +211,8 @@ func main() {
 			if bpfModule.Stopped() {
 				log.Println("bpfModule stopped")
 				cont = false
+			} else {
+				time.Sleep(1 * time.Second)
 			}
 		}
 	}
