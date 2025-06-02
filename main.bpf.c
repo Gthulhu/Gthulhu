@@ -797,7 +797,7 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 	if (is_belong_usersched_task(p)) {
 		scx_bpf_dsq_insert(p, 9223372036854775810ULL, SCX_SLICE_DFL,
 			enq_flags | SCX_ENQ_PREEMPT);
-		__sync_fetch_and_add(&nr_kernel_dispatches, 1);
+		// __sync_fetch_and_add(&nr_kernel_dispatches, 1);
 		return;
 	}
 
