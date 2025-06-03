@@ -82,6 +82,14 @@ sudo ./main
 
 The scheduler will run until terminated with Ctrl+C (SIGINT) or SIGTERM.
 
+### Running with Docker
+To run the scheduler in a Docker container, you can use the provided Dockerfile:
+
+```bash
+make image
+docker run --privileged=true --pid host --rm  gthulhu:latest /gthulhu/main
+```
+
 ### Debugging
 
 If you need to inspect the BPF components, you can use:

@@ -25,6 +25,9 @@ STATIC=-extldflags -static
 build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper
 	$(CGOFLAG) go build -ldflags "-w -s $(STATIC)" main.go
 
+image: build
+	docker build -t gthulhu:latest .
+
 test: build
 	vng -r v6.12.2 -- bash -c "./main"
 
