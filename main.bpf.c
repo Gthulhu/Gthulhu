@@ -1354,6 +1354,6 @@ SCX_OPS_DEFINE(goland,
 	       .exit			= (void *)goland_exit,
 		   .exit_task		= (void *)goland_exit_task,
 	       .flags			= SCX_OPS_ENQ_LAST | SCX_OPS_KEEP_BUILTIN_IDLE,
-	       .timeout_ms		= 10000,
+	       .timeout_ms		= 5000,
 	       .dispatch_max_batch	= MAX_DISPATCH_SLOT,
 	       .name			= "goland");

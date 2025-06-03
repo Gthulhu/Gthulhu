@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -216,25 +217,21 @@ func main() {
 		var err error
 		var cpu int32
 		var info *TaskInfo
-		sleepCnt := time.Duration(1)
 
 		for true {
 			t = GetTaskFromPool()
 			if t == nil {
-				if num := DrainQueuedTask(bpfModule); num == 0 {
-					for {
-						if pid := bpfModule.ReceiveProcExitEvt(); pid != -1 {
-							delete(taskInfoMap, int32(pid))
-						} else {
-							break
+				for taskPoolCount < 10 {
+					if num := DrainQueuedTask(bpfModule); num == 0 {
+						for i := 0; i < 10; i++ {
+							if pid := bpfModule.ReceiveProcExitEvt(); pid != -1 {
+								delete(taskInfoMap, int32(pid))
+							} else {
+								break
+							}
 						}
+						bpfModule.BlockTilReadyForDequeue()
 					}
-					// No tasks in the pool, wait for new tasks.
-					time.Sleep(100 * time.Microsecond)
-					sleepCnt++
-					continue
-				} else {
-					sleepCnt = 1
 				}
 			} else if t.Pid != -1 {
 				task = core.NewDispatchedTask(t)
@@ -261,20 +258,25 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 	cont := true
+	timer := time.NewTicker(1 * time.Second)
 	for cont {
 		select {
 		case <-signalChan:
 			log.Println("receive os signal")
 			cont = false
-		default:
+		case <-timer.C:
 			if bpfModule.Stopped() {
 				log.Println("bpfModule stopped")
+				cmd := exec.Command("bpftool", []string{"map", "dump", "name", "main_bpf.data"}...)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					log.Printf("bpftool map dump failed: %v", err)
+				}
 				cont = false
-			} else {
-				time.Sleep(1 * time.Second)
 			}
 		}
 	}
-
+	timer.Stop()
 	log.Println("scheduler exit")
 }
