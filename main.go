@@ -223,6 +223,13 @@ func main() {
 			t = GetTaskFromPool()
 			if t == nil {
 				if num := DrainQueuedTask(bpfModule); num == 0 {
+					for {
+						if pid := bpfModule.ReceiveProcExitEvt(); pid != -1 {
+							delete(taskInfoMap, int32(pid))
+						} else {
+							break
+						}
+					}
 					// No tasks in the pool, wait for new tasks.
 					time.Sleep(100 * time.Microsecond)
 					sleepCnt++
