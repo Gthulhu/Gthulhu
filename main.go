@@ -198,7 +198,6 @@ func main() {
 	if err != nil {
 		log.Printf("AssignUserSchedPid failed: %v", err)
 	}
-	log.Printf("pid: %v", pid)
 
 	err = util.InitCacheDomains(bpfModule)
 	if err != nil {
@@ -209,7 +208,7 @@ func main() {
 		log.Panicf("bpfModule attach failed: %v", err)
 	}
 
-	log.Printf("GetUserSchedPid: %v", core.GetUserSchedPid())
+	log.Printf("UserSched's Pid: %v", core.GetUserSchedPid())
 
 	go func() {
 		var t *core.QueuedTask
