@@ -52,7 +52,7 @@ dep:
 	git checkout 09b9e83 && \
 	cd src && \
 	make && \
-	git clone -b feat/user-ring-buffer https://github.com/Gthulhu/libbpfgo.git
+	git clone -b feat/skel https://github.com/Gthulhu/libbpfgo.git
 
 $(BPF_OBJ): %.o: %.c
 	clang-17 \
