@@ -87,7 +87,7 @@ volatile u64 nr_user_dispatches, nr_kernel_dispatches,
 volatile u64 nr_failed_dispatches, nr_sched_congested;
 
  /* Report additional debugging information */
-const volatile bool debug = true;
+const volatile bool debug = false;
 
 /* Allow to use bpf_printk() only when @debug is set */
 #define dbg_msg(_fmt, ...) do {						\
@@ -825,8 +825,7 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 	 * starvation on user space scheduler goroutine(s).
 	 */
 	if (is_belong_usersched_task(p)) {
-		scx_bpf_dsq_insert(p, 9223372036854775810ULL, SCX_SLICE_DFL,
-			enq_flags | SCX_ENQ_PREEMPT);
+		scx_bpf_dsq_insert_vtime(p, SHARED_DSQ, SCX_SLICE_DFL, 0, enq_flags);
 		// __sync_fetch_and_add(&nr_kernel_dispatches, 1);
 		return;
 	}
