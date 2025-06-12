@@ -52,6 +52,13 @@ meson compile -C build
 
 This will clone libbpf and the custom libbpfgo fork needed for the project.
 
+### Linting the Code
+To ensure code quality, run the linter:
+
+```bash
+make lint
+```
+
 ### Building the Scheduler
 
 Build the scheduler with:
