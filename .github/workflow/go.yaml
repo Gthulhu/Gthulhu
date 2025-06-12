@@ -1,0 +1,47 @@
+name: Go
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches:
+      - main
+  workflow_call:
+jobs:
+  analyze-code:
+    name: Analyze Code
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Dependencies
+        uses: ./.github/actions/build-dependencies
+      - name: Lint
+        run: |
+          if test -z "$(gofmt -l .)"; then
+            echo "Congrats! There is nothing to fix."
+          else
+            echo "The following lines should be fixed."
+            gofmt -s -d .
+            exit 1
+          fi
+        shell: bash
+      - name: Lint (vet)
+        run: |
+          make lint
+        shell: bash
+  self-tests:
+    name: Selftests
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        go-version: [ '1.22', '1.23', 'stable' ]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install Dependencies
+        uses: ./.github/actions/build-dependencies
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Static Selftests
+        run: |
+          make test
