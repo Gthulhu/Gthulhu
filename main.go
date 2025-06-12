@@ -19,6 +19,7 @@ const (
 	SLICE_NS_MIN       = 500 * 1000
 	SCX_ENQ_WAKEUP     = 1
 	NSEC_PER_SEC       = 1000000000 // 1 second in nanoseconds
+	PF_WQ_WORKER       = 0x00000020
 )
 
 const taskPoolSize = 4096
@@ -49,7 +50,7 @@ func DrainQueuedTask(s *core.Sched) int {
 	return 0
 }
 
-var timeout = uint64(5 * NSEC_PER_SEC)
+var timeout = uint64(3 * NSEC_PER_SEC)
 
 func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) {
 	var timeStp, deltaT, avgNvcsw, deltaNvcsw, slice,
@@ -75,9 +76,7 @@ func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) {
 	if deltaT >= NSEC_PER_SEC {
 		deltaNvcsw = t.Nvcsw - info.nvcsw
 		avgNvcsw = uint64(0)
-		if deltaT > 0 {
-			avgNvcsw = min(deltaNvcsw*NSEC_PER_SEC/deltaT, 1000)
-		}
+		avgNvcsw = min(deltaNvcsw*NSEC_PER_SEC/deltaT, 1000)
 		info.nvcsw = t.Nvcsw
 		info.nvcswTs = timeStp
 		info.avgNvcsw = calcAvg(info.avgNvcsw, avgNvcsw)
@@ -106,10 +105,6 @@ func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) {
 	minVruntimeLimit = saturating_sub(minVruntime, SLICE_NS_DEFAULT*latencyWeight)
 	if info.vruntime < minVruntimeLimit {
 		info.vruntime = minVruntimeLimit
-	}
-	if saturating_sub(minVruntimeLimit, timeStp) > timeout {
-		log.Printf("Task %d has not been scheduled for a long time, vruntime: %d, avgNvcsw: %d",
-			t.Pid, info.vruntime, info.avgNvcsw)
 	}
 	vslice = slice * 100 / t.Weight
 	info.vruntime += vslice
@@ -238,8 +233,10 @@ func main() {
 		for true {
 			t = GetTaskFromPool()
 			if t == nil {
-				if num := DrainQueuedTask(bpfModule); num == 0 {
-					bpfModule.BlockTilReadyForDequeue()
+				for uint64(taskPoolCount) < 10 {
+					if num := DrainQueuedTask(bpfModule); num == 0 {
+						bpfModule.BlockTilReadyForDequeue()
+					}
 				}
 			} else if t.Pid != -1 {
 				task = core.NewDispatchedTask(t)
