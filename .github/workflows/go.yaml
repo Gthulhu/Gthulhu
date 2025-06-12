@@ -44,4 +44,12 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Static Selftests
         run: |
+          make dep
+          git submodule init
+          git submodule sync
+          git submodule update
+          cd scx
+          meson setup build --prefix ~
+          meson compile -C build
+          cd ..
           make test
