@@ -28,6 +28,7 @@ jobs:
       - name: Lint (vet)
         run: |
           make dep
+          sleep 20
           make lint
         shell: bash
   self-tests:
@@ -53,4 +54,5 @@ jobs:
           meson setup build --prefix ~
           meson compile -C build
           cd ..
+          make build
           make test
