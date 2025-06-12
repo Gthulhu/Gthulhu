@@ -27,6 +27,7 @@ jobs:
         shell: bash
       - name: Lint (vet)
         run: |
+          make dep
           make lint
         shell: bash
   self-tests:
