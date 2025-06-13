@@ -57,8 +57,7 @@ dep:
 	cd libbpf && \
 	git checkout 09b9e83 && \
 	cd src && \
-	make && \
-	git clone -b feat/skel https://github.com/Gthulhu/libbpfgo.git
+	make
 
 $(BPF_OBJ): %.o: %.c
 	clang-17 \
