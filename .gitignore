@@ -1,6 +1,5 @@
 .vscode
 libbpf
-libbpfgo
 output
 *.ll
 *.o
