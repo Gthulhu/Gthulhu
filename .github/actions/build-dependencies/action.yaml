@@ -31,6 +31,6 @@ runs:
         for tool in "clang" "clang-format" "llc" "llvm-strip"
         do
           sudo rm -f /usr/bin/$tool
-          sudo ln -s /usr/bin/$tool-14 /usr/bin/$tool
+          sudo ln -s /usr/bin/$tool-17 /usr/bin/$tool
         done
       shell: bash
