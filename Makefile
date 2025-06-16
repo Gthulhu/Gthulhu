@@ -26,7 +26,7 @@ build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper
 	$(CGOFLAG) go build -ldflags "-w -s $(STATIC)" main.go
 
 .PHONY: lint
-lint:
+lint: build
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" main.go
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./internal/...
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./util/...
@@ -35,7 +35,7 @@ image: build
 	docker build -t gthulhu:latest .
 
 test: build
-	vng -r v6.12.2 -- bash -c "./main"
+	vng -r v6.12.2 -- timeout 15 bash -c "./main"
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
