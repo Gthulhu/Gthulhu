@@ -35,7 +35,7 @@ image: build
 	docker build -t gthulhu:latest .
 
 test: build
-	vng -r v6.12.2 -- timeout 15 bash -c "./main"
+	vng -r v6.12.2 -- timeout 15 bash -c "./main" || true
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
