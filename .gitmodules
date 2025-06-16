@@ -1,3 +1,6 @@
 [submodule "scx"]
 	path = scx
 	url = https://github.com/sched-ext/scx.git
+[submodule "libbpfgo"]
+	path = libbpfgo
+	url = https://github.com/Gthulhu/libbpfgo.git

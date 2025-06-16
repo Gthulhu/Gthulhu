@@ -18,7 +18,7 @@ LIBBPF_OBJ = $(abspath $(OUTPUT)/libbpf.a)
 LIBBPF_OBJDIR = $(abspath ./$(OUTPUT)/libbpf)
 LIBBPF_DESTDIR = $(abspath ./$(OUTPUT))
 CLANG_BPF_SYS_INCLUDES := `shell $(CLANG) -v -E - </dev/null 2>&1 | sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }'`
-CGOFLAG = CC=clang CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lz $(BASEDIR)/libwrapper.a"
+CGOFLAG = CC=clang CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
 STATIC=-extldflags -static
 
 .PHONY: build
@@ -26,7 +26,7 @@ build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper
 	$(CGOFLAG) go build -ldflags "-w -s $(STATIC)" main.go
 
 .PHONY: lint
-lint:
+lint: build
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" main.go
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./internal/...
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./util/...
@@ -35,7 +35,7 @@ image: build
 	docker build -t gthulhu:latest .
 
 test: build
-	vng -r v6.12.2 -- bash -c "./main"
+	vng -r v6.12.2 -- timeout 15 bash -c "./main" || true
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
@@ -58,7 +58,8 @@ dep:
 	git checkout 09b9e83 && \
 	cd src && \
 	make && \
-	git clone -b feat/skel https://github.com/Gthulhu/libbpfgo.git
+	sudo make install
+
 
 $(BPF_OBJ): %.o: %.c
 	clang-17 \

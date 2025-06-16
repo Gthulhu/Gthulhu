@@ -28,7 +28,16 @@ jobs:
       - name: Lint (vet)
         run: |
           make dep
-          sleep 20
+          git submodule init
+          git submodule sync
+          git submodule update
+          cd scx
+          meson setup build --prefix ~
+          meson compile -C build
+          cd ..
+          cd libbpfgo
+          make
+          cd ..
           make lint
         shell: bash
   self-tests:
@@ -54,5 +63,9 @@ jobs:
           meson setup build --prefix ~
           meson compile -C build
           cd ..
+          cd libbpfgo
+          make
+          cd ..
           make build
           make test
+        shell: bash
