@@ -35,6 +35,9 @@ jobs:
           meson setup build --prefix ~
           meson compile -C build
           cd ..
+          cd libbpfgo
+          make
+          cd ..
           make lint
         shell: bash
   self-tests:
@@ -59,6 +62,9 @@ jobs:
           cd scx
           meson setup build --prefix ~
           meson compile -C build
+          cd ..
+          cd libbpfgo
+          make
           cd ..
           make build
           make test
