@@ -57,7 +57,9 @@ dep:
 	cd libbpf && \
 	git checkout 09b9e83 && \
 	cd src && \
-	make
+	make && \
+	sudo make install
+
 
 $(BPF_OBJ): %.o: %.c
 	clang-17 \
