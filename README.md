@@ -1,6 +1,6 @@
 # Gthulhu Project
 
-![](./assets/logo.png)
+<img src="./assets/logo.png" alt="logo" width="300"/>
 
 ## Overview
 
