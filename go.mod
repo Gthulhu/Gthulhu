@@ -2,7 +2,7 @@ module github.com/Gthulhu/Gthulhu
 
 go 1.22.6
 
-require github.com/Gthulhu/scx_goland_core v0.0.3-0.20250617124046-5a9e6f60f416
+require github.com/Gthulhu/scx_goland_core v0.1.1-0.20250617151915-1480652fa6b1
 
 require (
 	github.com/aquasecurity/libbpfgo v0.8.0-libbpf-1.5 // indirect
