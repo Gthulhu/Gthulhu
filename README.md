@@ -1,4 +1,5 @@
 # Gthulhu Project
+[![Go](https://github.com/Gthulhu/Gthulhu/actions/workflows/go.yaml/badge.svg)](https://github.com/Gthulhu/Gthulhu/actions/workflows/go.yaml)
 
 <img src="./assets/logo.png" alt="logo" width="300"/>
 
