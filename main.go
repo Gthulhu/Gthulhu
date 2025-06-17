@@ -1,9 +1,9 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -32,6 +32,7 @@ func main() {
 	}
 
 	log.Printf("UserSched's Pid: %v", core.GetUserSchedPid())
+	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		for {
@@ -43,7 +44,7 @@ func main() {
 		}
 	}()
 
-	go func() {
+	go func(ctx context.Context) {
 		var t *core.QueuedTask
 		var task *core.DispatchedTask
 		var err error
@@ -51,6 +52,12 @@ func main() {
 		var info *sched.TaskInfo
 
 		for true {
+			select {
+			case <-ctx.Done():
+				log.Println("context done, exiting scheduler loop")
+				return
+			default:
+			}
 			t = sched.GetTaskFromPool()
 			if t == nil {
 				for sched.GetPoolCount() < 10 {
@@ -78,13 +85,13 @@ func main() {
 					continue
 				}
 
-				err = core.NotifyCompleteSkel(uint64(sched.GetPoolCount()))
+				err = core.NotifyComplete(uint64(sched.GetPoolCount()))
 				if err != nil {
 					log.Printf("NotifyComplete failed: %v", err)
 				}
 			}
 		}
-	}()
+	}(ctx)
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -95,19 +102,21 @@ func main() {
 		case <-signalChan:
 			log.Println("receive os signal")
 			cont = false
+			cancel()
 		case <-timer.C:
 			if bpfModule.Stopped() {
 				log.Println("bpfModule stopped")
-				cmd := exec.Command("bpftool", []string{"map", "dump", "name", "main_bpf.data"}...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					log.Printf("bpftool map dump failed: %v", err)
-				}
 				cont = false
 			}
 		}
 	}
 	timer.Stop()
+	uei, err := bpfModule.GetUeiData()
+	if err == nil {
+		log.Printf("uei: kind=%d, exitCode=%d, reason=%s, message=%s",
+			uei.Kind, uei.ExitCode, uei.GetReason(), uei.GetMessage())
+	} else {
+		log.Printf("GetUeiData failed: %v", err)
+	}
 	log.Println("scheduler exit")
 }
