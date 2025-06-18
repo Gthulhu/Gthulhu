@@ -56,7 +56,6 @@ func main() {
 			case <-signalChan:
 				log.Println("receive os signal")
 				cont = false
-				cancel()
 			case <-timer.C:
 				notifyCount++
 				if notifyCount%10 == 0 {
@@ -78,6 +77,7 @@ func main() {
 				}
 			}
 		}
+		cancel()
 		timer.Stop()
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {
@@ -93,6 +93,8 @@ func main() {
 	var cpu int32
 	var info *sched.TaskInfo
 
+	log.Println("scheduler started")
+
 	for true {
 		select {
 		case <-ctx.Done():
@@ -104,7 +106,14 @@ func main() {
 		if t == nil {
 			for sched.GetPoolCount() < 10 {
 				if num := sched.DrainQueuedTask(bpfModule); num == 0 {
-					bpfModule.BlockTilReadyForDequeue()
+					// prevent deadlock if no tasks are available (bpfmodule unloaded)
+					select {
+					case <-ctx.Done():
+						log.Println("context done, exiting scheduler loop")
+						return
+					default:
+					}
+					bpfModule.BlockTilReadyForDequeue(ctx)
 				}
 			}
 		} else if t.Pid != -1 {
