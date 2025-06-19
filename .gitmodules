@@ -4,3 +4,6 @@
 [submodule "libbpfgo"]
 	path = libbpfgo
 	url = https://github.com/Gthulhu/libbpfgo.git
+[submodule "api"]
+	path = api
+	url = https://github.com/Gthulhu/api.git
