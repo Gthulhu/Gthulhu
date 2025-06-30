@@ -9,11 +9,15 @@ import (
 
 const (
 	MAX_LATENCY_WEIGHT = 1000
-	SLICE_NS_DEFAULT   = 5000 * 1000 // 5ms
-	SLICE_NS_MIN       = 500 * 1000
 	SCX_ENQ_WAKEUP     = 1
 	NSEC_PER_SEC       = 1000000000 // 1 second in nanoseconds
 	PF_WQ_WORKER       = 0x00000020
+)
+
+// Configurable scheduler parameters
+var (
+	SLICE_NS_DEFAULT uint64 = 5000 * 1000 // 5ms (default)
+	SLICE_NS_MIN     uint64 = 500 * 1000  // 0.5ms (default)
 )
 
 const taskPoolSize = 4096
@@ -133,6 +137,21 @@ func GetTaskFromPool() *core.QueuedTask {
 	taskPoolHead = (taskPoolHead + 1) % taskPoolSize
 	taskPoolCount--
 	return t.QueuedTask
+}
+
+// SetSchedulerConfig updates the scheduler parameters from configuration
+func SetSchedulerConfig(sliceNsDefault, sliceNsMin uint64) {
+	if sliceNsDefault > 0 {
+		SLICE_NS_DEFAULT = sliceNsDefault
+	}
+	if sliceNsMin > 0 {
+		SLICE_NS_MIN = sliceNsMin
+	}
+}
+
+// GetSchedulerConfig returns current scheduler configuration
+func GetSchedulerConfig() (uint64, uint64) {
+	return SLICE_NS_DEFAULT, SLICE_NS_MIN
 }
 
 // TaskInfo stores task statistics

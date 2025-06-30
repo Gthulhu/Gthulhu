@@ -3,22 +3,44 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/Gthulhu/Gthulhu/internal/config"
 	"github.com/Gthulhu/Gthulhu/internal/sched"
 	core "github.com/Gthulhu/scx_goland_core/goland_core"
 	cache "github.com/Gthulhu/scx_goland_core/util"
 )
 
 func main() {
+	// Parse command line flags
+	configFile := flag.String("config", "", "Path to YAML configuration file")
+	flag.Parse()
+
+	// Load configuration
+	cfg, err := config.LoadConfig(*configFile)
+	if err != nil {
+		log.Panicf("Failed to load configuration: %v", err)
+	}
+
+	// Apply scheduler configuration before loading eBPF program
+	schedConfig := cfg.GetSchedulerConfig()
+	sched.SetSchedulerConfig(
+		cfg.Scheduler.SliceNsDefault,
+		cfg.Scheduler.SliceNsMin,
+	)
+
+	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
+		schedConfig.SliceNsDefault, schedConfig.SliceNsMin)
+
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
 	pid := os.Getpid()
-	err := bpfModule.AssignUserSchedPid(pid)
+	err = bpfModule.AssignUserSchedPid(pid)
 	if err != nil {
 		log.Printf("AssignUserSchedPid failed: %v", err)
 	}

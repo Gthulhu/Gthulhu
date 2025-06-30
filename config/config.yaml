@@ -1,0 +1,9 @@
+# Gthulhu Scheduler Configuration
+# This configuration file allows you to adjust scheduler parameters before eBPF program loading
+
+scheduler:
+  # Default time slice in nanoseconds (default: 5000000 = 5ms)
+  slice_ns_default: 5000000
+  
+  # Minimum time slice in nanoseconds (default: 500000 = 0.5ms)
+  slice_ns_min: 500000
