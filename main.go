@@ -116,18 +116,8 @@ func main() {
 		}
 		t = sched.GetTaskFromPool()
 		if t == nil {
-			for sched.GetPoolCount() < 10 {
-				if num := sched.DrainQueuedTask(bpfModule); num == 0 {
-					// prevent deadlock if no tasks are available (bpfmodule unloaded)
-					select {
-					case <-ctx.Done():
-						log.Println("context done, exiting scheduler loop")
-						return
-					default:
-					}
-					bpfModule.BlockTilReadyForDequeue(ctx)
-				}
-			}
+			bpfModule.BlockTilReadyForDequeue(ctx)
+			sched.DrainQueuedTask(bpfModule)
 		} else if t.Pid != -1 {
 			task = core.NewDispatchedTask(t)
 			err, cpu = bpfModule.SelectCPU(t)

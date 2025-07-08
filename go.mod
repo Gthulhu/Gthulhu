@@ -3,7 +3,7 @@ module github.com/Gthulhu/Gthulhu
 go 1.22.6
 
 require (
-	github.com/Gthulhu/scx_goland_core v0.2.0
+	github.com/Gthulhu/scx_goland_core v0.2.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
