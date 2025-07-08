@@ -11,7 +11,19 @@ void *open_skel() {
 }
 
 u32 get_usersched_pid() {
-    return global_obj->bss->usersched_pid;
+    return global_obj->rodata->usersched_pid;
+}
+
+void set_usersched_pid(u32 id) {
+    global_obj->rodata->usersched_pid = id;
+}
+
+void set_kugepagepid(u32 id) {
+    global_obj->rodata->khugepaged_pid = id;
+}
+
+void set_debug(bool enabled) {
+    global_obj->rodata->debug = enabled;
 }
 
 u64 get_nr_scheduled() {

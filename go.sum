@@ -1,5 +1,7 @@
 github.com/Gthulhu/scx_goland_core v0.1.1-0.20250618023044-c10de3c1bc3f h1:X/JApTIg7EFzZAt7g0uQsia1mbXXA/1fe6wo60YbB4U=
 github.com/Gthulhu/scx_goland_core v0.1.1-0.20250618023044-c10de3c1bc3f/go.mod h1:2WuCsF+yIieAArKGu3yzfv+KdR71JTNYJfvpYEEtXVk=
+github.com/Gthulhu/scx_goland_core v0.2.0 h1:Mxs0YXbjJaTmQl/QWhqvJBz9XPEqhOokYUhkIXMsqG8=
+github.com/Gthulhu/scx_goland_core v0.2.0/go.mod h1:2WuCsF+yIieAArKGu3yzfv+KdR71JTNYJfvpYEEtXVk=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

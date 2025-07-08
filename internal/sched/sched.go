@@ -1,8 +1,6 @@
 package sched
 
 import (
-	"sync"
-
 	"github.com/Gthulhu/Gthulhu/util"
 	core "github.com/Gthulhu/scx_goland_core/goland_core"
 )
@@ -26,24 +24,6 @@ var taskPool = make([]Task, taskPoolSize)
 var taskPoolCount = 0
 var taskPoolHead, taskPoolTail int
 
-func DeletePidFromTaskInfo(pid int) {
-	mapLock.Lock()
-	defer mapLock.Unlock()
-	if _, exists := taskInfoMap[int32(pid)]; exists {
-		delete(taskInfoMap, int32(pid))
-	}
-}
-
-func GetTaskInfo(pid int32) (*TaskInfo, bool) {
-	mapLock.RLock()
-	defer mapLock.RUnlock()
-	info, exists := taskInfoMap[pid]
-	if !exists {
-		return nil, false
-	}
-	return info, true
-}
-
 func DrainQueuedTask(s *core.Sched) int {
 	var count int
 	for (taskPoolTail+1)%taskPoolSize != taskPoolHead {
@@ -52,77 +32,30 @@ func DrainQueuedTask(s *core.Sched) int {
 		if newQueuedTask.Pid == -1 {
 			return count
 		}
-		updatedEnqueueTask(s, &newQueuedTask)
-		mapLock.RLock()
+
 		t := Task{
 			QueuedTask: &newQueuedTask,
-			Deadline:   taskInfoMap[newQueuedTask.Pid].Vruntime,
-			Timestamp:  taskInfoMap[newQueuedTask.Pid].nvcswTs,
+			Deadline:   updatedEnqueueTask(s, &newQueuedTask),
 		}
-		mapLock.RUnlock()
 		InsertTaskToPool(t)
 		count++
 	}
 	return 0
 }
 
-func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) {
-	var timeStp, deltaT, avgNvcsw, deltaNvcsw, slice,
-		minVruntimeLimit, weightMultiplier, baseWeight,
-		latencyWeight, vslice uint64
-	var info *TaskInfo
-	var exists bool
-	timeStp = util.Now()
-	mapLock.Lock()
-	info, exists = taskInfoMap[t.Pid]
-	if !exists {
-		info = &TaskInfo{
-			prevExecRuntime: t.SumExecRuntime,
-			Vruntime:        minVruntime,
-			nvcsw:           t.Nvcsw,
-			nvcswTs:         timeStp,
-		}
-		taskInfoMap[t.Pid] = info
+func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) uint64 {
+	if minVruntime < t.Vtime {
+		minVruntime = t.Vtime
 	}
-	mapLock.Unlock()
-
-	deltaT = timeStp - info.nvcswTs
-	if deltaT >= NSEC_PER_SEC {
-		deltaNvcsw = t.Nvcsw - info.nvcsw
-		avgNvcsw = uint64(0)
-		avgNvcsw = min(deltaNvcsw*NSEC_PER_SEC/deltaT, 1000)
-		info.nvcsw = t.Nvcsw
-		info.nvcswTs = timeStp
-		info.avgNvcsw = util.CalcAvg(info.avgNvcsw, avgNvcsw)
+	minVruntimeLocal := util.SaturatingSub(minVruntime, SLICE_NS_DEFAULT)
+	if t.Vtime == 0 {
+		t.Vtime = minVruntimeLocal + (SLICE_NS_DEFAULT * 100 / t.Weight)
+	} else if t.Vtime < minVruntimeLocal {
+		t.Vtime = minVruntimeLocal
 	}
+	t.Vtime += (t.StopTs - t.StartTs) * t.Weight / 100
 
-	// Evaluate used task time slice.
-	slice = min(
-		util.SaturatingSub(t.SumExecRuntime, info.prevExecRuntime),
-		SLICE_NS_DEFAULT,
-	)
-	// Update total task cputime.
-	info.prevExecRuntime = t.SumExecRuntime
-
-	// Update task's vruntime re-aligning it to min_vruntime.
-	//
-	// The amount of vruntime budget an idle task can accumulate is adjusted in function of its
-	// latency weight, which is derived from the average number of voluntary context switches.
-	// This ensures that latency-sensitive tasks receive a priority boost.
-	baseWeight = min(info.avgNvcsw, MAX_LATENCY_WEIGHT)
-	weightMultiplier = uint64(1)
-	if t.Flags&SCX_ENQ_WAKEUP != 0 {
-		weightMultiplier = 2
-	}
-	latencyWeight = (baseWeight * weightMultiplier) + 1
-
-	minVruntimeLimit = util.SaturatingSub(minVruntime, SLICE_NS_DEFAULT*latencyWeight)
-	if info.Vruntime < minVruntimeLimit {
-		info.Vruntime = minVruntimeLimit
-	}
-	vslice = slice * 100 / t.Weight
-	info.Vruntime += vslice
-	minVruntime += vslice
+	return t.Vtime + min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
 }
 
 func GetPoolCount() int {
@@ -164,8 +97,6 @@ type TaskInfo struct {
 	nvcswTs         uint64
 }
 
-var taskInfoMap = make(map[int32]*TaskInfo)
-var mapLock sync.RWMutex
 var minVruntime uint64 = 0 // global vruntime
 
 type Task struct {

@@ -44,6 +44,7 @@ func main() {
 	if err != nil {
 		log.Printf("AssignUserSchedPid failed: %v", err)
 	}
+	bpfModule.Start()
 
 	err = cache.InitCacheDomains(bpfModule)
 	if err != nil {
@@ -56,16 +57,6 @@ func main() {
 
 	log.Printf("UserSched's Pid: %v", core.GetUserSchedPid())
 	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		for {
-			if pid := bpfModule.ReceiveProcExitEvt(); pid != -1 {
-				sched.DeletePidFromTaskInfo(pid)
-			} else {
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-	}()
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -113,7 +104,6 @@ func main() {
 	var t *core.QueuedTask
 	var task *core.DispatchedTask
 	var cpu int32
-	var info *sched.TaskInfo
 
 	log.Println("scheduler started")
 
@@ -145,10 +135,9 @@ func main() {
 				log.Printf("SelectCPU failed: %v", err)
 			}
 
-			info, _ = sched.GetTaskInfo(t.Pid)
 			// Evaluate used task time slice.
 			nrWaiting := core.GetNrQueued() + core.GetNrScheduled() + 1
-			task.Vtime = info.Vruntime
+			task.Vtime = t.Vtime
 			task.SliceNs = max(sched.SLICE_NS_DEFAULT/nrWaiting, sched.SLICE_NS_MIN)
 			task.Cpu = cpu
 

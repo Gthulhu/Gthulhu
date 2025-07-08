@@ -46,6 +46,12 @@ void *open_skel();
 
 u32 get_usersched_pid();
 
+void set_usersched_pid(u32 id);
+
+void set_kugepagepid(u32 id);
+
+void set_debug(bool enabled);
+
 u64 get_nr_scheduled();
 
 u64 get_nr_queued();
@@ -55,4 +61,5 @@ void notify_complete(u64 nr_pending);
 void sub_nr_queued();
 
 void destroy_skel(void *);
+
 #endif
