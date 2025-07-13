@@ -13,10 +13,17 @@ type SchedulerConfig struct {
 	SliceNsMin     uint64 `yaml:"slice_ns_min"`
 }
 
+// ApiConfig represents API-specific configuration
+type ApiConfig struct {
+	Url      string `yaml:"url"`
+	Interval int    `yaml:"interval"` // Interval in seconds
+}
+
 // Config represents the application configuration
 type Config struct {
 	Scheduler SchedulerConfig `yaml:"scheduler"`
 	Debug     bool            `yaml:"debug,omitempty"` // Optional debug flag
+	Api       ApiConfig       `yaml:"api"`
 }
 
 // DefaultConfig returns the default configuration
@@ -25,6 +32,10 @@ func DefaultConfig() *Config {
 		Scheduler: SchedulerConfig{
 			SliceNsDefault: 5000 * 1000, // 5ms
 			SliceNsMin:     500 * 1000,  // 0.5ms
+		},
+		Api: ApiConfig{
+			Url:      "http://localhost:8080",
+			Interval: 10,
 		},
 	}
 }
@@ -64,4 +75,9 @@ func (c *Config) GetSchedulerConfig() SchedulerConfig {
 
 func (c *Config) IsDebugEnabled() bool {
 	return c.Debug
+}
+
+// GetApiConfig returns the API configuration
+func (c *Config) GetApiConfig() ApiConfig {
+	return c.Api
 }

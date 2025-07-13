@@ -44,16 +44,22 @@ func DrainQueuedTask(s *core.Sched) int {
 }
 
 func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) uint64 {
-	if minVruntime < t.Vtime {
-		minVruntime = t.Vtime
+	// Check if we have a specific strategy for this task
+	strategyApplied := ApplySchedulingStrategy(t)
+
+	if !strategyApplied {
+		// Default behavior if no specific strategy is found
+		if minVruntime < t.Vtime {
+			minVruntime = t.Vtime
+		}
+		minVruntimeLocal := util.SaturatingSub(minVruntime, SLICE_NS_DEFAULT)
+		if t.Vtime == 0 {
+			t.Vtime = minVruntimeLocal + (SLICE_NS_DEFAULT * 100 / t.Weight)
+		} else if t.Vtime < minVruntimeLocal {
+			t.Vtime = minVruntimeLocal
+		}
+		t.Vtime += (t.StopTs - t.StartTs) * t.Weight / 100
 	}
-	minVruntimeLocal := util.SaturatingSub(minVruntime, SLICE_NS_DEFAULT)
-	if t.Vtime == 0 {
-		t.Vtime = minVruntimeLocal + (SLICE_NS_DEFAULT * 100 / t.Weight)
-	} else if t.Vtime < minVruntimeLocal {
-		t.Vtime = minVruntimeLocal
-	}
-	t.Vtime += (t.StopTs - t.StartTs) * t.Weight / 100
 
 	return t.Vtime + min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
 }
