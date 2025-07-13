@@ -869,16 +869,6 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 		return;
 	}
 
-
-	if (is_kworker(p) && bpf_strncmp(p->comm, TASK_COMM_LEN, "events_unbound")) {
-		scx_bpf_dsq_insert_vtime(p, SHARED_DSQ, SCX_SLICE_DFL, 0, enq_flags);
-		__sync_fetch_and_add(&nr_kernel_dispatches, 1);
-		s32 prev_cpu;
-		prev_cpu = scx_bpf_task_cpu(p);
-		kick_task_cpu(p, prev_cpu);
-		return;
-	}
-
 	/*
 	 * Give the task a chance to be directly dispatched if
 	 * ops.select_cpu() was skipped.

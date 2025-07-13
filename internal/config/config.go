@@ -16,6 +16,7 @@ type SchedulerConfig struct {
 // Config represents the application configuration
 type Config struct {
 	Scheduler SchedulerConfig `yaml:"scheduler"`
+	Debug     bool            `yaml:"debug,omitempty"` // Optional debug flag
 }
 
 // DefaultConfig returns the default configuration
@@ -59,4 +60,8 @@ func LoadConfig(filename string) (*Config, error) {
 // GetSchedulerConfig returns the scheduler configuration
 func (c *Config) GetSchedulerConfig() SchedulerConfig {
 	return c.Scheduler
+}
+
+func (c *Config) IsDebugEnabled() bool {
+	return c.Debug
 }

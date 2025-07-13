@@ -39,6 +39,10 @@ func main() {
 
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
+
+	if cfg.IsDebugEnabled() {
+		bpfModule.SetDebug(true)
+	}
 	pid := os.Getpid()
 	err = bpfModule.AssignUserSchedPid(pid)
 	if err != nil {
@@ -114,10 +118,11 @@ func main() {
 			return
 		default:
 		}
+		sched.DrainQueuedTask(bpfModule)
 		t = sched.GetTaskFromPool()
 		if t == nil {
 			bpfModule.BlockTilReadyForDequeue(ctx)
-			sched.DrainQueuedTask(bpfModule)
+			// sched.DrainQueuedTask(bpfModule)
 		} else if t.Pid != -1 {
 			task = core.NewDispatchedTask(t)
 			err, cpu = bpfModule.SelectCPU(t)
