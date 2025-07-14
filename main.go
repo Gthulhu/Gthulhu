@@ -132,7 +132,6 @@ func main() {
 		t = sched.GetTaskFromPool()
 		if t == nil {
 			bpfModule.BlockTilReadyForDequeue(ctx)
-			// sched.DrainQueuedTask(bpfModule)
 		} else if t.Pid != -1 {
 			task = core.NewDispatchedTask(t)
 			err, cpu = bpfModule.SelectCPU(t)
