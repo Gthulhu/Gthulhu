@@ -34,6 +34,7 @@ func main() {
 		cfg.Scheduler.SliceNsMin,
 	)
 
+	schedConfig = cfg.GetSchedulerConfig()
 	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
 		schedConfig.SliceNsDefault, schedConfig.SliceNsMin)
 
@@ -49,6 +50,16 @@ func main() {
 		log.Println("Debug mode enabled")
 		bpfModule.SetDebug(true)
 	}
+
+	if cfg.EarlyProcessing {
+		log.Println("Early processing enabled")
+		bpfModule.SetEarlyProcessing(true)
+	} else {
+		log.Println("Early processing disabled")
+	}
+
+	bpfModule.SetDefaultSlice(schedConfig.SliceNsDefault)
+
 	pid := os.Getpid()
 	err = bpfModule.AssignUserSchedPid(pid)
 	if err != nil {

@@ -22,6 +22,14 @@ void set_kugepagepid(u32 id) {
     global_obj->rodata->khugepaged_pid = id;
 }
 
+void set_early_processing(bool enabled) {
+    global_obj->rodata->early_processing = enabled;
+}
+
+void set_default_slice(u64 t) {
+    global_obj->rodata->default_slice = t;
+}
+
 void set_debug(bool enabled) {
     global_obj->rodata->debug = enabled;
 }

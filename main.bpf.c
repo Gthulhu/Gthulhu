@@ -106,6 +106,12 @@ volatile u64 nr_failed_dispatches, nr_sched_congested;
  /* Report additional debugging information */
 const volatile bool debug;
 
+const volatile bool early_processing;
+
+const volatile u64 default_slice = 20000000ULL; 
+
+
+
 /* Rely on the in-kernel idle CPU selection policy */
 const volatile bool builtin_idle;
 
@@ -861,10 +867,11 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 	 * potentially stall the entire system if they are blocked for too long
 	 * (i.e., ksoftirqd/N, rcuop/N, etc.).
 	 */
-	if ((is_kthread(p) && p->nr_cpus_allowed == 1) || is_kswapd(p) || is_khugepaged(p)) {
+	if ((is_kthread(p) && p->nr_cpus_allowed == 1 && early_processing) 
+	|| is_kswapd(p) || is_khugepaged(p)) {
 		cpu = scx_bpf_task_cpu(p);
                 scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(cpu),
-					 SCX_SLICE_DFL, p->scx.dsq_vtime, enq_flags);
+					 default_slice, p->scx.dsq_vtime, enq_flags);
 		__sync_fetch_and_add(&nr_kernel_dispatches, 1);
 		return;
 	}

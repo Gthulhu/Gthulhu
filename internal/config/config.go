@@ -21,14 +21,17 @@ type ApiConfig struct {
 
 // Config represents the application configuration
 type Config struct {
-	Scheduler SchedulerConfig `yaml:"scheduler"`
-	Debug     bool            `yaml:"debug,omitempty"` // Optional debug flag
-	Api       ApiConfig       `yaml:"api"`
+	Scheduler       SchedulerConfig `yaml:"scheduler"`
+	Debug           bool            `yaml:"debug,omitempty"`            // Optional debug flag
+	EarlyProcessing bool            `yaml:"early_processing,omitempty"` // Optional early processing flag
+	Api             ApiConfig       `yaml:"api"`
 }
 
 // DefaultConfig returns the default configuration
 func DefaultConfig() *Config {
 	return &Config{
+		Debug:           false,
+		EarlyProcessing: true,
 		Scheduler: SchedulerConfig{
 			SliceNsDefault: 5000 * 1000, // 5ms
 			SliceNsMin:     500 * 1000,  // 0.5ms
