@@ -99,6 +99,8 @@ func StartStrategyFetcher(ctx context.Context, apiUrl string, interval time.Dura
 	}()
 }
 
+const SCX_ENQ_PREEMPT = 1 << 32
+
 // ApplySchedulingStrategy applies scheduling strategies to a task
 func ApplySchedulingStrategy(task *core.QueuedTask) bool {
 	if strategy, exists := strategyMap[task.Pid]; exists {
@@ -106,6 +108,7 @@ func ApplySchedulingStrategy(task *core.QueuedTask) bool {
 		if strategy.Priority {
 			// Priority tasks get minimum vtime
 			task.Vtime = minVruntime
+			task.Flags |= SCX_ENQ_PREEMPT
 		}
 
 		return true
