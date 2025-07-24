@@ -38,11 +38,6 @@ func main() {
 	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
 		schedConfig.SliceNsDefault, schedConfig.SliceNsMin)
 
-	// Setup API client configuration
-	apiConfig := cfg.GetApiConfig()
-	apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
-	log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
-
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
 
@@ -80,8 +75,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start scheduling strategy fetcher
-	sched.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
-	log.Printf("Started scheduling strategy fetcher with interval %d seconds", apiConfig.Interval)
+	apiConfig := cfg.GetApiConfig()
+	if apiConfig.Enabled {
+		apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
+		log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
+		sched.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
+		log.Printf("Started scheduling strategy fetcher with interval %d seconds", apiConfig.Interval)
+	}
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)

@@ -16,7 +16,8 @@ type SchedulerConfig struct {
 // ApiConfig represents API-specific configuration
 type ApiConfig struct {
 	Url      string `yaml:"url"`
-	Interval int    `yaml:"interval"` // Interval in seconds
+	Interval int    `yaml:"interval"`          // Interval in seconds
+	Enabled  bool   `yaml:"enabled,omitempty"` // Optional flag to enable/disable API
 }
 
 // Config represents the application configuration

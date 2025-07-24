@@ -8,7 +8,8 @@ scheduler:
   # Minimum time slice in nanoseconds (default: 500000 = 0.5ms)
   slice_ns_min: 500000
 api:
+  enabled: false
   url: http://127.0.0.1:8080
   interval: 5
 debug: false
-early_processing: true
+early_processing: false
