@@ -62,6 +62,12 @@ func main() {
 	}
 	bpfModule.Start()
 
+	topo, err := cache.GetTopology()
+	if err != nil {
+		log.Panicf("GetTopology failed: %v", err)
+	}
+	log.Printf("Topology: %v", topo)
+
 	err = cache.InitCacheDomains(bpfModule)
 	if err != nil {
 		log.Panicf("InitCacheDomains failed: %v", err)
