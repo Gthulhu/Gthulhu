@@ -46,6 +46,11 @@ func main() {
 		bpfModule.SetDebug(true)
 	}
 
+	if cfg.IsBuiltinIdleEnabled() {
+		log.Println("Built-in idle CPU selection enabled")
+		bpfModule.SetBuiltinIdle(true)
+	}
+
 	if cfg.EarlyProcessing {
 		log.Println("Early processing enabled")
 		bpfModule.SetEarlyProcessing(true)

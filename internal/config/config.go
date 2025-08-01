@@ -25,6 +25,7 @@ type Config struct {
 	Scheduler       SchedulerConfig `yaml:"scheduler"`
 	Debug           bool            `yaml:"debug,omitempty"`            // Optional debug flag
 	EarlyProcessing bool            `yaml:"early_processing,omitempty"` // Optional early processing flag
+	BuiltinIdle     bool            `yaml:"builtin_idle,omitempty"`     // Optional flag for built-in idle CPU selection
 	Api             ApiConfig       `yaml:"api"`
 }
 
@@ -79,6 +80,10 @@ func (c *Config) GetSchedulerConfig() SchedulerConfig {
 
 func (c *Config) IsDebugEnabled() bool {
 	return c.Debug
+}
+
+func (c *Config) IsBuiltinIdleEnabled() bool {
+	return c.BuiltinIdle
 }
 
 // GetApiConfig returns the API configuration

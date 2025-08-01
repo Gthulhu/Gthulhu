@@ -34,6 +34,10 @@ void set_debug(bool enabled) {
     global_obj->rodata->debug = enabled;
 }
 
+void set_builtin_idle(bool enabled) {
+    global_obj->rodata->builtin_idle = enabled;
+}
+
 u64 get_nr_scheduled() {
     return global_obj->bss->nr_scheduled;
 }

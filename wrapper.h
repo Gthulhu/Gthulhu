@@ -52,6 +52,8 @@ void set_kugepagepid(u32 id);
 
 void set_debug(bool enabled);
 
+void set_builtin_idle(bool enabled);
+
 void set_early_processing(bool enabled);
 
 void set_default_slice(u64 t);
