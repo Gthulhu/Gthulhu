@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Gthulhu/Gthulhu/internal/config"
+	"github.com/Gthulhu/Gthulhu/internal/migration"
 	"github.com/Gthulhu/Gthulhu/internal/sched"
 	core "github.com/Gthulhu/scx_goland_core/goland_core"
 	cache "github.com/Gthulhu/scx_goland_core/util"
@@ -138,10 +140,14 @@ func main() {
 
 	log.Println("scheduler started")
 
+	// prevent frequent task migration
+	m := migration.NewTaskMigrationManger()
+
 	for true {
 		select {
 		case <-ctx.Done():
 			log.Println("context done, exiting scheduler loop")
+			m.Done()
 			return
 		default:
 		}
@@ -154,6 +160,17 @@ func main() {
 			err, cpu = bpfModule.SelectCPU(t)
 			if err != nil {
 				log.Printf("SelectCPU failed: %v", err)
+			}
+
+			// prevent frequent task migration
+			if cpu != t.Cpu && m.Do(cpu, t.Cpu, t.SumExecRuntime) {
+				key := fmt.Sprintf("%d-%d", cpu, t.Cpu)
+				if cpu > t.Cpu {
+					key = fmt.Sprintf("%d-%d", t.Cpu, cpu)
+				}
+				if _, ok := topo["L2"][key]; ok {
+					cpu = t.Cpu
+				}
 			}
 
 			// Evaluate used task time slice.
