@@ -10,6 +10,8 @@ github.com/Gthulhu/scx_goland_core v0.2.3-0.20250731141235-8dd7e52ba39a h1:BR8Qz
 github.com/Gthulhu/scx_goland_core v0.2.3-0.20250731141235-8dd7e52ba39a/go.mod h1:2WuCsF+yIieAArKGu3yzfv+KdR71JTNYJfvpYEEtXVk=
 github.com/Gthulhu/scx_goland_core v0.2.3-0.20250801101750-272f6dfe7509 h1:yHDuflgZ79V3Np6m+FeJptMji62UuZoEf74uVaBI0w4=
 github.com/Gthulhu/scx_goland_core v0.2.3-0.20250801101750-272f6dfe7509/go.mod h1:2WuCsF+yIieAArKGu3yzfv+KdR71JTNYJfvpYEEtXVk=
+github.com/Gthulhu/scx_goland_core v0.2.3-0.20250804121020-fef1e6e4e3bf h1:rg7muz586HBWxGVzLEG2l1dH8O8hYtX0VO9jlNue/fw=
+github.com/Gthulhu/scx_goland_core v0.2.3-0.20250804121020-fef1e6e4e3bf/go.mod h1:2WuCsF+yIieAArKGu3yzfv+KdR71JTNYJfvpYEEtXVk=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

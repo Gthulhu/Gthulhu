@@ -89,6 +89,7 @@ struct queued_task_ctx {
 	u64 exec_runtime; /* Total cpu time since last sleep */
 	u64 weight; /* Task static priority */
 	u64 vtime; /* Current task's vruntime */
+	s32 tgid;
 };
 
 /*

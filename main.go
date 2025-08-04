@@ -156,10 +156,6 @@ func main() {
 			bpfModule.BlockTilReadyForDequeue(ctx)
 		} else if t.Pid != -1 {
 			task = core.NewDispatchedTask(t)
-			err, cpu = bpfModule.SelectCPU(t)
-			if err != nil {
-				log.Printf("SelectCPU failed: %v", err)
-			}
 
 			// Evaluate used task time slice.
 			nrWaiting := core.GetNrQueued() + core.GetNrScheduled() + 1
@@ -169,12 +165,16 @@ func main() {
 			customTime := sched.GetTaskExecutionTime(t.Pid)
 			if customTime > 0 {
 				// Use the custom execution time from the scheduling strategy
-				task.SliceNs = customTime
+				task.SliceNs = min(customTime, t.StopTs-t.StartTs)
 			} else {
 				// No custom execution time, use default algorithm
 				task.SliceNs = max(sched.SLICE_NS_DEFAULT/nrWaiting, sched.SLICE_NS_MIN)
 			}
 
+			err, cpu = bpfModule.SelectCPU(t)
+			if err != nil {
+				log.Printf("SelectCPU failed: %v", err)
+			}
 			task.Cpu = cpu
 
 			err = bpfModule.DispatchTask(task)

@@ -811,6 +811,7 @@ static void get_task_info(struct queued_task_ctx *task,
 	task->exec_runtime = tctx ? tctx->exec_runtime : 0;
 	task->weight = p->scx.weight;
 	task->vtime = p->scx.dsq_vtime;
+	task->tgid = p->tgid;
 }
 
 /*

@@ -103,7 +103,7 @@ const SCX_ENQ_PREEMPT = 1 << 32
 
 // ApplySchedulingStrategy applies scheduling strategies to a task
 func ApplySchedulingStrategy(task *core.QueuedTask) bool {
-	if strategy, exists := strategyMap[task.Pid]; exists {
+	if strategy, exists := strategyMap[task.Tgid]; exists {
 		// Apply strategy
 		if strategy.Priority {
 			// Priority tasks get minimum vtime

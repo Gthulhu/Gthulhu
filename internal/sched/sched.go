@@ -37,9 +37,6 @@ func DrainQueuedTask(s *core.Sched) int {
 			QueuedTask: &newQueuedTask,
 			Deadline:   updatedEnqueueTask(s, &newQueuedTask),
 		}
-		if t.QueuedTask.Pid == 168420 {
-			t.Deadline = 0 // Special case for PID 168420
-		}
 		InsertTaskToPool(t)
 		count++
 	}
@@ -64,7 +61,7 @@ func updatedEnqueueTask(s *core.Sched, t *core.QueuedTask) uint64 {
 		t.Vtime += (t.StopTs - t.StartTs) * t.Weight / 100
 	}
 
-	return t.Vtime + min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
+	return 0
 }
 
 func GetPoolCount() int {
