@@ -645,6 +645,10 @@ static void dispatch_task(const struct dispatched_task_ctx *task)
 	 */
 	scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(task->cpu),
 				 task->slice_ns, task->vtime, task->flags);
+	if (task->vtime == 0) {
+		dbg_msg("preempt: pid=%d (%s) cpu=%ld", p->pid, p->comm, task->cpu);
+		scx_bpf_kick_cpu(task->cpu, SCX_KICK_PREEMPT);
+	}
 	__sync_fetch_and_add(&nr_user_dispatches, 1);
 
 	/*

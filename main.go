@@ -142,6 +142,11 @@ func main() {
 	var cpu int32
 
 	log.Println("scheduler started")
+	bss, err := bpfModule.GetBssData()
+	if err != nil {
+		log.Printf("GetBssData failed: %v", err)
+		os.Exit(-1)
+	}
 
 	for true {
 		select {
@@ -175,7 +180,31 @@ func main() {
 			if err != nil {
 				log.Printf("SelectCPU failed: %v", err)
 			}
-			task.Cpu = cpu
+
+			if cpu == core.RL_CPU_ANY && task.Vtime == 0 {
+				// when system is busy, we select the previous CPU to
+				// avoid unnecessary context switches for priority tasks
+				task.Cpu = t.Cpu
+
+				// Record the task dispatch for priority CPU tracking
+				sched.RecordTaskDispatch(t.Pid, task.Cpu)
+			} else if cpu == core.RL_CPU_ANY {
+				// for non-priority tasks,
+				// we select the CPU which is not handling the priority task
+				// Check if we should avoid certain CPUs due to recent priority task usage
+				// Use a reasonable default for CPU count since bpfModule doesn't expose GetNrCpuIds()
+				availableCPUs := sched.GetAvailableCPUsForTask(t.Pid, int32(bss.Nr_online_cpus))
+				if len(availableCPUs) > 0 {
+					// Select the first available CPU that hasn't been recently used by priority tasks
+					// In a more sophisticated implementation, we could use load balancing here
+					task.Cpu = availableCPUs[0]
+				} else {
+					// Fallback to previous CPU if no alternatives are available
+					task.Cpu = cpu
+				}
+			} else {
+				task.Cpu = cpu
+			}
 
 			err = bpfModule.DispatchTask(task)
 			if err != nil {

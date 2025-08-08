@@ -107,8 +107,9 @@ func ApplySchedulingStrategy(task *core.QueuedTask) bool {
 		// Apply strategy
 		if strategy.Priority {
 			// Priority tasks get minimum vtime
-			task.Vtime = minVruntime
-			task.Flags |= SCX_ENQ_PREEMPT
+			task.Vtime = 0
+			// Record that a priority task is being processed
+			// This will be recorded when the task is actually dispatched to a CPU
 		}
 
 		return true
@@ -122,4 +123,14 @@ func GetTaskExecutionTime(pid int32) uint64 {
 		return strategy.ExecutionTime
 	}
 	return 0
+}
+
+// RecordTaskDispatch records when a task is dispatched to a specific CPU
+// This should be called when a task is actually assigned to a CPU
+func RecordTaskDispatch(pid int32, cpu int32) {
+	// Check if this is a priority task
+	if strategy, exists := strategyMap[pid]; exists && strategy.Priority {
+		// Record the CPU usage by the priority task
+		RecordPriorityCPUUsage(cpu, pid)
+	}
 }
