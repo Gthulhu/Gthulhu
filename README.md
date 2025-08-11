@@ -122,6 +122,11 @@ This software is distributed under the terms of the GNU General Public License v
 
 Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
 
+## Community Resources
+
+- [NotebookLM](https://notebooklm.google.com/notebook/89a6a260-3d54-4760-93a2-dcc06c6d8043): includes all of materials used in the project, including the pptx, design documents, and more.
+- [GitHub Discussion](https://github.com/Gthulhu/Gthulhu/discussions): a place for community discussions, questions, and feature requests.
+
 ## Special Thanks
 
 - [scx](https://github.com/sched-ext/scx)
