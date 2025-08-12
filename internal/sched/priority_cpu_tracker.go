@@ -115,14 +115,6 @@ func GetAvailableCPUsForTask(taskPID int32, totalCPUs int32) []int32 {
 		}
 	}
 
-	// If no CPUs are available (all were recently used by priority tasks),
-	// return all CPUs to prevent starvation
-	if len(availableCPUs) == 0 {
-		for cpu := int32(0); cpu < totalCPUs; cpu++ {
-			availableCPUs = append(availableCPUs, cpu)
-		}
-	}
-
 	return availableCPUs
 }
 
