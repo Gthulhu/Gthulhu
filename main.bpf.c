@@ -770,6 +770,14 @@ s32 BPF_STRUCT_OPS(goland_select_cpu, struct task_struct *p, s32 prev_cpu,
 
 }
 
+SEC("syscall")
+int do_preempt(struct preempt_cpu_arg *input)
+{
+	dbg_msg("do_preempt on cpu %d", input->cpu_id);
+	scx_bpf_kick_cpu(input->cpu_id, SCX_KICK_PREEMPT);
+	return 0;
+}
+
 /*
  * Select and wake-up an idle CPU for a specific task from the user-space
  * scheduler.

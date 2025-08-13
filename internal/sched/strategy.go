@@ -107,8 +107,9 @@ func ApplySchedulingStrategy(task *core.QueuedTask) bool {
 		// Apply strategy
 		if strategy.Priority {
 			// Priority tasks get minimum vtime
-			task.Vtime = minVruntime
-			task.Flags |= SCX_ENQ_PREEMPT
+			task.Vtime = 0
+			// Record that a priority task is being processed
+			// This will be recorded when the task is actually dispatched to a CPU
 		}
 
 		return true

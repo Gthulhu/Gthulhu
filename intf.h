@@ -65,6 +65,10 @@ struct task_cpu_arg {
 	u64 flags;
 };
 
+struct preempt_cpu_arg {
+	s32 cpu_id;
+};
+
 /*
  * Specify a sibling CPU relationship for a specific scheduling domain.
  */
