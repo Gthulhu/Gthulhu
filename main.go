@@ -147,6 +147,7 @@ func main() {
 		log.Printf("GetBssData failed: %v", err)
 		os.Exit(-1)
 	}
+	preemptMap := make(map[int32]bool, bss.Nr_online_cpus)
 
 	for true {
 		select {
@@ -170,7 +171,7 @@ func main() {
 			customTime := sched.GetTaskExecutionTime(t.Pid)
 			if customTime > 0 {
 				// Use the custom execution time from the scheduling strategy
-				task.SliceNs = min(customTime, t.StopTs-t.StartTs)
+				task.SliceNs = min(customTime, (t.StopTs-t.StartTs)*11/10)
 			} else {
 				// No custom execution time, use default algorithm
 				task.SliceNs = max(sched.SLICE_NS_DEFAULT/nrWaiting, sched.SLICE_NS_MIN)
@@ -181,29 +182,20 @@ func main() {
 				log.Printf("SelectCPU failed: %v", err)
 			}
 
+			needPreempt := false
 			if cpu == core.RL_CPU_ANY && task.Vtime == 0 {
 				// when system is busy, we select the previous CPU to
 				// avoid unnecessary context switches for priority tasks
 				task.Cpu = t.Cpu
-
-				// Record the task dispatch for priority CPU tracking
-				sched.RecordTaskDispatch(t.Pid, task.Cpu)
-			} else if cpu == core.RL_CPU_ANY {
-				// for non-priority tasks,
-				// we select the CPU which is not handling the priority task
-				// Check if we should avoid certain CPUs due to recent priority task usage
-				// Use a reasonable default for CPU count since bpfModule doesn't expose GetNrCpuIds()
-				availableCPUs := sched.GetAvailableCPUsForTask(t.Pid, int32(bss.Nr_online_cpus))
-				if len(availableCPUs) > 0 {
-					// Select the first available CPU that hasn't been recently used by priority tasks
-					// In a more sophisticated implementation, we could use load balancing here
-					task.Cpu = availableCPUs[0]
-				} else {
-					// Fallback to previous CPU if no alternatives are available
-					task.Cpu = cpu
-				}
-			} else {
-				task.Cpu = cpu
+				needPreempt = true
+			}
+			if task.Vtime == 0 &&
+				preemptMap[task.Cpu] == false &&
+				needPreempt {
+				bpfModule.PreemptCpu(task.Cpu)
+				preemptMap[task.Cpu] = true
+			} else if cpu != core.RL_CPU_ANY {
+				preemptMap[task.Cpu] = false
 			}
 
 			err = bpfModule.DispatchTask(task)

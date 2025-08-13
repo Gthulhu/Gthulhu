@@ -645,10 +645,6 @@ static void dispatch_task(const struct dispatched_task_ctx *task)
 	 */
 	scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(task->cpu),
 				 task->slice_ns, task->vtime, task->flags);
-	if (task->vtime == 0) {
-		dbg_msg("preempt: pid=%d (%s) cpu=%ld", p->pid, p->comm, task->cpu);
-		scx_bpf_kick_cpu(task->cpu, SCX_KICK_PREEMPT);
-	}
 	__sync_fetch_and_add(&nr_user_dispatches, 1);
 
 	/*
@@ -772,6 +768,14 @@ s32 BPF_STRUCT_OPS(goland_select_cpu, struct task_struct *p, s32 prev_cpu,
 	 */
 	return is_wake_sync(wake_flags) ? bpf_get_smp_processor_id() : prev_cpu;
 
+}
+
+SEC("syscall")
+int do_preempt(struct preempt_cpu_arg *input)
+{
+	dbg_msg("do_preempt on cpu %d", input->cpu_id);
+	scx_bpf_kick_cpu(input->cpu_id, SCX_KICK_PREEMPT);
+	return 0;
 }
 
 /*
