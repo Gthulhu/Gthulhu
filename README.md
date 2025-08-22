@@ -11,6 +11,12 @@ The scheduler consists of two main components:
 1. A BPF component that implements low-level sched-ext functionalities
 2. A user-space scheduler written in Go with [scx_goland_core](https://github.com/Gthulhu/scx_goland_core) that implements the actual scheduling policy
 
+## DEMO
+
+Click the image below to see our DEMO on YouTube!
+
+[![IMAGE ALT TEXT HERE](https://i9.ytimg.com/vi_webp/MfU64idQcHg/maxresdefault.webp?v=68a87b87&sqp=CJSAosUG&rs=AOn4CLAUmD1L7X1GDSryOvd0y4F3IF2Tpw)](https://www.youtube.com/watch?v=MfU64idQcHg)
+
 ## Key Features
 
 - Virtual runtime (vruntime) based scheduling
