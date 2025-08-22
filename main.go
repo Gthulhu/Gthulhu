@@ -34,9 +34,8 @@ func main() {
 		cfg.Scheduler.SliceNsMin,
 	)
 
-	schedConfig = cfg.GetSchedulerConfig()
 	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
-		schedConfig.SliceNsDefault, schedConfig.SliceNsMin)
+		sched.SLICE_NS_DEFAULT, sched.SLICE_NS_MIN)
 
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
@@ -142,12 +141,6 @@ func main() {
 	var cpu int32
 
 	log.Println("scheduler started")
-	bss, err := bpfModule.GetBssData()
-	if err != nil {
-		log.Printf("GetBssData failed: %v", err)
-		os.Exit(-1)
-	}
-	preemptMap := make(map[int32]bool, bss.Nr_online_cpus)
 
 	for true {
 		select {
@@ -181,22 +174,7 @@ func main() {
 			if err != nil {
 				log.Printf("SelectCPU failed: %v", err)
 			}
-
-			needPreempt := false
-			if cpu == core.RL_CPU_ANY && task.Vtime == 0 {
-				// when system is busy, we select the previous CPU to
-				// avoid unnecessary context switches for priority tasks
-				task.Cpu = t.Cpu
-				needPreempt = true
-			}
-			if task.Vtime == 0 &&
-				preemptMap[task.Cpu] == false &&
-				needPreempt {
-				bpfModule.PreemptCpu(task.Cpu)
-				preemptMap[task.Cpu] = true
-			} else if cpu != core.RL_CPU_ANY {
-				preemptMap[task.Cpu] = false
-			}
+			task.Cpu = cpu
 
 			err = bpfModule.DispatchTask(task)
 			if err != nil {

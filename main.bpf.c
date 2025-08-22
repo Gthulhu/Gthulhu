@@ -182,6 +182,26 @@ struct {
 } dispatched SEC(".maps");
 
 /*
+ * Map to track PIDs with vtime==0 (priority tasks).
+ *
+ * This hashmap stores PIDs as both key and value for tasks that have
+ * vtime set to 0, indicating they are high priority tasks.
+ */
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, u32);    /* PID */
+	__type(value, u8);   /* Dummy value (1 indicates present) */
+	__uint(max_entries, MAX_ENQUEUED_TASKS);
+} priority_tasks SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, s32);    /* CPU */
+	__type(value, u32);   /* PID */
+	__uint(max_entries, MAX_CPUS);
+} running_task SEC(".maps");
+
+/*
  * Per-CPU context.
  */
 struct cpu_ctx {
@@ -400,6 +420,20 @@ static u64 cpu_to_dsq(s32 cpu)
 		return SHARED_DSQ;
 	}
 	return (u64)cpu;
+}
+
+/*
+ * Helper function to update priority tasks map based on vtime.
+ * If vtime == 0, add PID to map. If vtime != 0, remove PID from map.
+ */
+static void update_priority_task_map(u32 pid, u64 vtime)
+{
+	if (vtime == 0) {
+		u8 val = 1;
+		bpf_map_update_elem(&priority_tasks, &pid, &val, BPF_ANY);
+	} else {
+		bpf_map_delete_elem(&priority_tasks, &pid);
+	}
 }
 
 /*
@@ -643,8 +677,10 @@ static void dispatch_task(const struct dispatched_task_ctx *task)
 	 * Dispatch a task to a target CPU selected by the user-space
 	 * scheduler.
 	 */
-	scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(task->cpu),
+	update_priority_task_map(task->pid, task->vtime);
+		scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(task->cpu),
 				 task->slice_ns, task->vtime, task->flags);
+	
 	__sync_fetch_and_add(&nr_user_dispatches, 1);
 
 	/*
@@ -772,8 +808,7 @@ s32 BPF_STRUCT_OPS(goland_select_cpu, struct task_struct *p, s32 prev_cpu,
 
 SEC("syscall")
 int do_preempt(struct preempt_cpu_arg *input)
-{
-	dbg_msg("do_preempt on cpu %d", input->cpu_id);
+{	
 	scx_bpf_kick_cpu(input->cpu_id, SCX_KICK_PREEMPT);
 	return 0;
 }
@@ -862,12 +897,41 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 	 * starvation on user space scheduler goroutine(s).
 	 */
 	if (is_belong_usersched_task(p)) {
-		scx_bpf_dsq_insert_vtime(p, SCHED_DSQ+1, SCX_SLICE_INF, 0, enq_flags | SCX_ENQ_PREEMPT);
+		scx_bpf_dsq_insert(p, SCHED_DSQ, SCX_SLICE_INF, SCX_ENQ_HEAD);
 		s32 prev_cpu;
 		prev_cpu = scx_bpf_task_cpu(p);
 		kick_task_cpu(p, prev_cpu);
 		return;
 	}
+
+	u8* elem;
+	u32 pid = p->pid;
+	s32 prio_cpu = -EBUSY;
+	u64 prio_enq_flags = SCX_ENQ_PREEMPT;
+	u32* cur_pid_val;
+    u32 cur_pid;
+
+	elem = bpf_map_lookup_elem(&priority_tasks, &pid);
+	if (elem) {
+		prio_cpu = scx_bpf_pick_idle_cpu(p->cpus_ptr, 0);
+		if (prio_cpu == -EBUSY) {
+			prio_cpu = scx_bpf_task_cpu(p);
+		}
+		if (prio_cpu >= 0) {
+			cur_pid_val = bpf_map_lookup_elem(&running_task, &prio_cpu);
+			if (cur_pid_val) {
+				cur_pid = *cur_pid_val;
+				elem = bpf_map_lookup_elem(&priority_tasks, &cur_pid);
+				if (elem) {
+					prio_enq_flags = SCX_ENQ_HEAD;
+				}
+			}
+			scx_bpf_dsq_insert(p, SCX_DSQ_LOCAL_ON | prio_cpu,
+				default_slice, prio_enq_flags);
+			return;
+		}
+	}
+
 
 	/*
 	 * Always dispatch per-CPU kthreads directly on their target CPU.
@@ -879,7 +943,7 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 	if (is_kthread(p) && p->nr_cpus_allowed == 1 && early_processing) {
 		cpu = scx_bpf_task_cpu(p);
                 scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(cpu),
-					 default_slice, p->scx.dsq_vtime, enq_flags | SCX_ENQ_PREEMPT);
+					 default_slice, p->scx.dsq_vtime, enq_flags);
 		__sync_fetch_and_add(&nr_kernel_dispatches, 1);
 		return;
 	}
@@ -952,7 +1016,7 @@ static void dispatch_user_scheduler(void)
 	 * The user-space scheduler will voluntarily yield the CPU upon
 	 * completion through BpfScheduler->notify_complete().
 	 */
-	scx_bpf_dsq_insert(p, SCHED_DSQ, SCX_SLICE_INF, 0);
+	scx_bpf_dsq_insert(p, SCHED_DSQ, default_slice, SCX_ENQ_HEAD);
 
 	bpf_task_release(p);
 }
@@ -1012,9 +1076,6 @@ void BPF_STRUCT_OPS(goland_dispatch, s32 cpu, struct task_struct *prev)
 	if (scx_bpf_dsq_move_to_local(SHARED_DSQ))
 		return;
 
-	if (scx_bpf_dsq_move_to_local(SCHED_DSQ+1))
-		return;
-
 	/*
 	 * Lastly, consume and dispatch the user-space scheduler.
 	 */
@@ -1066,6 +1127,9 @@ void BPF_STRUCT_OPS(goland_running, struct task_struct *p)
 		usersched_last_run_at = scx_bpf_now();
 		return;
 	}
+
+	u32 pid = p->pid;
+	bpf_map_update_elem(&running_task, &cpu, &pid, BPF_ANY);
 
 	dbg_msg("start: pid=%d (%s) cpu=%ld", p->pid, p->comm, cpu);
 
@@ -1121,7 +1185,7 @@ void BPF_STRUCT_OPS(goland_cpu_release, s32 cpu,
 	 * re-schedule it immediately.
 	 */
 	dbg_msg("cpu preemption: pid=%d (%s)", p->pid, p->comm);
-	if (is_usersched_task(p))
+	if (is_belong_usersched_task(p))
 		set_usersched_needed();
 }
 
@@ -1293,12 +1357,6 @@ static int dsq_init(void)
 		return err;
 	}
 
-	err = scx_bpf_create_dsq(SCHED_DSQ+1, -1);
-	if (err) {
-		scx_bpf_error("failed to create shared DSQ for user sched: %d", err);
-		return err;
-	}
-
 	/* Create the scheduler's DSQ */
 	err = scx_bpf_create_dsq(SCHED_DSQ, -1);
 	if (err) {
@@ -1392,6 +1450,18 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(goland_init)
 }
 
 /*
+ * A task is being destroyed.
+ *
+ * Clean up the task from priority tasks map.
+ */
+void BPF_STRUCT_OPS(goland_exit_task, struct task_struct *p,
+		    struct scx_exit_task_args *args)
+{
+	/* Remove task from priority tasks map */
+	update_priority_task_map(p->pid, 1);
+}
+
+/*
  * Unregister the scheduling class.
  */
 void BPF_STRUCT_OPS(goland_exit, struct scx_exit_info *ei)
@@ -1412,6 +1482,7 @@ SCX_OPS_DEFINE(goland,
 	       .cpu_release		= (void *)goland_cpu_release,
 	       .enable			= (void *)goland_enable,
 	       .init_task		= (void *)goland_init_task,
+	       .exit_task		= (void *)goland_exit_task,
 	       .init			= (void *)goland_init,
 	       .exit			= (void *)goland_exit,
 	       .timeout_ms		= 5000,

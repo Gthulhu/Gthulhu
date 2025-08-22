@@ -44,6 +44,9 @@ typedef int pid_t;
  * cpu_map that is used to store the idle state and CPU ownership).
  */
 #define MAX_CPUS 1024
+#define SCX_DSQ_LOCAL_ON 13835058055282163712ULL
+#define SCX_ENQ_PREEMPT 4294967296ULL
+#define SCX_ENQ_HEAD 16ULL
 
 /* Special dispatch flags */
 enum {
