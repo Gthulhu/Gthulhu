@@ -34,9 +34,8 @@ func main() {
 		cfg.Scheduler.SliceNsMin,
 	)
 
-	schedConfig = cfg.GetSchedulerConfig()
 	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
-		schedConfig.SliceNsDefault, schedConfig.SliceNsMin)
+		sched.SLICE_NS_DEFAULT, sched.SLICE_NS_MIN)
 
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
@@ -165,7 +164,7 @@ func main() {
 			customTime := sched.GetTaskExecutionTime(t.Pid)
 			if customTime > 0 {
 				// Use the custom execution time from the scheduling strategy
-				task.SliceNs = min(customTime, t.StopTs-t.StartTs)
+				task.SliceNs = min(customTime, (t.StopTs-t.StartTs)*11/10)
 			} else {
 				// No custom execution time, use default algorithm
 				task.SliceNs = max(sched.SLICE_NS_DEFAULT/nrWaiting, sched.SLICE_NS_MIN)
