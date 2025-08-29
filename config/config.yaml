@@ -3,14 +3,15 @@
 
 scheduler:
   # Default time slice in nanoseconds (default: 5000000 = 5ms)
-  slice_ns_default: 20000000
+  slice_ns_default: 5000000
   
   # Minimum time slice in nanoseconds (default: 500000 = 0.5ms)
   slice_ns_min: 500000
 api:
-  enabled: false
+  enabled: true
   url: http://127.0.0.1:8080
   interval: 5
-debug: false
+  public_key_path: ./api/config/jwt_public_key.pem
+debug: true
 early_processing: false
 builtin_idle: false

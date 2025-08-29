@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Gthulhu/Gthulhu/internal/config"
+	"github.com/Gthulhu/Gthulhu/internal/metrics"
 	"github.com/Gthulhu/Gthulhu/internal/sched"
 	core "github.com/Gthulhu/scx_goland_core/goland_core"
 	cache "github.com/Gthulhu/scx_goland_core/util"
@@ -86,11 +87,23 @@ func main() {
 
 	// Start scheduling strategy fetcher
 	apiConfig := cfg.GetApiConfig()
+	var metricsClient *metrics.MetricsClient
+
 	if apiConfig.Enabled {
-		apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
-		log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
-		sched.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
-		log.Printf("Started scheduling strategy fetcher with interval %d seconds", apiConfig.Interval)
+		// Initialize JWT client for API authentication
+		jwtClient, err := sched.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize JWT client: %v", err)
+			log.Printf("Scheduling strategy fetcher and metrics reporting will be disabled")
+		} else {
+			// Initialize metrics client
+			metricsClient = metrics.NewMetricsClient(jwtClient, apiConfig.Url)
+
+			apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
+			log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
+			sched.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
+			log.Printf("Started scheduling strategy fetcher with JWT authentication, interval %d seconds", apiConfig.Interval)
+		}
 	}
 
 	signalChan := make(chan os.Signal, 1)
@@ -116,6 +129,25 @@ func main() {
 							log.Printf("json.Marshal failed: %v", err)
 						} else {
 							log.Printf("bss data: %s", string(b))
+
+							// Send metrics to API server if metrics client is available
+							if metricsClient != nil {
+								// Convert BSS data to metrics format
+								metricsData := metrics.BssData{
+									UserschedLastRunAt: bss.Usersched_last_run_at,
+									NrQueued:           bss.Nr_queued,
+									NrScheduled:        bss.Nr_scheduled,
+									NrRunning:          bss.Nr_running,
+									NrOnlineCpus:       bss.Nr_online_cpus,
+									NrUserDispatches:   bss.Nr_user_dispatches,
+									NrKernelDispatches: bss.Nr_kernel_dispatches,
+									NrCancelDispatches: bss.Nr_cancel_dispatches,
+									NrBounceDispatches: bss.Nr_bounce_dispatches,
+									NrFailedDispatches: bss.Nr_failed_dispatches,
+									NrSchedCongested:   bss.Nr_sched_congested,
+								}
+								metricsClient.SendMetricsAsync(metricsData)
+							}
 						}
 					}
 				}

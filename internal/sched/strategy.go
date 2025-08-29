@@ -3,11 +3,12 @@ package sched
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"time"
 
+	"github.com/Gthulhu/Gthulhu/internal/auth"
 	core "github.com/Gthulhu/scx_goland_core/goland_core"
 )
 
@@ -29,9 +30,27 @@ type SchedulingStrategiesResponse struct {
 // strategyMap maps PIDs to their scheduling strategies
 var strategyMap = make(map[int32]SchedulingStrategy)
 
-// FetchSchedulingStrategies fetches scheduling strategies from the API server
+// jwtClient for authenticated API requests
+var jwtClient *auth.JWTClient
+
+// InitJWTClient initializes the JWT client for API authentication
+func InitJWTClient(publicKeyPath, apiBaseURL string) (*auth.JWTClient, error) {
+	jwtClient = auth.NewJWTClient(publicKeyPath, apiBaseURL)
+	return jwtClient, nil
+}
+
+// GetJWTClient returns the current JWT client instance
+func GetJWTClient() *auth.JWTClient {
+	return jwtClient
+}
+
+// FetchSchedulingStrategies fetches scheduling strategies from the API server with JWT authentication
 func FetchSchedulingStrategies(apiUrl string) ([]SchedulingStrategy, error) {
-	resp, err := http.Get(apiUrl)
+	if jwtClient == nil {
+		return nil, fmt.Errorf("JWT client not initialized")
+	}
+
+	resp, err := jwtClient.MakeAuthenticatedRequest("GET", apiUrl, nil)
 	if err != nil {
 		return nil, err
 	}

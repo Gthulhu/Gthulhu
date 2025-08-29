@@ -15,9 +15,10 @@ type SchedulerConfig struct {
 
 // ApiConfig represents API-specific configuration
 type ApiConfig struct {
-	Url      string `yaml:"url"`
-	Interval int    `yaml:"interval"`          // Interval in seconds
-	Enabled  bool   `yaml:"enabled,omitempty"` // Optional flag to enable/disable API
+	Url           string `yaml:"url"`
+	Interval      int    `yaml:"interval"`          // Interval in seconds
+	Enabled       bool   `yaml:"enabled,omitempty"` // Optional flag to enable/disable API
+	PublicKeyPath string `yaml:"public_key_path"`   // Path to JWT public key for authentication
 }
 
 // Config represents the application configuration
@@ -39,8 +40,9 @@ func DefaultConfig() *Config {
 			SliceNsMin:     500 * 1000,  // 0.5ms
 		},
 		Api: ApiConfig{
-			Url:      "http://localhost:8080",
-			Interval: 10,
+			Url:           "http://localhost:8080",
+			Interval:      10,
+			PublicKeyPath: "./api/jwt_public_key.pem", // Default path to public key
 		},
 	}
 }
