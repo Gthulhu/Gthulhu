@@ -190,7 +190,7 @@ struct {
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__type(key, u32);    /* PID */
-	__type(value, u8);   /* Dummy value (1 indicates present) */
+	__type(value, u64);   /* time slice */
 	__uint(max_entries, MAX_ENQUEUED_TASKS);
 } priority_tasks SEC(".maps");
 
@@ -426,11 +426,10 @@ static u64 cpu_to_dsq(s32 cpu)
  * Helper function to update priority tasks map based on vtime.
  * If vtime == 0, add PID to map. If vtime != 0, remove PID from map.
  */
-static void update_priority_task_map(u32 pid, u64 vtime)
+static void update_priority_task_map(u32 pid, u64 vtime, u64 slice)
 {
 	if (vtime == 0) {
-		u8 val = 1;
-		bpf_map_update_elem(&priority_tasks, &pid, &val, BPF_ANY);
+		bpf_map_update_elem(&priority_tasks, &pid, &slice, BPF_ANY);
 	} else {
 		bpf_map_delete_elem(&priority_tasks, &pid);
 	}
@@ -677,11 +676,22 @@ static void dispatch_task(const struct dispatched_task_ctx *task)
 	 * Dispatch a task to a target CPU selected by the user-space
 	 * scheduler.
 	 */
-	update_priority_task_map(task->pid, task->vtime);
+	if (task->vtime) {
 		scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(task->cpu),
-				 task->slice_ns, task->vtime, task->flags);
-	
-	__sync_fetch_and_add(&nr_user_dispatches, 1);
+				task->slice_ns, task->vtime, task->flags);
+		__sync_fetch_and_add(&nr_user_dispatches, 1);
+	} else {
+		s32 cur_pid;
+		u64* elem;
+		cur_pid = task->pid;
+		elem = bpf_map_lookup_elem(&priority_tasks, &cur_pid);
+		if (!elem){
+			scx_bpf_dsq_insert_vtime(p, cpu_to_dsq(task->cpu),
+				task->slice_ns, task->vtime, task->flags);
+			__sync_fetch_and_add(&nr_user_dispatches, 1);
+		}
+	}
+	update_priority_task_map(task->pid, task->vtime, task->slice_ns);
 
 	/*
 	 * If the cpumask is not valid anymore, ignore the dispatch event.
@@ -904,35 +914,6 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 		return;
 	}
 
-	u8* elem;
-	u32 pid = p->pid;
-	s32 prio_cpu = -EBUSY;
-	u64 prio_enq_flags = SCX_ENQ_PREEMPT;
-	u32* cur_pid_val;
-    u32 cur_pid;
-
-	elem = bpf_map_lookup_elem(&priority_tasks, &pid);
-	if (elem) {
-		prio_cpu = scx_bpf_pick_idle_cpu(p->cpus_ptr, 0);
-		if (prio_cpu == -EBUSY) {
-			prio_cpu = scx_bpf_task_cpu(p);
-		}
-		if (prio_cpu >= 0) {
-			cur_pid_val = bpf_map_lookup_elem(&running_task, &prio_cpu);
-			if (cur_pid_val) {
-				cur_pid = *cur_pid_val;
-				elem = bpf_map_lookup_elem(&priority_tasks, &cur_pid);
-				if (elem) {
-					prio_enq_flags = SCX_ENQ_HEAD;
-				}
-			}
-			scx_bpf_dsq_insert(p, SCX_DSQ_LOCAL_ON | prio_cpu,
-				default_slice, prio_enq_flags);
-			return;
-		}
-	}
-
-
 	/*
 	 * Always dispatch per-CPU kthreads directly on their target CPU.
 	 *
@@ -966,6 +947,38 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 		if (dispatched) {
 			scx_bpf_kick_cpu(cpu, SCX_KICK_IDLE);
 			return;
+		}
+	}
+
+	u64* elem;
+	u64 slice;
+	u32 pid = p->pid;
+	s32 prio_cpu = -EBUSY;
+	u64 prio_enq_flags = SCX_ENQ_PREEMPT;
+	u32* cur_pid_val;
+    u32 cur_pid;
+
+	elem = bpf_map_lookup_elem(&priority_tasks, &pid);
+	if (elem) {
+		prio_cpu = scx_bpf_pick_idle_cpu(p->cpus_ptr, 0);
+		if (prio_cpu == -EBUSY) {
+			prio_cpu = scx_bpf_task_cpu(p);
+		}
+		slice = *elem;
+		if (prio_cpu >= 0) {
+			cur_pid_val = bpf_map_lookup_elem(&running_task, &prio_cpu);
+			if (cur_pid_val) {
+				cur_pid = *cur_pid_val;
+				elem = bpf_map_lookup_elem(&priority_tasks, &cur_pid);
+				// If current running task is prioritized, do not preempt it (SCX_ENQ_HEAD).
+				// Otherwise, keep the flag equals to SCX_ENQ_PREEMPT
+				if (elem) {
+					prio_enq_flags = SCX_ENQ_HEAD;
+				}
+			}
+			scx_bpf_dsq_insert(p, SCX_DSQ_LOCAL_ON | prio_cpu,
+				slice, prio_enq_flags);
+			__sync_fetch_and_add(&nr_user_dispatches, 1);
 		}
 	}
 
@@ -1458,7 +1471,7 @@ void BPF_STRUCT_OPS(goland_exit_task, struct task_struct *p,
 		    struct scx_exit_task_args *args)
 {
 	/* Remove task from priority tasks map */
-	update_priority_task_map(p->pid, 1);
+	update_priority_task_map(p->pid, 1, 0);
 }
 
 /*
