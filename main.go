@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/Gthulhu/Gthulhu/internal/config"
-	"github.com/Gthulhu/Gthulhu/internal/metrics"
-	"github.com/Gthulhu/Gthulhu/internal/sched"
+	"github.com/Gthulhu/plugin/models"
+	"github.com/Gthulhu/plugin/plugin/gthulhu"
 	core "github.com/Gthulhu/scx_goland_core/goland_core"
 	cache "github.com/Gthulhu/scx_goland_core/util"
 )
@@ -30,16 +30,19 @@ func main() {
 
 	// Apply scheduler configuration before loading eBPF program
 	schedConfig := cfg.GetSchedulerConfig()
-	sched.SetSchedulerConfig(
-		cfg.Scheduler.SliceNsDefault,
-		cfg.Scheduler.SliceNsMin,
-	)
+
+	plugin := gthulhu.NewGthulhuPlugin(cfg.Scheduler.SliceNsDefault,
+		cfg.Scheduler.SliceNsMin)
+
+	SLICE_NS_DEFAULT, SLICE_NS_MIN := gthulhu.GetSchedulerConfig()
 
 	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
-		sched.SLICE_NS_DEFAULT, sched.SLICE_NS_MIN)
+		SLICE_NS_DEFAULT, SLICE_NS_MIN)
 
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
+
+	bpfModule.SetPlugin(plugin)
 
 	if cfg.IsDebugEnabled() {
 		log.Println("Debug mode enabled")
@@ -87,21 +90,21 @@ func main() {
 
 	// Start scheduling strategy fetcher
 	apiConfig := cfg.GetApiConfig()
-	var metricsClient *metrics.MetricsClient
+	var metricsClient *gthulhu.MetricsClient
 
 	if apiConfig.Enabled {
 		// Initialize JWT client for API authentication
-		jwtClient, err := sched.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
+		jwtClient, err := gthulhu.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
 		if err != nil {
 			log.Printf("Warning: Failed to initialize JWT client: %v", err)
 			log.Printf("Scheduling strategy fetcher and metrics reporting will be disabled")
 		} else {
 			// Initialize metrics client
-			metricsClient = metrics.NewMetricsClient(jwtClient, apiConfig.Url)
+			metricsClient = gthulhu.NewMetricsClient(jwtClient, apiConfig.Url)
 
 			apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
 			log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
-			sched.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
+			gthulhu.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
 			log.Printf("Started scheduling strategy fetcher with JWT authentication, interval %d seconds", apiConfig.Interval)
 		}
 	}
@@ -133,7 +136,7 @@ func main() {
 							// Send metrics to API server if metrics client is available
 							if metricsClient != nil {
 								// Convert BSS data to metrics format
-								metricsData := metrics.BssData{
+								metricsData := gthulhu.BssData{
 									UserschedLastRunAt: bss.Usersched_last_run_at,
 									NrQueued:           bss.Nr_queued,
 									NrScheduled:        bss.Nr_scheduled,
@@ -168,7 +171,7 @@ func main() {
 		}
 	}()
 
-	var t *core.QueuedTask
+	var t *models.QueuedTask
 	var task *core.DispatchedTask
 	var cpu int32
 
@@ -181,8 +184,8 @@ func main() {
 			return
 		default:
 		}
-		sched.DrainQueuedTask(bpfModule)
-		t = sched.GetTaskFromPool()
+		bpfModule.DrainQueuedTask()
+		t = bpfModule.SelectQueuedTask()
 		if t == nil {
 			bpfModule.BlockTilReadyForDequeue(ctx)
 		} else if t.Pid != -1 {
@@ -193,13 +196,13 @@ func main() {
 			task.Vtime = t.Vtime
 
 			// Check if a custom execution time was set by a scheduling strategy
-			customTime := sched.GetTaskExecutionTime(t.Pid)
+			customTime := bpfModule.DetermineTimeSlice(t)
 			if customTime > 0 {
 				// Use the custom execution time from the scheduling strategy
 				task.SliceNs = min(customTime, (t.StopTs-t.StartTs)*11/10)
 			} else {
 				// No custom execution time, use default algorithm
-				task.SliceNs = max(sched.SLICE_NS_DEFAULT/nrWaiting, sched.SLICE_NS_MIN)
+				task.SliceNs = max(SLICE_NS_DEFAULT/nrWaiting, SLICE_NS_MIN)
 			}
 
 			err, cpu = bpfModule.SelectCPU(t)
@@ -214,7 +217,7 @@ func main() {
 				continue
 			}
 
-			err = core.NotifyComplete(uint64(sched.GetPoolCount()))
+			err = core.NotifyComplete(bpfModule.GetPoolCount())
 			if err != nil {
 				log.Printf("NotifyComplete failed: %v", err)
 			}
