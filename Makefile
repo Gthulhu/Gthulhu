@@ -80,3 +80,30 @@ clean:
 	rm *.skeleton.h || true
 	rm *.ll *.o || true
 	rm main || true
+
+# Snap packaging targets
+.PHONY: snap
+snap:
+	@echo "Building snap package..."
+	@if ! command -v snapcraft >/dev/null 2>&1; then \
+		echo "Error: snapcraft not installed. Install with: sudo snap install snapcraft --classic"; \
+		exit 1; \
+	fi
+	snapcraft
+
+.PHONY: snap-clean
+snap-clean:
+	@if command -v snapcraft >/dev/null 2>&1; then \
+		snapcraft clean; \
+	fi
+	rm -f *.snap
+
+.PHONY: snap-install
+snap-install: snap
+	@echo "Installing snap package locally..."
+	sudo snap install --dangerous gthulhu_*.snap
+
+.PHONY: snap-test
+snap-test:
+	@echo "Running snap build test..."
+	./scripts/test-snap-build.sh
