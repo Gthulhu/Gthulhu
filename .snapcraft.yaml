@@ -1,0 +1,21 @@
+# Snapcraft build configuration
+# This file configures automatic building on snapcraft.io
+
+name: gthulhu
+adopt-info: gthulhu
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+channels:
+  # Automatically publish to edge on every commit
+  edge:
+    branch: main
+  # Manually promote to other channels
+  beta:
+    branch: null
+  candidate:
+    branch: null
+  stable:
+    branch: null

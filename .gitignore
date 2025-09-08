@@ -6,3 +6,10 @@ output
 *.skeleton.h
 main
 libwrapper.a
+
+# Snap build artifacts
+*.snap
+snap/.snapcraft/
+prime/
+stage/
+parts/

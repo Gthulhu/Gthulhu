@@ -33,7 +33,24 @@ The scheduling policy is based on virtual runtime:
 - Tasks are dispatched from lowest to highest vruntime
 - Latency-sensitive tasks receive priority boost based on voluntary context switches
 
-## Building
+## Installation
+
+### Option 1: Install from Snap Store (Recommended for Ubuntu 25.04+)
+
+```bash
+# Install from the stable channel
+sudo snap install gthulhu
+
+# Or install from edge channel for latest development version
+sudo snap install gthulhu --edge
+
+# Run the scheduler
+sudo snap run gthulhu
+```
+
+For detailed snap installation and usage instructions, see [docs/SNAP.md](docs/SNAP.md).
+
+### Option 2: Build from Source
 
 Prerequisites:
 - Go 1.22+

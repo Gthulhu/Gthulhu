@@ -1,0 +1,121 @@
+name: gthulhu
+base: core24
+version: '1.0.0'
+summary: Linux sched_ext scheduler for cloud-native workloads
+description: |
+  Gthulhu is a Linux scheduler extension that optimizes cloud-native workloads
+  using eBPF for kernel-level scheduling and Go for user-space policy implementation.
+  
+  This is a hybrid scheduler architecture with priority-aware task scheduling
+  that implements virtual runtime (vruntime) based scheduling, latency-sensitive
+  task prioritization, dynamic time slice adjustment, and CPU topology aware
+  task placement.
+  
+  Requires Linux kernel 6.12+ with sched_ext support enabled.
+  
+  **Warning**: This scheduler requires classic confinement and root privileges
+  to load BPF programs and interact with the kernel scheduler. Use with caution
+  in production environments.
+
+website: https://github.com/Gthulhu/Gthulhu
+source-code: https://github.com/Gthulhu/Gthulhu
+issues: https://github.com/Gthulhu/Gthulhu/issues
+license: GPL-2.0
+
+grade: stable
+confinement: classic
+
+architectures:
+  - build-on: amd64
+    build-for: amd64
+  - build-on: arm64
+    build-for: arm64
+
+apps:
+  gthulhu:
+    command: bin/launcher.sh
+    environment:
+      PATH: $SNAP/bin:$SNAP/usr/bin:$PATH
+      LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET:$LD_LIBRARY_PATH
+
+parts:
+  gthulhu:
+    plugin: nil
+    source: .
+    build-packages:
+      - gcc
+      - clang-17
+      - llvm-17
+      - libbpf-dev
+      - libelf-dev
+      - zlib1g-dev
+      - libzstd-dev
+      - pkg-config
+      - git
+      - python3
+      - python3-pip
+      - meson
+      - ninja-build
+      - make
+      - bpftool
+    stage-packages:
+      - libbpf1
+      - libelf1
+      - zlib1g
+      - libzstd1
+    override-build: |
+      set -e
+      
+      # Set up Go environment
+      export GOPATH=$CRAFT_PART_BUILD/go
+      export PATH=$GOPATH/bin:/snap/go/current/bin:$PATH
+      
+      # Initialize and update submodules
+      git submodule init
+      git submodule sync  
+      git submodule update
+      
+      # Build dependencies
+      make dep
+      
+      # Build scx dependencies
+      cd scx
+      meson setup build --prefix=$CRAFT_PART_INSTALL
+      meson compile -C build
+      cd ..
+      
+      # Build libbpfgo
+      cd libbpfgo
+      make
+      cd ..
+      
+      # Build the main application
+      make build
+      
+      # Install binary and launcher
+      mkdir -p $CRAFT_PART_INSTALL/bin
+      cp main $CRAFT_PART_INSTALL/bin/gthulhu
+      cp snap/local/launcher.sh $CRAFT_PART_INSTALL/bin/launcher.sh
+      chmod +x $CRAFT_PART_INSTALL/bin/launcher.sh
+      
+      # Install configuration
+      mkdir -p $CRAFT_PART_INSTALL/etc/gthulhu
+      cp config/config.yaml $CRAFT_PART_INSTALL/etc/gthulhu/
+      
+      # Install any required BPF objects or other assets
+      if [ -f "*.bpf.o" ]; then
+        mkdir -p $CRAFT_PART_INSTALL/lib/gthulhu
+        cp *.bpf.o $CRAFT_PART_INSTALL/lib/gthulhu/ || true
+      fi
+
+build-packages:
+  - golang-go
+
+plugs:
+  kernel-module-control:
+  system-observe:
+  hardware-observe:
+  process-control:
+  mount-observe:
+  network:
+  network-bind:
