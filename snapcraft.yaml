@@ -25,10 +25,12 @@ license: GPL-2.0
 grade: stable
 confinement: classic
 
-architectures:
-  - build-on: amd64
+platforms:
+  amd64:
+    build-on: amd64
     build-for: amd64
-  - build-on: arm64
+  arm64:
+    build-on: arm64
     build-for: arm64
 
 apps:
@@ -37,6 +39,14 @@ apps:
     environment:
       PATH: $SNAP/bin:$SNAP/usr/bin:$PATH
       LD_LIBRARY_PATH: $SNAP/lib:$SNAP/usr/lib:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET:$LD_LIBRARY_PATH
+    plugs:
+      - kernel-module-control
+      - system-observe
+      - hardware-observe
+      - process-control
+      - mount-observe
+      - network
+      - network-bind
 
 parts:
   gthulhu:
@@ -110,12 +120,3 @@ parts:
 
 build-packages:
   - golang-go
-
-plugs:
-  kernel-module-control:
-  system-observe:
-  hardware-observe:
-  process-control:
-  mount-observe:
-  network:
-  network-bind:
