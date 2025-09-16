@@ -938,9 +938,10 @@ void BPF_STRUCT_OPS(goland_enqueue, struct task_struct *p, u64 enq_flags)
 
 	/*
 	 * Give the task a chance to be directly dispatched if
-	 * ops.select_cpu() was skipped.
+	 * ops.select_cpu() was skipped or if it has been re-enqueued due
+	 * to a higher scheduling class stealing the CPU.
 	 */
-	if (builtin_idle && is_queued_wakeup(p, enq_flags)) {
+	if (builtin_idle && (is_queued_wakeup(p, enq_flags) || (enq_flags & SCX_ENQ_REENQ))) {
 		bool dispatched = false;
 
 		cpu = try_direct_dispatch(p, scx_bpf_task_cpu(p), enq_flags, &dispatched);
@@ -1200,6 +1201,13 @@ void BPF_STRUCT_OPS(goland_cpu_release, s32 cpu,
 	dbg_msg("cpu preemption: pid=%d (%s)", p->pid, p->comm);
 	if (is_belong_usersched_task(p))
 		set_usersched_needed();
+
+	/*
+	 * A higher scheduler class stole the CPU, re-enqueue all the tasks
+	 * that are waiting on this CPU and give them a chance to pick
+	 * another idle CPU.
+	 */
+	scx_bpf_reenqueue_local();
 }
 
 /*
