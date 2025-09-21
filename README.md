@@ -5,11 +5,13 @@
 
 ## Overview
 
-Gthulhu optimizes cloud-native workloads using the Linux Scheduler Extension for different application scenarios.
+Gthulhu is a next-generation scheduler designed for the cloud-native ecosystem, built with Golang and powered by the qumun framework.
 
-The scheduler consists of two main components:
-1. A BPF component that implements low-level sched-ext functionalities
-2. A user-space scheduler written in Go with [qumun](https://github.com/Gthulhu/qumun) that implements the actual scheduling policy
+The name Gthulhu is inspired by Cthulhu, a mythical creature known for its many tentacles. Just as tentacles can grasp and steer, Gthulhu symbolizes the ability to take the helm and navigate the complex world of modern distributed systems — much like how Kubernetes uses a ship’s wheel as its emblem.
+
+The prefix “G” comes from Golang, the language at the core of this project, highlighting both its technical foundation and its developer-friendly design.
+
+Underneath, Gthulhu runs on the qumun framework (qumun means “heart” in the Bunun language, an Indigenous people of Taiwan), reflecting the role of a scheduler as the beating heart of the operating system. This not only emphasizes its central importance in orchestrating workloads but also shares a piece of Taiwan’s Indigenous culture with the global open-source community.
 
 ## DEMO
 
