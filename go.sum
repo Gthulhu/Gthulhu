@@ -1,7 +1,7 @@
 github.com/Gthulhu/plugin v0.0.0-20250905072935-0410da5d4da9 h1:1+mvtfYZT1jKEVD4kaw8FBrCNP8poUl/lnh2s7aGwIY=
 github.com/Gthulhu/plugin v0.0.0-20250905072935-0410da5d4da9/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
-github.com/Gthulhu/scx_goland_core v0.3.1-0.20250905073643-f2d179f6324b h1:91RzQYo9IGdmoBe8PxeC1bbz1VlLYFUndxAkVlOLHHk=
-github.com/Gthulhu/scx_goland_core v0.3.1-0.20250905073643-f2d179f6324b/go.mod h1:jk2lTJh6mF1K6e0d1iO871IzcTURQGm9dUChyymvqBs=
+github.com/Gthulhu/qumun v0.3.2-0.20250921082002-7776a780e40f h1:ZU8vu3QOxD5yNpUP0apAL2pb2Atd/idSuVhoxnBu01k=
+github.com/Gthulhu/qumun v0.3.2-0.20250921082002-7776a780e40f/go.mod h1:ucPktp8l5//1yPtIK5p0VtP6fNRDbqyu5O0ZGq1bFYA=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

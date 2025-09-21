@@ -13,8 +13,8 @@ import (
 	"github.com/Gthulhu/Gthulhu/internal/config"
 	"github.com/Gthulhu/plugin/models"
 	"github.com/Gthulhu/plugin/plugin/gthulhu"
-	core "github.com/Gthulhu/scx_goland_core/goland_core"
-	cache "github.com/Gthulhu/scx_goland_core/util"
+	core "github.com/Gthulhu/qumun/goland_core"
+	cache "github.com/Gthulhu/qumun/util"
 )
 
 func main() {

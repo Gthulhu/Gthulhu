@@ -5,7 +5,7 @@ LIBBPF_OBJDIR = $(abspath ./$(OUTPUT)/libbpf)
 LIBBPF_DESTDIR = $(abspath ./$(OUTPUT))
 
 
-TARGET = main
+TARGET = qumun/main
 BPF_TARGET = ${TARGET:=.bpf}
 BPF_C = ${BPF_TARGET:=.c}
 BPF_OBJ = ${BPF_C:.c=.o}
@@ -18,7 +18,7 @@ LIBBPF_OBJ = $(abspath $(OUTPUT)/libbpf.a)
 LIBBPF_OBJDIR = $(abspath ./$(OUTPUT)/libbpf)
 LIBBPF_DESTDIR = $(abspath ./$(OUTPUT))
 CLANG_BPF_SYS_INCLUDES := `shell $(CLANG) -v -E - </dev/null 2>&1 | sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }'`
-CGOFLAG = CC=clang CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
+CGOFLAG = CC=clang CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/qumun -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
 STATIC=-extldflags -static
 
 .PHONY: build
@@ -71,8 +71,8 @@ $(BPF_OBJ): %.o: %.c
 		-c $< -o $@
 
 wrapper:
-	bpftool gen skeleton main.bpf.o > main.skeleton.h
-	clang -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include -I scx/scheds/include/arch/x86 -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c wrapper.c -o wrapper.o
+	bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
+	clang -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include -I scx/scheds/include/arch/x86 -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 
 clean:
