@@ -7,3 +7,6 @@
 [submodule "api"]
 	path = api
 	url = https://github.com/Gthulhu/api.git
+[submodule "qumun"]
+	path = qumun
+	url = https://github.com/Gthulhu/qumun.git

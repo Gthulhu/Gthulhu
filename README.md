@@ -9,7 +9,7 @@ Gthulhu optimizes cloud-native workloads using the Linux Scheduler Extension for
 
 The scheduler consists of two main components:
 1. A BPF component that implements low-level sched-ext functionalities
-2. A user-space scheduler written in Go with [scx_goland_core](https://github.com/Gthulhu/scx_goland_core) that implements the actual scheduling policy
+2. A user-space scheduler written in Go with [qumun](https://github.com/Gthulhu/qumun) that implements the actual scheduling policy
 
 ## DEMO
 
