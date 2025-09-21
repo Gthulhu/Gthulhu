@@ -16,8 +16,9 @@ Underneath, Gthulhu runs on the qumun framework (qumun means “heart” in the 
 ## DEMO
 
 Click the image below to see our DEMO on YouTube!
-
-[![IMAGE ALT TEXT HERE](./assets/preview.png)](https://www.youtube.com/watch?v=MfU64idQcHg)
+<a href="https://www.youtube.com/watch?v=MfU64idQcHg" target="_blank">
+<img src="./assets/preview.png" alt="preview" width="300"/>
+</a>
 
 ## Key Features
 
