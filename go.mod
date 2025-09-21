@@ -13,4 +13,7 @@ require (
 	golang.org/x/sys v0.26.0 // indirect
 )
 
-replace github.com/aquasecurity/libbpfgo => ./libbpfgo
+replace (
+	github.com/aquasecurity/libbpfgo => ./libbpfgo
+	github.com/Gthulhu/qumun => ./qumun
+)
