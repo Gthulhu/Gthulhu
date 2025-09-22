@@ -10,3 +10,6 @@
 [submodule "qumun"]
 	path = qumun
 	url = https://github.com/Gthulhu/qumun.git
+[submodule "chart"]
+	path = chart
+	url = https://github.com/Gthulhu/chart.git

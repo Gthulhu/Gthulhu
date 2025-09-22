@@ -104,7 +104,7 @@ To run the scheduler in a Docker container, you can use the provided Dockerfile:
 
 ```bash
 make image
-docker run --privileged=true --pid host --rm  gthulhu:latest /gthulhu/main
+docker run --privileged=true --pid host --rm  127.0.0.1:25000/gthulhu:latest /gthulhu/main
 ```
 
 ### Debugging

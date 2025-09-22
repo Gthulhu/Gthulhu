@@ -32,7 +32,7 @@ lint: build
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./util/...
 
 image: build
-	docker build -t gthulhu:latest .
+	docker build -t 127.0.0.1:32000/gthulhu:latest .
 
 test: build
 	vng -r v6.12.2 -- timeout 15 bash -c "./main" || true
