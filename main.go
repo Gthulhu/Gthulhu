@@ -34,7 +34,7 @@ func main() {
 	plugin := gthulhu.NewGthulhuPlugin(cfg.Scheduler.SliceNsDefault,
 		cfg.Scheduler.SliceNsMin)
 
-	SLICE_NS_DEFAULT, SLICE_NS_MIN := gthulhu.GetSchedulerConfig()
+	SLICE_NS_DEFAULT, SLICE_NS_MIN := plugin.GetSchedulerConfig()
 
 	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
 		SLICE_NS_DEFAULT, SLICE_NS_MIN)
@@ -94,17 +94,22 @@ func main() {
 
 	if apiConfig.Enabled {
 		// Initialize JWT client for API authentication
-		jwtClient, err := gthulhu.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
+		err := plugin.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
 		if err != nil {
 			log.Printf("Warning: Failed to initialize JWT client: %v", err)
 			log.Printf("Scheduling strategy fetcher and metrics reporting will be disabled")
 		} else {
 			// Initialize metrics client
-			metricsClient = gthulhu.NewMetricsClient(jwtClient, apiConfig.Url)
+			err = plugin.InitMetricsClient(apiConfig.Url)
+			if err != nil {
+				log.Printf("Warning: Failed to initialize metrics client: %v", err)
+			} else {
+				metricsClient = plugin.GetMetricsClient()
+			}
 
 			apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
 			log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
-			gthulhu.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
+			plugin.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
 			log.Printf("Started scheduling strategy fetcher with JWT authentication, interval %d seconds", apiConfig.Interval)
 		}
 	}
