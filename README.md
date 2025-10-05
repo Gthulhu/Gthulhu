@@ -100,8 +100,14 @@ sudo ./main
 The scheduler will run until terminated with Ctrl+C (SIGINT) or SIGTERM.
 
 ### Running with Docker
-To run the scheduler in a Docker container, you can use the provided Dockerfile:
+To run the scheduler in a Docker container, you can either build locally or use the pre-built image from GitHub Container Registry:
 
+**Using the pre-built image from GitHub Packages:**
+```bash
+docker run --privileged=true --pid host --rm ghcr.io/gthulhu/gthulhu:latest /gthulhu/main
+```
+
+**Building locally:**
 ```bash
 make image
 docker run --privileged=true --pid host --rm  127.0.0.1:25000/gthulhu:latest /gthulhu/main
