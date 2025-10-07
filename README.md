@@ -27,6 +27,7 @@ Click the image below to see our DEMO on YouTube!
 - Dynamic time slice adjustment
 - CPU topology aware task placement
 - Automatic idle CPU selection
+- **NEW**: GTP5G Operator for 5G UPF kernel module management
 
 ## How It Works
 
@@ -128,6 +129,42 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe # View BPF trace output
 ```
 stress-ng -c 20 --timeout 20s --metrics-brief
 ```
+
+## GTP5G Operator (NEW!)
+
+Gthulhu now includes an optional Kubernetes operator for managing gtp5g kernel modules, enabling seamless deployment of 5G UPF workloads.
+
+### Quick Start
+
+Enable the operator when installing via Helm:
+
+```bash
+helm install gthulhu ./chart/gthulhu \
+  --set gtp5gOperator.enabled=true \
+  --namespace gthulhu-system \
+  --create-namespace
+```
+
+Label nodes that should run gtp5g:
+
+```bash
+kubectl label node worker1 gtp5g.gthulhu.io/enabled=true
+```
+
+Create a GTP5GModule resource:
+
+```yaml
+apiVersion: operator.gthulhu.io/v1alpha1
+kind: GTP5GModule
+metadata:
+  name: upf-gtp5g
+spec:
+  version: v0.8.3
+```
+
+For detailed documentation, see:
+- [Quick Start Guide](docs/gtp5g-operator-quickstart.md)
+- [Operator Development Plan](GTP5G_OPERATOR_DEVELOPMENT_PLAN.md)
 
 ## License
 
