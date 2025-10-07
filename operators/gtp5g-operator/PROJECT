@@ -1,0 +1,16 @@
+domain: gthulhu.io
+layout:
+- go.kubebuilder.io/v3
+projectName: gtp5g-operator
+repo: github.com/Gthulhu/Gthulhu/operators/gtp5g-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: false
+  controller: true
+  domain: gthulhu.io
+  group: operator
+  kind: GTP5GModule
+  path: github.com/Gthulhu/Gthulhu/operators/gtp5g-operator/api/v1alpha1
+  version: v1alpha1
+version: "3"

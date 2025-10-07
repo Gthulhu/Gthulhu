@@ -1,0 +1,23 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gtp5g-operator-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["operator.gthulhu.io"]
+  resources: ["gtp5gmodules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["operator.gthulhu.io"]
+  resources: ["gtp5gmodules/status"]
+  verbs: ["get", "update", "patch"]
+- apiGroups: ["operator.gthulhu.io"]
+  resources: ["gtp5gmodules/finalizers"]
+  verbs: ["update"]
