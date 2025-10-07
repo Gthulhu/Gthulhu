@@ -1,4 +1,6 @@
-# GTP5G Operator - Quick Start
+# GTP5G Operator - Developer Quick Start
+
+> **Note**: This guide is for **developers** building from source. For **end users** deploying via Helm, see [docs/gtp5g-operator-quickstart.md](../../docs/gtp5g-operator-quickstart.md).
 
 ## Prerequisites
 
@@ -6,6 +8,7 @@
 - kubectl configured
 - Kubernetes cluster (kind/minikube/real cluster)
 - Local registry at localhost:5000 (optional)
+- Go 1.22+
 
 ## Build and Deploy (Local Testing)
 

@@ -1,4 +1,6 @@
-# GTP5G Operator - Quick Start Guide
+# GTP5G Operator - User Quick Start Guide
+
+> **Note**: This guide is for **end users** deploying via Helm. For **developers** building from source, see [operators/gtp5g-operator/QUICKSTART.md](../operators/gtp5g-operator/QUICKSTART.md).
 
 ## Overview
 

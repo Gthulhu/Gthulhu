@@ -49,6 +49,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "gtp5g-operator.gthulhu.io",
+		// Metrics server is automatically started on :8080 by default
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

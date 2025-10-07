@@ -1,0 +1,430 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>v1alpha1: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/Gthulhu/Gthulhu/operators/gtp5g-operator/api/v1alpha1/gtp5gmodule_types.go (100.0%)</option>
+				
+				<option value="file1">github.com/Gthulhu/Gthulhu/operators/gtp5g-operator/api/v1alpha1/gtp5gmodule_webhook.go (90.5%)</option>
+				
+				<option value="file2">github.com/Gthulhu/Gthulhu/operators/gtp5g-operator/api/v1alpha1/zz_generated.deepcopy.go (0.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package v1alpha1
+
+import (
+        metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+// GTP5GModuleSpec defines the desired state of GTP5GModule
+type GTP5GModuleSpec struct {
+        // Version is the gtp5g module version (git tag)
+        // +kubebuilder:validation:Required
+        // +kubebuilder:validation:Pattern=^v[0-9]+\.[0-9]+\.[0-9]+$
+        Version string `json:"version"`
+
+        // KernelVersion specifies target kernel version (optional, auto-detect if empty)
+        // +optional
+        KernelVersion string `json:"kernelVersion,omitempty"`
+
+        // NodeSelector selects nodes to install the module
+        // +optional
+        NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+
+        // Image is the installer container image (optional)
+        // +optional
+        Image string `json:"image,omitempty"`
+}
+
+// ModulePhase is the lifecycle phase of the module
+// +kubebuilder:validation:Enum=Pending;Installing;Installed;Failed
+type ModulePhase string
+
+const (
+        ModulePhasePending    ModulePhase = "Pending"
+        ModulePhaseInstalling ModulePhase = "Installing"
+        ModulePhaseInstalled  ModulePhase = "Installed"
+        ModulePhaseFailed     ModulePhase = "Failed"
+)
+
+// NodeFailure records node installation failure info
+type NodeFailure struct {
+        NodeName string `json:"nodeName"`
+        Reason   string `json:"reason"`
+}
+
+// GTP5GModuleStatus defines the observed state of GTP5GModule
+type GTP5GModuleStatus struct {
+        // Phase indicates current status
+        // +optional
+        Phase ModulePhase `json:"phase,omitempty"`
+
+        // InstalledNodes is the list of nodes with module successfully installed
+        // +optional
+        InstalledNodes []string `json:"installedNodes,omitempty"`
+
+        // FailedNodes is the list of nodes where installation failed
+        // +optional
+        FailedNodes []NodeFailure `json:"failedNodes,omitempty"`
+
+        // Message provides human-readable status information
+        // +optional
+        Message string `json:"message,omitempty"`
+
+        // LastUpdateTime is the last update timestamp
+        // +optional
+        LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=`.spec.version`
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+// +kubebuilder:printcolumn:name="Installed",type=integer,JSONPath=`.status.installedNodes`
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+
+// GTP5GModule is the Schema for the gtp5gmodules API
+type GTP5GModule struct {
+        metav1.TypeMeta   `json:",inline"`
+        metav1.ObjectMeta `json:"metadata,omitempty"`
+
+        Spec   GTP5GModuleSpec   `json:"spec,omitempty"`
+        Status GTP5GModuleStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// GTP5GModuleList contains a list of GTP5GModule
+type GTP5GModuleList struct {
+        metav1.TypeMeta `json:",inline"`
+        metav1.ListMeta `json:"metadata,omitempty"`
+        Items           []GTP5GModule `json:"items"`
+}
+
+func init() <span class="cov8" title="1">{
+        SchemeBuilder.Register(&amp;GTP5GModule{}, &amp;GTP5GModuleList{})
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package v1alpha1
+
+import (
+        "fmt"
+        "regexp"
+
+        "k8s.io/apimachinery/pkg/runtime"
+        ctrl "sigs.k8s.io/controller-runtime"
+        logf "sigs.k8s.io/controller-runtime/pkg/log"
+        "sigs.k8s.io/controller-runtime/pkg/webhook"
+        "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+)
+
+var gtp5gmodulelog = logf.Log.WithName("gtp5gmodule-resource")
+
+// versionPattern validates semantic versioning with 'v' prefix
+var versionPattern = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+$`)
+
+func (r *GTP5GModule) SetupWebhookWithManager(mgr ctrl.Manager) error <span class="cov0" title="0">{
+        return ctrl.NewWebhookManagedBy(mgr).
+                For(r).
+                Complete()
+}</span>
+
+// +kubebuilder:webhook:path=/mutate-operator-gthulhu-io-v1alpha1-gtp5gmodule,mutating=true,failurePolicy=fail,sideEffects=None,groups=operator.gthulhu.io,resources=gtp5gmodules,verbs=create;update,versions=v1alpha1,name=mgtp5gmodule.kb.io,admissionReviewVersions=v1
+
+var _ webhook.Defaulter = &amp;GTP5GModule{}
+
+// Default implements webhook.Defaulter
+func (r *GTP5GModule) Default() <span class="cov8" title="1">{
+        gtp5gmodulelog.Info("default", "name", r.Name)
+
+        // Set default node selector if not provided
+        if r.Spec.NodeSelector == nil </span><span class="cov8" title="1">{
+                r.Spec.NodeSelector = map[string]string{
+                        "gtp5g.gthulhu.io/enabled": "true",
+                }
+        }</span>
+
+        // Set default installer image if not provided
+        <span class="cov8" title="1">if r.Spec.Image == "" </span><span class="cov8" title="1">{
+                r.Spec.Image = "localhost:5000/gtp5g-installer:latest"
+        }</span>
+}
+
+// +kubebuilder:webhook:path=/validate-operator-gthulhu-io-v1alpha1-gtp5gmodule,mutating=false,failurePolicy=fail,sideEffects=None,groups=operator.gthulhu.io,resources=gtp5gmodules,verbs=create;update,versions=v1alpha1,name=vgtp5gmodule.kb.io,admissionReviewVersions=v1
+
+var _ webhook.Validator = &amp;GTP5GModule{}
+
+// ValidateCreate implements webhook.Validator
+func (r *GTP5GModule) ValidateCreate() (admission.Warnings, error) <span class="cov8" title="1">{
+        gtp5gmodulelog.Info("validate create", "name", r.Name)
+
+        if err := r.validateGTP5GModule(); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">return nil, nil</span>
+}
+
+// ValidateUpdate implements webhook.Validator
+func (r *GTP5GModule) ValidateUpdate(old runtime.Object) (admission.Warnings, error) <span class="cov8" title="1">{
+        gtp5gmodulelog.Info("validate update", "name", r.Name)
+
+        if err := r.validateGTP5GModule(); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // Allow all updates for now
+        // Could add immutability checks in future if needed
+        <span class="cov8" title="1">return nil, nil</span>
+}
+
+// ValidateDelete implements webhook.Validator
+func (r *GTP5GModule) ValidateDelete() (admission.Warnings, error) <span class="cov8" title="1">{
+        gtp5gmodulelog.Info("validate delete", "name", r.Name)
+
+        // No validation needed for deletion
+        return nil, nil
+}</span>
+
+// validateGTP5GModule contains common validation logic
+func (r *GTP5GModule) validateGTP5GModule() error <span class="cov8" title="1">{
+        // Validate version is required
+        if r.Spec.Version == "" </span><span class="cov8" title="1">{
+                return fmt.Errorf("spec.version is required")
+        }</span>
+
+        // Validate version format
+        <span class="cov8" title="1">if !versionPattern.MatchString(r.Spec.Version) </span><span class="cov8" title="1">{
+                return fmt.Errorf("spec.version must match pattern ^v[0-9]+\\.[0-9]+\\.[0-9]+$, got: %s", r.Spec.Version)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// +build !ignore_autogenerated
+
+package v1alpha1
+
+import (
+        "k8s.io/apimachinery/pkg/runtime"
+)
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GTP5GModule) DeepCopyInto(out *GTP5GModule) <span class="cov0" title="0">{
+        *out = *in
+        out.TypeMeta = in.TypeMeta
+        in.ObjectMeta.DeepCopyInto(&amp;out.ObjectMeta)
+        in.Spec.DeepCopyInto(&amp;out.Spec)
+        in.Status.DeepCopyInto(&amp;out.Status)
+}</span>
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GTP5GModule.
+func (in *GTP5GModule) DeepCopy() *GTP5GModule <span class="cov0" title="0">{
+        if in == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">out := new(GTP5GModule)
+        in.DeepCopyInto(out)
+        return out</span>
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *GTP5GModule) DeepCopyObject() runtime.Object <span class="cov0" title="0">{
+        if c := in.DeepCopy(); c != nil </span><span class="cov0" title="0">{
+                return c
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GTP5GModuleList) DeepCopyInto(out *GTP5GModuleList) <span class="cov0" title="0">{
+        *out = *in
+        out.TypeMeta = in.TypeMeta
+        in.ListMeta.DeepCopyInto(&amp;out.ListMeta)
+        if in.Items != nil </span><span class="cov0" title="0">{
+                in, out := &amp;in.Items, &amp;out.Items
+                *out = make([]GTP5GModule, len(*in))
+                for i := range *in </span><span class="cov0" title="0">{
+                        (*in)[i].DeepCopyInto(&amp;(*out)[i])
+                }</span>
+        }
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GTP5GModuleList.
+func (in *GTP5GModuleList) DeepCopy() *GTP5GModuleList <span class="cov0" title="0">{
+        if in == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">out := new(GTP5GModuleList)
+        in.DeepCopyInto(out)
+        return out</span>
+}
+
+// DeepCopyObject is an autogenerated deepcopy function, copying the receiver, creating a new runtime.Object.
+func (in *GTP5GModuleList) DeepCopyObject() runtime.Object <span class="cov0" title="0">{
+        if c := in.DeepCopy(); c != nil </span><span class="cov0" title="0">{
+                return c
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GTP5GModuleSpec) DeepCopyInto(out *GTP5GModuleSpec) <span class="cov0" title="0">{
+        *out = *in
+        if in.NodeSelector != nil </span><span class="cov0" title="0">{
+                in, out := &amp;in.NodeSelector, &amp;out.NodeSelector
+                *out = make(map[string]string, len(*in))
+                for key, val := range *in </span><span class="cov0" title="0">{
+                        (*out)[key] = val
+                }</span>
+        }
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GTP5GModuleSpec.
+func (in *GTP5GModuleSpec) DeepCopy() *GTP5GModuleSpec <span class="cov0" title="0">{
+        if in == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">out := new(GTP5GModuleSpec)
+        in.DeepCopyInto(out)
+        return out</span>
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *GTP5GModuleStatus) DeepCopyInto(out *GTP5GModuleStatus) <span class="cov0" title="0">{
+        *out = *in
+        if in.InstalledNodes != nil </span><span class="cov0" title="0">{
+                in, out := &amp;in.InstalledNodes, &amp;out.InstalledNodes
+                *out = make([]string, len(*in))
+                copy(*out, *in)
+        }</span>
+        <span class="cov0" title="0">if in.FailedNodes != nil </span><span class="cov0" title="0">{
+                in, out := &amp;in.FailedNodes, &amp;out.FailedNodes
+                *out = make([]NodeFailure, len(*in))
+                copy(*out, *in)
+        }</span>
+        <span class="cov0" title="0">in.LastUpdateTime.DeepCopyInto(&amp;out.LastUpdateTime)</span>
+}
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new GTP5GModuleStatus.
+func (in *GTP5GModuleStatus) DeepCopy() *GTP5GModuleStatus <span class="cov0" title="0">{
+        if in == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">out := new(GTP5GModuleStatus)
+        in.DeepCopyInto(out)
+        return out</span>
+}
+
+// DeepCopyInto is an autogenerated deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *NodeFailure) DeepCopyInto(out *NodeFailure) <span class="cov0" title="0">{
+        *out = *in
+}</span>
+
+// DeepCopy is an autogenerated deepcopy function, copying the receiver, creating a new NodeFailure.
+func (in *NodeFailure) DeepCopy() *NodeFailure <span class="cov0" title="0">{
+        if in == nil </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+        <span class="cov0" title="0">out := new(NodeFailure)
+        in.DeepCopyInto(out)
+        return out</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
