@@ -8,7 +8,7 @@ scheduler:
   # Minimum time slice in nanoseconds (default: 500000 = 0.5ms)
   slice_ns_min: 500000
   # mode: simple
-# simple_scheduler only be applied if mode = simple
+# simple_scheduler is only applied if mode = simple
 simple_scheduler:
   enable_fifo: true
 api:
