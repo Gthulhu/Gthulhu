@@ -12,7 +12,9 @@ import (
 
 	"github.com/Gthulhu/Gthulhu/internal/config"
 	"github.com/Gthulhu/plugin/models"
+	"github.com/Gthulhu/plugin/plugin"
 	"github.com/Gthulhu/plugin/plugin/gthulhu"
+	"github.com/Gthulhu/plugin/plugin/simple"
 	core "github.com/Gthulhu/qumun/goland_core"
 	cache "github.com/Gthulhu/qumun/util"
 )
@@ -31,18 +33,58 @@ func main() {
 	// Apply scheduler configuration before loading eBPF program
 	schedConfig := cfg.GetSchedulerConfig()
 
-	plugin := gthulhu.NewGthulhuPlugin(cfg.Scheduler.SliceNsDefault,
-		cfg.Scheduler.SliceNsMin)
+	var p plugin.CustomScheduler
+	var metricsClient *gthulhu.MetricsClient
+	var SLICE_NS_DEFAULT, SLICE_NS_MIN uint64
 
-	SLICE_NS_DEFAULT, SLICE_NS_MIN := plugin.GetSchedulerConfig()
+	ctx, cancel := context.WithCancel(context.Background())
 
-	log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
-		SLICE_NS_DEFAULT, SLICE_NS_MIN)
+	switch schedConfig.Mode {
+	case "simple":
+		log.Printf("Using simple scheduling mode, fifo=%v", cfg.SimpleScheduler.EnableFifo)
+		plugin := simple.NewSimplePlugin(cfg.SimpleScheduler.EnableFifo)
+		plugin.SetSliceDefault(schedConfig.SliceNsDefault)
+		p = plugin
+	default:
+		log.Println("Using gthulhu scheduling mode")
+		plugin := gthulhu.NewGthulhuPlugin(cfg.Scheduler.SliceNsDefault,
+			cfg.Scheduler.SliceNsMin)
+
+		SLICE_NS_DEFAULT, SLICE_NS_MIN = plugin.GetSchedulerConfig()
+
+		log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
+			SLICE_NS_DEFAULT, SLICE_NS_MIN)
+		p = plugin
+		// Start scheduling strategy fetcher
+		apiConfig := cfg.GetApiConfig()
+
+		if apiConfig.Enabled {
+			// Initialize JWT client for API authentication
+			err := plugin.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
+			if err != nil {
+				log.Printf("Warning: Failed to initialize JWT client: %v", err)
+				log.Printf("Scheduling strategy fetcher and metrics reporting will be disabled")
+			} else {
+				// Initialize metrics client
+				err = plugin.InitMetricsClient(apiConfig.Url)
+				if err != nil {
+					log.Printf("Warning: Failed to initialize metrics client: %v", err)
+				} else {
+					metricsClient = plugin.GetMetricsClient()
+				}
+
+				apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
+				log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
+				plugin.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
+				log.Printf("Started scheduling strategy fetcher with JWT authentication, interval %d seconds", apiConfig.Interval)
+			}
+		}
+	}
 
 	bpfModule := core.LoadSched("main.bpf.o")
 	defer bpfModule.Close()
 
-	bpfModule.SetPlugin(plugin)
+	bpfModule.SetPlugin(p)
 
 	if cfg.IsDebugEnabled() {
 		log.Println("Debug mode enabled")
@@ -86,33 +128,6 @@ func main() {
 	}
 
 	log.Printf("UserSched's Pid: %v", core.GetUserSchedPid())
-	ctx, cancel := context.WithCancel(context.Background())
-
-	// Start scheduling strategy fetcher
-	apiConfig := cfg.GetApiConfig()
-	var metricsClient *gthulhu.MetricsClient
-
-	if apiConfig.Enabled {
-		// Initialize JWT client for API authentication
-		err := plugin.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize JWT client: %v", err)
-			log.Printf("Scheduling strategy fetcher and metrics reporting will be disabled")
-		} else {
-			// Initialize metrics client
-			err = plugin.InitMetricsClient(apiConfig.Url)
-			if err != nil {
-				log.Printf("Warning: Failed to initialize metrics client: %v", err)
-			} else {
-				metricsClient = plugin.GetMetricsClient()
-			}
-
-			apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
-			log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
-			plugin.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
-			log.Printf("Started scheduling strategy fetcher with JWT authentication, interval %d seconds", apiConfig.Interval)
-		}
-	}
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)

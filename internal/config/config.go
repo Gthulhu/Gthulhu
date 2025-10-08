@@ -11,6 +11,11 @@ import (
 type SchedulerConfig struct {
 	SliceNsDefault uint64 `yaml:"slice_ns_default"`
 	SliceNsMin     uint64 `yaml:"slice_ns_min"`
+	Mode           string `yaml:"mode,omitempty"` // Optional mode field
+}
+
+type SimpleSchedulerConfig struct {
+	EnableFifo bool `yaml:"enable_fifo,omitempty"` // Optional FIFO scheduling flag
 }
 
 // ApiConfig represents API-specific configuration
@@ -23,11 +28,12 @@ type ApiConfig struct {
 
 // Config represents the application configuration
 type Config struct {
-	Scheduler       SchedulerConfig `yaml:"scheduler"`
-	Debug           bool            `yaml:"debug,omitempty"`            // Optional debug flag
-	EarlyProcessing bool            `yaml:"early_processing,omitempty"` // Optional early processing flag
-	BuiltinIdle     bool            `yaml:"builtin_idle,omitempty"`     // Optional flag for built-in idle CPU selection
-	Api             ApiConfig       `yaml:"api"`
+	Scheduler       SchedulerConfig       `yaml:"scheduler"`
+	SimpleScheduler SimpleSchedulerConfig `yaml:"simple_scheduler,omitempty"`
+	Debug           bool                  `yaml:"debug,omitempty"`            // Optional debug flag
+	EarlyProcessing bool                  `yaml:"early_processing,omitempty"` // Optional early processing flag
+	BuiltinIdle     bool                  `yaml:"builtin_idle,omitempty"`     // Optional flag for built-in idle CPU selection
+	Api             ApiConfig             `yaml:"api"`
 }
 
 // DefaultConfig returns the default configuration
