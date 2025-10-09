@@ -20,6 +20,10 @@ Click the image below to see our DEMO on YouTube!
 <img src="./assets/preview.png" alt="preview" width="300"/>
 </a>
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Gthulhu/Gthulhu&type=Date)](https://www.star-history.com/#Gthulhu/Gthulhu&Date)
+
 ## Key Features
 
 - Virtual runtime (vruntime) based scheduling
