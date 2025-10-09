@@ -1,0 +1,8 @@
+apiVersion: operator.gthulhu.io/v1alpha1
+kind: GTP5GModule
+metadata:
+  name: sample-gtp5g
+spec:
+  version: v0.8.3
+  nodeSelector:
+    gtp5g.gthulhu.io/enabled: "true"

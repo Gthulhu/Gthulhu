@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gtp5g-operator-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gtp5g-operator-role
+subjects:
+- kind: ServiceAccount
+  name: gtp5g-operator
+  namespace: gtp5g-operator-system
