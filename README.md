@@ -133,6 +133,28 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe # View BPF trace output
 stress-ng -c 20 --timeout 20s --metrics-brief
 ```
 
+## Troubleshooting
+
+### Issue 1: `undefined reference to eu_search_tree_init`
+
+If you encounter this, it’s because the system is using the elfutils version of libelf. You can download and compile libelf yourself to resolve it:
+```sh
+sudo apt remove --purge elfutils libelf-dev
+cd ~
+git clone https://github.com/arachsys/libelf.git
+cd libelf
+make
+sudo make install
+```
+
+### Issue 2: `ERROR: Program 'clang' not found or not executable`
+
+If you see this when running meson setup build --prefix ~, try:
+```sh
+sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-17 100
+sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-17 100
+```
+
 ## License
 
 This software is distributed under the terms of the GNU General Public License version 2.

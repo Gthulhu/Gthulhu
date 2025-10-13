@@ -1,3 +1,7 @@
+<todos title="Todos" rule="Review steps frequently throughout the conversation and DO NOT stop between steps unless they explicitly require it.">
+- No current todos
+</todos>
+
 # Gthulhu Scheduler Development Guide
 
 Gthulhu is a Linux sched_ext scheduler that uses eBPF for kernel-level scheduling and Go for user-space policy implementation. This is a hybrid scheduler architecture with priority-aware task scheduling.
@@ -17,99 +21,55 @@ The scheduler uses a ringbuffer communication pattern:
 - BPF dispatcher is agnostic to scheduling policy - all logic is in Go
 
 ### Key Data Flow
-1. Tasks are enqueued in BPF (`goland_enqueue`)
-2. Task info sent to user-space via `struct queued_task_ctx`
-3. Go scheduler applies vruntime/priority logic
-4. Tasks dispatched back via `struct dispatched_task_ctx`
-5. BPF handles final CPU assignment and dispatch
+# Copilot instructions for Gthulhu (sched_ext + eBPF + Go)
 
-## Development Workflows
+Purpose: make AI agents productive immediately in this repo by capturing the true architecture, data flow, build/test flows, and house rules with concrete file references.
 
-### Building
-```bash
-make dep                    # Clone libbpf and scx dependencies
-git submodule init && git submodule sync && git submodule update
-cd scx && meson setup build --prefix ~ && meson compile -C build
-make build                  # Compile BPF, generate skeleton, build Go binary
-```
+Architecture and data flow
+- BPF backend: `qumun/main.bpf.c` implements sched_ext ops; contracts in `qumun/intf.h`.
+- User-space scheduler: `main.go` wires plugins and the BPF module from `github.com/Gthulhu/qumun/goland_core` and `github.com/Gthulhu/plugin/*`.
+- API server: `api/` serves strategies and metrics with JWT auth.
+- Communication: BPF ringbuf `queued` → Go; user ringbuf `dispatched` → BPF. Structs: `queued_task_ctx` and `dispatched_task_ctx` (see `qumun/intf.h`).
+- Flow: `goland_enqueue` enqueues → Go computes vtime/slice/CPU → dispatch back → BPF does final DSQ insert/kick.
 
-### Testing
-```bash
-make test                   # Run in vng virtual environment with kernel v6.12.2
-sudo ./main                 # Run on actual system (requires sched_ext kernel)
-```
+Key files and concepts
+- `qumun/main.bpf.c`: ringbuffers, DSQs (per-CPU, SHARED_DSQ, SCHED_DSQ), priority path and maps (`priority_tasks`, `running_task`), idle CPU picking, heartbeat timer.
+- `main.go`: config loading (`internal/config/config.go`, YAML `config/config.yaml`), plugin selection (simple|gthulhu), strategy fetcher + metrics, topology init via `qumun/util`.
+- `qumun/intf.h`: exact fields for task structs; keep these in sync with Go models in the plugin layer.
+- `api/main.go`: endpoints `/api/v1/scheduling/strategies`, `/api/v1/metrics`, JWT token `/api/v1/auth/token`; Kubernetes label-to-PID mapping.
 
-### Debugging
-- Use `make lint` for code quality checks
-- BPF debugging: `sudo cat /sys/kernel/debug/tracing/trace_pipe`
-- Inspect BPF state: `sudo bpftool prog list` and `sudo bpftool map list`
+Build, run, test (Makefile-backed)
+- Prereqs: Linux 6.12+ with CONFIG_SCHED_CLASS_EXT, clang/LLVM 17+, Go 1.22+, root (CAP_SYS_ADMIN).
+- First-time deps: `make dep` then build scx submodule: `cd scx && meson setup build --prefix ~ && meson compile -C build`.
+- Build all: `make build` (compiles BPF `qumun/main.bpf.o`, generates skeleton, links `libbpf.a`, builds Go `./main`).
+- Test in VM kernel: `make test` (runs with vng v6.12.2). Local run: `sudo ./main`.
+- Optional image: `make image`; runtime needs `--privileged --pid host` when containerized.
 
-## Project-Specific Patterns
+Scheduling policy patterns (what “priority” means here)
+- Priority is expressed by setting dispatched `vtime==0`. BPF tracks such PIDs in `priority_tasks` and may preempt or head-insert accordingly.
+- Default slice and min slice come from config; Go may override per-task via strategy (see `bpfModule.DetermineTimeSlice` usage in `main.go`).
+- Idle CPU selection honors cache domains; initialize domains via `cache.InitCacheDomains(bpfModule)`.
 
-### Configuration Management
-- YAML config in `config/config.yaml` or via `-config` flag
-- Fallback to sensible defaults in `internal/config/config.go`
-- Runtime reconfiguration via API server
+Configuration
+- Primary YAML: `config/config.yaml` (overridable via `-config`). Fallbacks in `internal/config/config.go`.
+- Notable keys: `scheduler.slice_ns_default`, `scheduler.slice_ns_min`, `scheduler.mode` ("simple" or default), `api.{enabled,url,interval,public_key_path}`, `debug`, `early_processing`, `builtin_idle`.
 
-### Scheduling Strategy System
-Priority tasks get vtime=0 for immediate scheduling:
-```go
-// In strategy.go
-if strategy.Priority {
-    task.Vtime = 0  // Minimum vtime = highest priority
-}
-```
+API integration (JWT-protected)
+- Obtain token: POST `/api/v1/auth/token` with your PEM public key; include `Authorization: Bearer <token>` for subsequent calls (enforced except for token/health/static).
+- Get/Set strategies: `/api/v1/scheduling/strategies` (GET/POST). Example POST payload snippet:
+    {"strategies":[{"priority":true,"execution_time":20000000,"selectors":[{"key":"nf","value":"upf"}],"command_regex":".*"}]}
+- Metrics: POST `/api/v1/metrics`; current metrics: GET `/api/v1/metrics`. Pod→PID map: GET `/api/v1/pods/pids` (Kubernetes lookup with caching; falls back to mock on failure).
 
-### CPU Topology Awareness
-- `cache.GetTopology()` and `cache.InitCacheDomains()` for NUMA/cache-aware placement
-- Priority CPU tracking to avoid interference with regular tasks
+Debugging essentials
+- Lint/vet: `make lint`. Trace BPF: `sudo cat /sys/kernel/debug/tracing/trace_pipe`. Inspect: `sudo bpftool prog list` / `sudo bpftool map list`.
+- User exit info (UEI) is recorded by BPF and printed by `main.go` on shutdown.
 
-### Memory Management
-Ring buffers use explicit size limits:
-- Task pool: 4096 entries circular buffer
-- BPF ringbuffer communication for task passing
+Conventions and limits you should respect
+- Keep algorithms in user-space; BPF is minimal (stack limits, no dyn alloc). Use provided ringbuffers and maps; do not change struct layouts lightly.
+- Task pool: lockless circular buffer of 4096 (see `qumun/main.go` ref impl); ringbuffers sized for that magnitude.
+- Topology aware CPU choice and DSQ usage are centralized in BPF; user-space provides hints (cpu, vtime, slice_ns) only.
 
-## Critical Dependencies
+Common gotchas (seen in this repo)
+- libelf conflict: if you hit `eu_search_tree_init` linker errors, prefer arachsys libelf (see root README troubleshooting).
+- Ensure scx headers are built (`scx/build/...`) before BPF compile; skeleton is generated via Makefile target `wrapper`.
 
-### External Submodules
-- `libbpf/`: eBPF library (specific commit 09b9e83)
-- `scx/`: sched_ext framework and example schedulers
-- `libbpfgo/`: Custom Go BPF bindings (replaced via go.mod)
-
-### Build Dependencies
-- Kernel 6.12+ with sched_ext support
-- LLVM/Clang 17+ for BPF compilation
-- Go 1.22.6+
-
-### Runtime Requirements
-- `CAP_SYS_ADMIN` or root for BPF program loading
-- sched_ext enabled kernel with CONFIG_SCHED_CLASS_EXT=y
-
-## API Integration Points
-
-### REST API Server (`api/`)
-- Dynamic strategy updates via `/api/v1/scheduling/strategies`
-- Pod-to-PID mapping for Kubernetes integration
-- Metrics collection for observability
-
-### Kubernetes Integration
-- Pod label-based scheduling strategies
-- Process command regex matching
-- Automatic PID discovery from cgroups
-
-## Common Anti-Patterns
-
-### BPF Limitations
-- Avoid complex algorithms in BPF - keep scheduling logic in Go user-space
-- BPF has limited stack size and no dynamic memory allocation
-- Use libbpfgo wrappers instead of raw BPF syscalls
-
-### Concurrency
-- Task pool uses lockless circular buffer design
-- Strategy map updates use RWMutex for concurrent access
-- Context cancellation for graceful shutdown
-
-### Error Handling
-- BPF errors bubble up via `uei` (user exit info) mechanism
-- Fallback to kernel scheduling on user-space scheduler failure
-- Comprehensive logging with structured JSON output
