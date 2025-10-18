@@ -103,6 +103,32 @@ sudo ./main
 
 The scheduler will run until terminated with Ctrl+C (SIGINT) or SIGTERM.
 
+### Launching Gthulhu by using schedkit
+
+First, install `schedctl` from [schedkit](https://github.com/schedkit/schedctl) (created by @dottorblaster):
+```sh
+$ git clone https://github.com/schedkit/schedctl.git
+$ cd schedctl
+$ make install
+```
+
+Then, you can launch Gthulhu with:
+
+```sh
+$ sudo ./schedctl run gthulhu
+Trying to pull ghcr.io/schedkit/gthulhu:latest...
+Getting image source signatures
+Copying blob sha256:a517a5a43837a7785dad62f579950a8abe4d1bd2ae5a096bda78150a1cc70c64
+Copying blob sha256:2d35ebdb57d9971fea0cac1582aa78935adf8058b2cc32db163c98822e5dfa1b
+Copying config sha256:85fb26cbfed25f79e321ef4e0a3e4e6fc7f01a957dbcee6aed815bdb93458136
+Writing manifest to image destination
+Storing signatures
+Container ghcr.io/schedkit/gthulhu:latest started successfully
+$ sudo podman ps -a
+CONTAINER ID  IMAGE                            COMMAND     CREATED        STATUS            PORTS       NAMES
+015d1b5fbe96  ghcr.io/schedkit/gthulhu:latest  /main       6 seconds ago  Up 6 seconds ago              gthulhu
+```
+
 ### Running with Docker
 To run the scheduler in a Docker container, you can either build locally or use the pre-built image from GitHub Container Registry:
 
