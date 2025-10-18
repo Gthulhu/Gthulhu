@@ -26,11 +26,11 @@ runs:
         sudo apt-get install --yes python3 python3-pip ninja-build
         sudo apt-get install --yes libseccomp-dev protobuf-compiler
         pip3 install --user meson
-        for tool in "clang" "clang-format" "llc" "llvm-strip"
+        for tool in "clang" "clang-format" "llc"
         do
           sudo rm -f /usr/bin/$tool
           sudo ln -s /usr/bin/$tool-17 /usr/bin/$tool
         done
-        # Install llvm-strip symlink (needed for scx build)
+        # Install llvm-strip symlink (needed for scx build, uses version 18)
         sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-18 100
       shell: bash
