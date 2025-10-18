@@ -18,7 +18,7 @@ runs:
         sudo apt-get install --yes bsdutils
         sudo apt-get install --yes build-essential
         sudo apt-get install --yes pkgconf
-        sudo apt-get install --yes llvm-17 clang-17 clang-format-17
+        sudo apt-get install --yes llvm-17 llvm-18 clang-17 clang-format-17
         sudo apt-get install --yes libbpf-dev libelf-dev libzstd-dev zlib1g-dev
         sudo apt-get install --yes virtme-ng
         sudo apt-get install --yes gcc-multilib
@@ -26,9 +26,11 @@ runs:
         sudo apt-get install --yes python3 python3-pip ninja-build
         sudo apt-get install --yes libseccomp-dev protobuf-compiler
         pip3 install --user meson
-        for tool in "clang" "clang-format" "llc" "llvm-strip"
+        for tool in "clang" "clang-format" "llc"
         do
           sudo rm -f /usr/bin/$tool
           sudo ln -s /usr/bin/$tool-17 /usr/bin/$tool
         done
+        # Install llvm-strip symlink to version 18 (scx meson.build requires llvm-strip executable)
+        sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-18 100
       shell: bash

@@ -71,7 +71,7 @@ $(BPF_OBJ): %.o: %.c
 		-c $< -o $@
 
 wrapper:
-	bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
+	scx/build/bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
 	clang -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include -I scx/scheds/include/arch/x86 -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 
