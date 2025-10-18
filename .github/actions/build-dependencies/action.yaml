@@ -31,6 +31,6 @@ runs:
           sudo rm -f /usr/bin/$tool
           sudo ln -s /usr/bin/$tool-17 /usr/bin/$tool
         done
-        # Install llvm-strip symlink (needed for scx build, uses version 18)
+        # Install llvm-strip symlink to version 18 (scx meson.build requires llvm-strip executable)
         sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-18 100
       shell: bash
