@@ -34,8 +34,11 @@ lint: build
 image: build
 	docker build -t 127.0.0.1:32000/gthulhu:latest .
 
+# Default kernel version for testing
+KERNEL_VERSION ?= 6.12.2
+
 test: build
-	vng -r v6.12.2 -- timeout 15 bash -c "./main" || true
+	vng -r v$(KERNEL_VERSION) -- timeout 15 bash -c "./main" || true
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
