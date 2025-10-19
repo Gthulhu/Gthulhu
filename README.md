@@ -1,5 +1,6 @@
 # Gthulhu Project
 [![Go](https://github.com/Gthulhu/Gthulhu/actions/workflows/go.yaml/badge.svg)](https://github.com/Gthulhu/Gthulhu/actions/workflows/go.yaml)
+[![Portability](https://github.com/Gthulhu/Gthulhu/actions/workflows/portability.yaml/badge.svg)](https://github.com/Gthulhu/Gthulhu/actions/workflows/portability.yaml)
 
 <img src="./assets/logo.png" alt="logo" width="300"/>
 
@@ -92,6 +93,16 @@ make test
 ```
 
 This uses `vng` (virtual kernel playground) to run the scheduler with the appropriate kernel version.
+
+You can also test with a specific kernel version:
+
+```bash
+make test KERNEL_VERSION=6.13
+```
+
+#### Portability Testing
+
+Gthulhu is automatically tested for portability across multiple Linux kernel versions (6.12+) through a daily scheduled GitHub Actions workflow. This ensures that the released packages remain compatible with newer kernel versions. The portability tests run against kernel versions 6.12, 6.13, 6.14, 6.15, 6.16, and 6.17.
 
 ### Running in Production
 

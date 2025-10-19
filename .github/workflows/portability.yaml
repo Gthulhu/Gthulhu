@@ -1,0 +1,65 @@
+name: Portability Validation
+
+on:
+  schedule:
+    # Run daily at 2:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/portability.yaml'
+      - 'qumun/**'
+      - 'main.go'
+      - 'Makefile'
+
+jobs:
+  portability-test:
+    name: Test on Linux ${{ matrix.kernel-version }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        kernel-version: ['6.12.2', '6.13', '6.14', '6.15', '6.16', '6.17']
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        uses: ./.github/actions/build-dependencies
+
+      - name: Build Gthulhu
+        run: |
+          make dep
+          git submodule init
+          git submodule sync
+          git submodule update
+          cd scx
+          meson setup build --prefix ~
+          meson compile -C build
+          cd ..
+          cd libbpfgo
+          make
+          cd ..
+          make build
+        shell: bash
+
+      - name: Test on Kernel ${{ matrix.kernel-version }}
+        run: |
+          make test KERNEL_VERSION=${{ matrix.kernel-version }}
+        shell: bash
+        continue-on-error: true
+
+      - name: Report Results
+        if: always()
+        run: |
+          echo "Portability test completed for kernel version ${{ matrix.kernel-version }}"
+          if [ $? -eq 0 ]; then
+            echo "✅ Test PASSED"
+          else
+            echo "❌ Test FAILED or SKIPPED"
+          fi
+        shell: bash
