@@ -14,7 +14,6 @@ import (
 	"github.com/Gthulhu/plugin/models"
 	"github.com/Gthulhu/plugin/plugin"
 	"github.com/Gthulhu/plugin/plugin/gthulhu"
-	"github.com/Gthulhu/plugin/plugin/simple"
 	core "github.com/Gthulhu/qumun/goland_core"
 	cache "github.com/Gthulhu/qumun/util"
 )
@@ -38,47 +37,21 @@ func main() {
 	var SLICE_NS_DEFAULT, SLICE_NS_MIN uint64
 
 	ctx, cancel := context.WithCancel(context.Background())
-
-	switch schedConfig.Mode {
-	case "simple":
-		log.Printf("Using simple scheduling mode, fifo=%v", cfg.SimpleScheduler.EnableFifo)
-		plugin := simple.NewSimplePlugin(cfg.SimpleScheduler.EnableFifo)
-		plugin.SetSliceDefault(schedConfig.SliceNsDefault)
-		p = plugin
-	default:
-		log.Println("Using gthulhu scheduling mode")
-		plugin := gthulhu.NewGthulhuPlugin(cfg.Scheduler.SliceNsDefault,
-			cfg.Scheduler.SliceNsMin)
-
-		SLICE_NS_DEFAULT, SLICE_NS_MIN = plugin.GetSchedulerConfig()
-
-		log.Printf("Scheduler config: SLICE_NS_DEFAULT=%d, SLICE_NS_MIN=%d",
-			SLICE_NS_DEFAULT, SLICE_NS_MIN)
-		p = plugin
-		// Start scheduling strategy fetcher
-		apiConfig := cfg.GetApiConfig()
-
-		if apiConfig.Enabled {
-			// Initialize JWT client for API authentication
-			err := plugin.InitJWTClient(apiConfig.PublicKeyPath, apiConfig.Url)
-			if err != nil {
-				log.Printf("Warning: Failed to initialize JWT client: %v", err)
-				log.Printf("Scheduling strategy fetcher and metrics reporting will be disabled")
-			} else {
-				// Initialize metrics client
-				err = plugin.InitMetricsClient(apiConfig.Url)
-				if err != nil {
-					log.Printf("Warning: Failed to initialize metrics client: %v", err)
-				} else {
-					metricsClient = plugin.GetMetricsClient()
-				}
-
-				apiUrl := apiConfig.Url + "/api/v1/scheduling/strategies"
-				log.Printf("API config: URL=%s, Interval=%d seconds", apiUrl, apiConfig.Interval)
-				plugin.StartStrategyFetcher(ctx, apiUrl, time.Duration(apiConfig.Interval)*time.Second)
-				log.Printf("Started scheduling strategy fetcher with JWT authentication, interval %d seconds", apiConfig.Interval)
-			}
-		}
+	config := &plugin.SchedConfig{
+		Mode: schedConfig.Mode,
+		Scheduler: plugin.Scheduler{
+			SliceNsDefault: cfg.Scheduler.SliceNsDefault,
+			SliceNsMin:     cfg.Scheduler.SliceNsMin,
+		},
+		APIConfig: plugin.APIConfig{
+			BaseURL:       cfg.Api.Url,
+			Interval:      cfg.Api.Interval,
+			PublicKeyPath: cfg.Api.PublicKeyPath,
+		},
+	}
+	p, err = plugin.NewSchedulerPlugin(ctx, config)
+	if err != nil {
+		log.Fatalf("Failed to create plugin: %v", err)
 	}
 
 	bpfModule := core.LoadSched("main.bpf.o")

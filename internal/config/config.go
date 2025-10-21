@@ -21,9 +21,8 @@ type SimpleSchedulerConfig struct {
 // ApiConfig represents API-specific configuration
 type ApiConfig struct {
 	Url           string `yaml:"url"`
-	Interval      int    `yaml:"interval"`          // Interval in seconds
-	Enabled       bool   `yaml:"enabled,omitempty"` // Optional flag to enable/disable API
-	PublicKeyPath string `yaml:"public_key_path"`   // Path to JWT public key for authentication
+	Interval      int    `yaml:"interval"`        // Interval in seconds
+	PublicKeyPath string `yaml:"public_key_path"` // Path to JWT public key for authentication
 }
 
 // Config represents the application configuration
