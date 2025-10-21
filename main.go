@@ -33,7 +33,6 @@ func main() {
 	schedConfig := cfg.GetSchedulerConfig()
 
 	var p plugin.CustomScheduler
-	var metricsClient *gthulhu.MetricsClient
 	var SLICE_NS_DEFAULT, SLICE_NS_MIN uint64
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,23 +126,21 @@ func main() {
 							log.Printf("bss data: %s", string(b))
 
 							// Send metrics to API server if metrics client is available
-							if metricsClient != nil {
-								// Convert BSS data to metrics format
-								metricsData := gthulhu.BssData{
-									UserschedLastRunAt: bss.Usersched_last_run_at,
-									NrQueued:           bss.Nr_queued,
-									NrScheduled:        bss.Nr_scheduled,
-									NrRunning:          bss.Nr_running,
-									NrOnlineCpus:       bss.Nr_online_cpus,
-									NrUserDispatches:   bss.Nr_user_dispatches,
-									NrKernelDispatches: bss.Nr_kernel_dispatches,
-									NrCancelDispatches: bss.Nr_cancel_dispatches,
-									NrBounceDispatches: bss.Nr_bounce_dispatches,
-									NrFailedDispatches: bss.Nr_failed_dispatches,
-									NrSchedCongested:   bss.Nr_sched_congested,
-								}
-								metricsClient.SendMetricsAsync(metricsData)
+							// Convert BSS data to metrics format
+							metricsData := gthulhu.BssData{
+								UserschedLastRunAt: bss.Usersched_last_run_at,
+								NrQueued:           bss.Nr_queued,
+								NrScheduled:        bss.Nr_scheduled,
+								NrRunning:          bss.Nr_running,
+								NrOnlineCpus:       bss.Nr_online_cpus,
+								NrUserDispatches:   bss.Nr_user_dispatches,
+								NrKernelDispatches: bss.Nr_kernel_dispatches,
+								NrCancelDispatches: bss.Nr_cancel_dispatches,
+								NrBounceDispatches: bss.Nr_bounce_dispatches,
+								NrFailedDispatches: bss.Nr_failed_dispatches,
+								NrSchedCongested:   bss.Nr_sched_congested,
 							}
+							p.SendMetrics(metricsData)
 						}
 					}
 				}
