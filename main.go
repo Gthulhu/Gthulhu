@@ -48,6 +48,9 @@ func main() {
 			PublicKeyPath: cfg.Api.PublicKeyPath,
 		},
 	}
+	if config.Mode == "" {
+		config.Mode = "gthulhu"
+	}
 	p, err = plugin.NewSchedulerPlugin(ctx, config)
 	if err != nil {
 		log.Fatalf("Failed to create plugin: %v", err)
