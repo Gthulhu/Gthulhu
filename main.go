@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,6 +19,12 @@ import (
 )
 
 func main() {
+	// Initialize structured logger
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+
 	// Parse command line flags
 	configFile := flag.String("config", "", "Path to YAML configuration file")
 	flag.Parse()
@@ -26,7 +32,8 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig(*configFile)
 	if err != nil {
-		log.Panicf("Failed to load configuration: %v", err)
+		slog.Error("Failed to load configuration", "error", err)
+		panic(err)
 	}
 
 	// Apply scheduler configuration before loading eBPF program
@@ -53,7 +60,8 @@ func main() {
 	}
 	p, err = plugin.NewSchedulerPlugin(ctx, config)
 	if err != nil {
-		log.Fatalf("Failed to create plugin: %v", err)
+		slog.Error("Failed to create plugin", "error", err)
+		os.Exit(1)
 	}
 
 	bpfModule := core.LoadSched("main.bpf.o")
@@ -62,20 +70,20 @@ func main() {
 	bpfModule.SetPlugin(p)
 
 	if cfg.IsDebugEnabled() {
-		log.Println("Debug mode enabled")
+		slog.Info("Debug mode enabled")
 		bpfModule.SetDebug(true)
 	}
 
 	if cfg.IsBuiltinIdleEnabled() {
-		log.Println("Built-in idle CPU selection enabled")
+		slog.Info("Built-in idle CPU selection enabled")
 		bpfModule.SetBuiltinIdle(true)
 	}
 
 	if cfg.EarlyProcessing {
-		log.Println("Early processing enabled")
+		slog.Info("Early processing enabled")
 		bpfModule.SetEarlyProcessing(true)
 	} else {
-		log.Println("Early processing disabled")
+		slog.Info("Early processing disabled")
 	}
 
 	bpfModule.SetDefaultSlice(schedConfig.SliceNsDefault)
@@ -83,26 +91,29 @@ func main() {
 	pid := os.Getpid()
 	err = bpfModule.AssignUserSchedPid(pid)
 	if err != nil {
-		log.Printf("AssignUserSchedPid failed: %v", err)
+		slog.Warn("AssignUserSchedPid failed", "error", err)
 	}
 	bpfModule.Start()
 
 	topo, err := cache.GetTopology()
 	if err != nil {
-		log.Panicf("GetTopology failed: %v", err)
+		slog.Error("GetTopology failed", "error", err)
+		panic(err)
 	}
-	log.Printf("Topology: %v", topo)
+	slog.Info("Topology", "topology", topo)
 
 	err = cache.InitCacheDomains(bpfModule)
 	if err != nil {
-		log.Panicf("InitCacheDomains failed: %v", err)
+		slog.Error("InitCacheDomains failed", "error", err)
+		panic(err)
 	}
 
 	if err := bpfModule.Attach(); err != nil {
-		log.Panicf("bpfModule attach failed: %v", err)
+		slog.Error("bpfModule attach failed", "error", err)
+		panic(err)
 	}
 
-	log.Printf("UserSched's Pid: %v", core.GetUserSchedPid())
+	slog.Info("UserSched's Pid", "pid", core.GetUserSchedPid())
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
@@ -113,20 +124,20 @@ func main() {
 		for cont {
 			select {
 			case <-signalChan:
-				log.Println("receive os signal")
+				slog.Info("receive os signal")
 				cont = false
 			case <-timer.C:
 				notifyCount++
 				if notifyCount%10 == 0 {
 					bss, err := bpfModule.GetBssData()
 					if err != nil {
-						log.Printf("GetBssData failed: %v", err)
+						slog.Warn("GetBssData failed", "error", err)
 					} else {
 						b, err := json.Marshal(bss)
 						if err != nil {
-							log.Printf("json.Marshal failed: %v", err)
+							slog.Warn("json.Marshal failed", "error", err)
 						} else {
-							log.Printf("bss data: %s", string(b))
+							slog.Info("bss data", "data", string(b))
 
 							// Send metrics to API server if metrics client is available
 							// Convert BSS data to metrics format
@@ -148,7 +159,7 @@ func main() {
 					}
 				}
 				if bpfModule.Stopped() {
-					log.Println("bpfModule stopped")
+					slog.Info("bpfModule stopped")
 					cont = false
 				}
 			}
@@ -157,10 +168,9 @@ func main() {
 		timer.Stop()
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {
-			log.Printf("uei: kind=%d, exitCode=%d, reason=%s, message=%s",
-				uei.Kind, uei.ExitCode, uei.GetReason(), uei.GetMessage())
+			slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
 		} else {
-			log.Printf("GetUeiData failed: %v", err)
+			slog.Warn("GetUeiData failed", "error", err)
 		}
 	}()
 
@@ -168,12 +178,12 @@ func main() {
 	var task *core.DispatchedTask
 	var cpu int32
 
-	log.Println("scheduler started")
+	slog.Info("scheduler started")
 
 	for true {
 		select {
 		case <-ctx.Done():
-			log.Println("context done, exiting scheduler loop")
+			slog.Info("context done, exiting scheduler loop")
 			return
 		default:
 		}
@@ -200,22 +210,22 @@ func main() {
 
 			err, cpu = bpfModule.SelectCPU(t)
 			if err != nil {
-				log.Printf("SelectCPU failed: %v", err)
+				slog.Warn("SelectCPU failed", "error", err)
 			}
 			task.Cpu = cpu
 
 			err = bpfModule.DispatchTask(task)
 			if err != nil {
-				log.Printf("DispatchTask failed: %v", err)
+				slog.Warn("DispatchTask failed", "error", err)
 				continue
 			}
 
 			err = core.NotifyComplete(bpfModule.GetPoolCount())
 			if err != nil {
-				log.Printf("NotifyComplete failed: %v", err)
+				slog.Warn("NotifyComplete failed", "error", err)
 			}
 		}
 	}
 
-	log.Println("scheduler exit")
+	slog.Info("scheduler exit")
 }
