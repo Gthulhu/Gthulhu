@@ -9,7 +9,12 @@
 
 ## Overview
 
-Gthulhu is a next-generation scheduler designed for the cloud-native ecosystem, built with Golang and powered by the qumun framework.
+Gthulhu is a next-generation scheduler designed for the cloud-native ecosystem, built with Golang and powered by the [qumun](https://github.com/Gthulhu/qumun) framework.
+- The qumun provides a series of API and abstractions to facilitate the development of custom Linux kernel schedulers using eBPF and Go.
+- Gthulhu implements a virtual runtime (vruntime) based scheduling policy, inspired by the concepts of proportional share scheduling and the needs of modern cloud-native applications.
+- Gthulhu supports preemptive multitasking, latency-sensitive task prioritization, and dynamic time slice adjustment to optimize CPU utilization and responsiveness. User can define what kind of tasks should be prioritized by invoking HTTP based APIs, provided by the [api server](https://github.com/Gthulhu/api).
+
+### Meaning of the Name
 
 The name Gthulhu is inspired by Cthulhu, a mythical creature known for its many tentacles. Just as tentacles can grasp and steer, Gthulhu symbolizes the ability to take the helm and navigate the complex world of modern distributed systems — much like how Kubernetes uses a ship’s wheel as its emblem.
 
