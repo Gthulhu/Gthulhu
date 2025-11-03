@@ -14,7 +14,6 @@ runs:
         go-version: "${{ inputs.go-version }}"
     - name: Install Compilers & Formatters
       run: |
-        sudo dpkg --add-architecture arm64
         sudo apt-get update
         sudo apt-get install --yes bsdutils
         sudo apt-get install --yes build-essential
@@ -26,8 +25,6 @@ runs:
         sudo apt-get install --yes systemtap-sdt-dev
         sudo apt-get install --yes python3 python3-pip ninja-build
         sudo apt-get install --yes libseccomp-dev protobuf-compiler
-        sudo apt-get install --yes gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-        sudo apt-get install --yes libelf-dev:arm64 zlib1g-dev:arm64 libzstd-dev:arm64
         pip3 install --user meson
         for tool in "clang" "clang-format" "llc"
         do
