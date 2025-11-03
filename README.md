@@ -29,33 +29,15 @@ Click the image below to see our DEMO on YouTube!
 <img src="./assets/preview.png" alt="preview" width="300"/>
 </a>
 
-## Star History
+## Prerequisites
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Gthulhu/Gthulhu&type=Date)](https://www.star-history.com/#Gthulhu/Gthulhu&Date)
-
-## Key Features
-
-- Virtual runtime (vruntime) based scheduling
-- Latency-sensitive task prioritization
-- Dynamic time slice adjustment
-- CPU topology aware task placement
-- Automatic idle CPU selection
-
-## How It Works
-
-The scheduling policy is based on virtual runtime:
-- Each task receives a time slice of execution (slice_ns)
-- The actual execution time is adjusted based on task's static priority (weight)
-- Tasks are dispatched from lowest to highest vruntime
-- Latency-sensitive tasks receive priority boost based on voluntary context switches
-
-## Building
-
-Prerequisites:
+To build and run Gthulhu, ensure you have the following prerequisites installed on your system
 - Go 1.22+
 - LLVM/Clang 17+
 - libbpf
 - Linux kernel 6.12+ with sched_ext support
+
+See [Installation guide](https://gthulhu.org/installation/) for detailed installation instructions.
 
 ## Usage
 
@@ -92,6 +74,12 @@ make build
 
 This compiles the BPF program, builds libbpf, generates the skeleton, and builds the Go application.
 
+Cross-compilation for arm64 is supported by setting the `ARCH` variable:
+
+```bash
+make build ARCH=arm64
+```
+
 ### Testing the Scheduler
 
 To test the scheduler in a virtual environment using kernel v6.12.2:
@@ -111,16 +99,6 @@ make test KERNEL_VERSION=6.13
 #### Portability Testing
 
 Gthulhu is automatically tested for portability across multiple Linux kernel versions (6.12+) through a daily scheduled GitHub Actions workflow. This ensures that the released packages remain compatible with newer kernel versions. The portability tests run against kernel versions 6.12, 6.13, 6.14, 6.15, 6.16, and 6.17.
-
-### Running in Production
-
-To run the scheduler on your system:
-
-```bash
-sudo ./main
-```
-
-The scheduler will run until terminated with Ctrl+C (SIGINT) or SIGTERM.
 
 ### Launching Gthulhu by using schedkit
 
@@ -180,25 +158,7 @@ stress-ng -c 20 --timeout 20s --metrics-brief
 
 ## Troubleshooting
 
-### Issue 1: `undefined reference to eu_search_tree_init`
-
-If you encounter this, it’s because the system is using the elfutils version of libelf. You can download and compile libelf yourself to resolve it:
-```sh
-sudo apt remove --purge elfutils libelf-dev
-cd ~
-git clone https://github.com/arachsys/libelf.git
-cd libelf
-make
-sudo make install
-```
-
-### Issue 2: `ERROR: Program 'clang' not found or not executable`
-
-If you see this when running meson setup build --prefix ~, try:
-```sh
-sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-17 100
-sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-17 100
-```
+See [Installation guide](https://gthulhu.org/installation/#troubleshooting).
 
 ## License
 
@@ -206,12 +166,16 @@ This software is distributed under the terms of the GNU General Public License v
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+See [Contributing guide](https://gthulhu.org/contributing/).
 
 ## Community Resources
 
 - [NotebookLM](https://notebooklm.google.com/notebook/89a6a260-3d54-4760-93a2-dcc06c6d8043): includes all of materials used in the project, including the pptx, design documents, and more.
 - [GitHub Discussion](https://github.com/Gthulhu/Gthulhu/discussions): a place for community discussions, questions, and feature requests.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Gthulhu/Gthulhu&type=Date)](https://www.star-history.com/#Gthulhu/Gthulhu&Date)
 
 ## Special Thanks
 
