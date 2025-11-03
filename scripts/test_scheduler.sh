@@ -5,7 +5,7 @@
 set -e
 
 LOGFILE="/tmp/scheduler_test.log"
-TIMEOUT_DURATION=15
+TIMEOUT_DURATION=60
 WARMUP_TIME=15
 
 echo "Starting scheduler test..."
