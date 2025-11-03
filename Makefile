@@ -1,3 +1,36 @@
+# Gthulhu Scheduler Makefile
+# 
+# Usage:
+#   make build              # Build for default architecture (x86_64)
+#   make build ARCH=arm64   # Build for ARM64 architecture
+#   make build-arm64        # Convenience target for ARM64 build
+#   make test               # Test on x86_64
+#   make test-arm64         # Test on ARM64
+#   make image              # Build Docker image for x86_64
+#   make image-arm64        # Build Docker image for ARM64
+#
+# Architecture configuration (default: x86_64, can override with ARCH=arm64)
+ARCH ?= x86_64
+
+# Architecture-specific settings
+ifeq ($(ARCH),arm64)
+    ARCH_DEFINE = -D__TARGET_ARCH_arm64
+    ARCH_CPU_FLAGS = -mcpu=v3
+    ARCH_SCHED_INCLUDE = -I scx/scheds/include/arch/aarch64
+    ARCH_INCLUDE_DIR = aarch64-linux-gnu
+    GOARCH_ENV = CGO_ENABLED=1 GOARCH=arm64
+    CGO_CC = aarch64-linux-gnu-gcc
+    LIBBPF_CC = aarch64-linux-gnu-gcc
+else
+    ARCH_DEFINE = -D__TARGET_ARCH_x86
+    ARCH_CPU_FLAGS = -mcpu=v3
+    ARCH_SCHED_INCLUDE = -I scx/scheds/include/arch/x86
+    ARCH_INCLUDE_DIR = x86_64-linux-gnu
+    GOARCH_ENV = 
+    CGO_CC = clang
+    LIBBPF_CC = gcc
+endif
+
 OUTPUT = output
 LIBBPF_SRC = $(abspath libbpf/src)
 LIBBPF_OBJ = $(abspath $(OUTPUT)/libbpf.a)
@@ -18,12 +51,22 @@ LIBBPF_OBJ = $(abspath $(OUTPUT)/libbpf.a)
 LIBBPF_OBJDIR = $(abspath ./$(OUTPUT)/libbpf)
 LIBBPF_DESTDIR = $(abspath ./$(OUTPUT))
 CLANG_BPF_SYS_INCLUDES := `shell $(CLANG) -v -E - </dev/null 2>&1 | sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }'`
-CGOFLAG = CC=clang CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/qumun -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
+CGOFLAG = $(GOARCH_ENV) CC=$(CGO_CC) CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/qumun -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
 STATIC=-extldflags -static
 
 .PHONY: build
 build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper
 	$(CGOFLAG) go build -ldflags "-w -s $(STATIC)" main.go
+
+# Build for ARM64 architecture
+.PHONY: build-arm64
+build-arm64:
+	$(MAKE) build ARCH=arm64
+
+# Build for x86_64 architecture (explicit)
+.PHONY: build-x86_64
+build-x86_64:
+	$(MAKE) build ARCH=x86_64
 
 .PHONY: lint
 lint: build
@@ -34,11 +77,23 @@ lint: build
 image: build
 	docker build -t 127.0.0.1:32000/gthulhu:latest .
 
+# Build ARM64 Docker image
+.PHONY: image-arm64
+image-arm64:
+	$(MAKE) build-arm64
+	docker build -t 127.0.0.1:32000/gthulhu:latest-arm64 .
+
 # Default kernel version for testing
 KERNEL_VERSION ?= 6.12.2
 
 test: build
-	vng -r v$(KERNEL_VERSION) -- timeout 15 bash -c "./main" || true
+	vng -r v$(KERNEL_VERSION) -- timeout 15 bash -c "./main"
+
+# Test with ARM64 build
+.PHONY: test-arm64
+test-arm64:
+	$(MAKE) build-arm64
+	vng --arch arm64 -r v$(KERNEL_VERSION) -- timeout 15 bash -c "./main"
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
@@ -47,7 +102,8 @@ libbpf-uapi: $(LIBBPF_SRC)
 
 .PHONY: libbpf
 libbpf: $(LIBBPF_SRC) $(wildcard $(LIBBPF_SRC)/*.[ch])
-	CC="gcc" CFLAGS="-g -O2 -Wall -fpie" \
+	$(MAKE) -C $(LIBBPF_SRC) clean
+	CC="$(LIBBPF_CC)" CFLAGS="-g -O2 -Wall -fpie" \
 	   $(MAKE) -C $(LIBBPF_SRC) \
 		BUILD_STATIC_ONLY=1 \
 		OBJDIR=$(LIBBPF_OBJDIR) \
@@ -67,18 +123,19 @@ dep:
 $(BPF_OBJ): %.o: %.c
 	clang-17 \
 		-O2 -g -Wall -target bpf \
-		-D__TARGET_ARCH_x86 -mcpu=v3 -mlittle-endian \
-		'-idirafter$ /usr/lib/llvm-17/lib/clang/17/include' '-idirafter$ /usr/local/include' '-idirafter$ /usr/include/x86_64-linux-gnu' '-idirafter$ /usr/include' \
-		-I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include -I scx/scheds/include/arch/x86 -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib \
+		$(ARCH_DEFINE) $(ARCH_CPU_FLAGS) -mlittle-endian \
+		-idirafter /usr/lib/llvm-17/lib/clang/17/include -idirafter /usr/local/include -idirafter /usr/include/$(ARCH_INCLUDE_DIR) -idirafter /usr/include \
+		-I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib \
 		-Wno-compare-distinct-pointer-types \
 		-c $< -o $@
 
 wrapper:
 	scx/build/bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
-	clang -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include -I scx/scheds/include/arch/x86 -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
+	$(CGO_CC) -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 
 clean:
+	rm -rf output || true
 	rm libwrapper.a || true
 	rm *.skeleton.h || true
 	rm *.ll *.o || true
