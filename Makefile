@@ -87,13 +87,17 @@ image-arm64:
 KERNEL_VERSION ?= 6.12.2
 
 test: build
-	vng -r v$(KERNEL_VERSION) -- timeout 15 bash -c "./main"
+	@echo "Running scheduler test for $(KERNEL_VERSION)..."
+	@chmod +x scripts/test_scheduler.sh
+	@vng -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh
 
 # Test with ARM64 build
 .PHONY: test-arm64
 test-arm64:
 	$(MAKE) build-arm64
-	vng --arch arm64 -r v$(KERNEL_VERSION) -- timeout 15 bash -c "./main"
+	@echo "Running ARM64 scheduler test for $(KERNEL_VERSION)..."
+	@chmod +x scripts/test_scheduler.sh
+	@vng --arch arm64 -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
