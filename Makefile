@@ -9,6 +9,30 @@
 #   make image              # Build Docker image for x86_64
 #   make image-arm64        # Build Docker image for ARM64
 #
+
+# Minimum required clang version
+MIN_CLANG_VERSION = 17
+
+# Auto-detect clang or use CLANG environment variable
+CLANG ?= $(shell which clang 2>/dev/null)
+ifeq ($(CLANG),)
+    $(error clang not found. Please install clang $(MIN_CLANG_VERSION)+ or set CLANG environment variable)
+endif
+
+# Extract clang version
+CLANG_VERSION := $(shell $(CLANG) --version | head -n1 | sed -E 's/.*version ([0-9]+).*/\1/')
+
+# Validate clang version
+ifeq ($(shell test $(CLANG_VERSION) -ge $(MIN_CLANG_VERSION); echo $$?),1)
+    $(error clang version $(CLANG_VERSION) is too old. Minimum required: $(MIN_CLANG_VERSION))
+endif
+
+# Auto-detect clang resource directory for include paths
+CLANG_RESOURCE_DIR := $(shell $(CLANG) --print-resource-dir)
+
+$(info Using clang version $(CLANG_VERSION) at $(CLANG))
+$(info Clang resource directory: $(CLANG_RESOURCE_DIR))
+
 # Architecture configuration (default: x86_64, can override with ARCH=arm64)
 ARCH ?= x86_64
 
@@ -44,12 +68,7 @@ BPF_C = ${BPF_TARGET:=.c}
 BPF_OBJ = ${BPF_C:.c=.o}
 
 BASEDIR = $(abspath .)
-OUTPUT = output
 LIBBPF_INCLUDE_UAPI = $(abspath ./libbpf/include/uapi)
-LIBBPF_SRC = $(abspath libbpf/src)
-LIBBPF_OBJ = $(abspath $(OUTPUT)/libbpf.a)
-LIBBPF_OBJDIR = $(abspath ./$(OUTPUT)/libbpf)
-LIBBPF_DESTDIR = $(abspath ./$(OUTPUT))
 CLANG_BPF_SYS_INCLUDES := `shell $(CLANG) -v -E - </dev/null 2>&1 | sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }'`
 CGOFLAG = $(GOARCH_ENV) CC=$(CGO_CC) CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/qumun -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
 STATIC=-extldflags -static
@@ -125,10 +144,10 @@ dep:
 
 
 $(BPF_OBJ): %.o: %.c
-	clang-17 \
+	$(CLANG) \
 		-O2 -g -Wall -target bpf \
 		$(ARCH_DEFINE) $(ARCH_CPU_FLAGS) -mlittle-endian \
-		-idirafter /usr/lib/llvm-17/lib/clang/17/include -idirafter /usr/local/include -idirafter /usr/include/$(ARCH_INCLUDE_DIR) -idirafter /usr/include \
+		-idirafter $(CLANG_RESOURCE_DIR)/include -idirafter /usr/local/include -idirafter /usr/include/$(ARCH_INCLUDE_DIR) -idirafter /usr/include \
 		-I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib \
 		-Wno-compare-distinct-pointer-types \
 		-c $< -o $@
