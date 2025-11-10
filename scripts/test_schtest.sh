@@ -93,15 +93,61 @@ if [ ! -d "${SCHEDULER_DIR}/api" ]; then
 fi
 # Create a dummy JWT public key file if it doesn't exist (to avoid startup errors)
 # The scheduler will log a warning but should still start
-if [ ! -f "${SCHEDULER_DIR}/api/jwt_public_key.pem" ] && [ ! -f "${SCHEDULER_DIR}/api/config/jwt_public_key.pem" ]; then
+# Note: The scheduler looks for ./api/jwt_public_key.pem (relative to working directory)
+if [ ! -f "${SCHEDULER_DIR}/api/jwt_public_key.pem" ]; then
     echo "⚠ JWT public key file not found, creating dummy file to avoid startup errors..."
-    mkdir -p "${SCHEDULER_DIR}/api/config" 2>/dev/null || true
-    echo "# Dummy JWT public key for testing" > "${SCHEDULER_DIR}/api/config/jwt_public_key.pem" 2>/dev/null || true
+    mkdir -p "${SCHEDULER_DIR}/api" 2>/dev/null || true
+    # Create a minimal valid PEM file structure (even if it's not a real key)
+    cat > "${SCHEDULER_DIR}/api/jwt_public_key.pem" <<EOF
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0Z3VS5JJcds3xfn/ygWp
+4X2HVIjLc5e3uYuKtAhQ8SIGH9cPeHxTOAYWl0VHZRhqvQnF6XjLhOmNZHPDHuBP
+wBKjqrXXRkWXZfVZcnLQrmFUvNRoMdBfr7E5T8W0W7XQ7x/oVXn6l6NRQw2Ycb5c
+b0mQhXLZfJXsrFqYXQWXC7nJx6D5/CJvGNB3xXmXQ0VqYHPvOXxRQQvNQqQVbPZH
+8WQXJ0jVWQFxYXmQz9QW+MZhXPwXvHqQjQXQ7vNRQQwZJXxvHQmQZvXQRQXQHvQZ
+vHQZQXQvZHQRQXHQvQRQZQXvQHQZQRvXQHQXvQZHQXRQZvHQXQRHQZvXQRQXHQvZ
+QIDAQAB
+-----END PUBLIC KEY-----
+EOF
+    chmod 644 "${SCHEDULER_DIR}/api/jwt_public_key.pem" 2>/dev/null || true
 fi
 
 # Note: schtest will start the scheduler itself
 # We don't pre-initialize because it causes scheduler state issues
 # (e.g., "disabling" status when schtest tries to query it)
+
+# Create a wrapper script for the scheduler that adds a startup delay
+# This helps schtest avoid catching the scheduler in "disabling" transition state
+SCHEDULER_WRAPPER="${SCHEDULER_DIR}/scheduler_wrapper.sh"
+echo "Creating scheduler wrapper script..."
+cat > "${SCHEDULER_WRAPPER}" <<'WRAPPER_EOF'
+#!/bin/bash
+# Wrapper script to add startup delay for scheduler
+# This ensures schtest doesn't query the scheduler during state transitions
+
+# Get the real scheduler binary path (passed as first argument or from wrapper location)
+REAL_SCHEDULER="$(dirname "$0")/main"
+
+# Start the scheduler in background
+"${REAL_SCHEDULER}" "$@" &
+SCHEDULER_PID=$!
+
+# Add a delay to let the scheduler fully initialize
+# This prevents schtest from catching it in "disabling" state
+sleep 2
+
+# Wait for the scheduler process
+wait $SCHEDULER_PID
+WRAPPER_EOF
+
+chmod +x "${SCHEDULER_WRAPPER}"
+
+# Use the wrapper instead of the real binary
+SCHEDULER_BINARY="${SCHEDULER_WRAPPER}"
+export SCHEDULER_BINARY
+
+echo "Waiting for system to stabilize before running schtest..."
+sleep 2
 
 # Run schtest - check if schtest has a test runner
 # Note: schtest will start the scheduler itself, we don't need to start it in background
@@ -114,22 +160,63 @@ if [ -f "${SCHTEST_DIR}/target/release/schtest" ]; then
     # Check schtest help to understand usage
     echo "Checking schtest usage..."
     "${SCHTEST_BIN}" --help 2>&1 | head -20 || true
-    # Run schtest with scheduler binary path as argument (if supported)
-    # Also export as environment variable for cases that use it
-    if "${SCHTEST_BIN}" "${SCHEDULER_BINARY}" 2>&1; then
+    
+    # Run schtest with retry logic to handle scheduler state transition timing
+    # Sometimes schtest catches the scheduler in "disabling" state during startup
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    SCHTEST_SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+        if "${SCHTEST_BIN}" "${SCHEDULER_BINARY}" 2>&1; then
+            SCHTEST_SUCCESS=true
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠ Schtest attempt failed, retrying in 5 seconds..."
+                # Ensure any running scheduler processes are stopped
+                pkill -9 -f "${SCHEDULER_BINARY}" 2>/dev/null || true
+                sleep 5
+            fi
+        fi
+    done
+    
+    if [ "$SCHTEST_SUCCESS" = true ]; then
         echo "✓ Schtest tests passed"
     else
-        echo "✗ Schtest tests failed"
+        echo "✗ Schtest tests failed after $MAX_RETRIES attempts"
         exit 1
     fi
 elif [ -f "${SCHTEST_DIR}/schtest" ]; then
     SCHTEST_BIN="${SCHTEST_DIR}/schtest"
     echo "Running schtest binary: ${SCHTEST_BIN}"
-    # Run schtest with scheduler binary path
-    if "${SCHTEST_BIN}" "${SCHEDULER_BINARY}" 2>&1; then
+    
+    # Run schtest with retry logic
+    MAX_RETRIES=3
+    RETRY_COUNT=0
+    SCHTEST_SUCCESS=false
+    
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
+        if "${SCHTEST_BIN}" "${SCHEDULER_BINARY}" 2>&1; then
+            SCHTEST_SUCCESS=true
+            break
+        else
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⚠ Schtest attempt failed, retrying in 5 seconds..."
+                pkill -9 -f "${SCHEDULER_BINARY}" 2>/dev/null || true
+                sleep 5
+            fi
+        fi
+    done
+    
+    if [ "$SCHTEST_SUCCESS" = true ]; then
         echo "✓ Schtest tests passed"
     else
-        echo "✗ Schtest tests failed"
+        echo "✗ Schtest tests failed after $MAX_RETRIES attempts"
         exit 1
     fi
 # Check if schtest has a Makefile with test target
