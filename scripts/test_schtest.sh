@@ -36,53 +36,11 @@ fi
 # Export SCHEDULER_BINARY as environment variable for schtest cases
 export SCHEDULER_BINARY
 
-# Pre-initialize scheduler to ensure it's ready (similar to test_scheduler.sh)
-# This helps verify the scheduler binary works correctly before schtest runs
-echo "Pre-initializing scheduler to verify it's ready..."
-LOGFILE="/tmp/schtest_scheduler.log"
-TIMEOUT_DURATION=30
-WARMUP_TIME=15
-
-# Run scheduler in background to verify it starts correctly
-timeout ${TIMEOUT_DURATION} "${SCHEDULER_BINARY}" > "${LOGFILE}" 2>&1 &
-SCHED_PID=$!
-
-echo "Scheduler PID: ${SCHED_PID}"
-
-# Wait for scheduler to initialize
-sleep ${WARMUP_TIME}
-
-# Check if scheduler is still running
-if ! ps -p ${SCHED_PID} > /dev/null 2>&1; then
-    echo "✗ Scheduler crashed during initialization"
-    echo "Log output:"
-    cat "${LOGFILE}"
-    exit 1
-fi
-
-echo "✓ Scheduler is running"
-
-# Check if scheduler started successfully
-if grep -q "scheduler started" "${LOGFILE}"; then
-    echo "✓ Scheduler started successfully"
-else
-    echo "✗ Scheduler did not start properly"
-    echo "Log output:"
-    cat "${LOGFILE}"
-    kill ${SCHED_PID} 2>/dev/null || true
-    exit 1
-fi
-
-# Let it run for a few more seconds to ensure it's fully ready
-sleep 5
-
-# Clean shutdown - ensure scheduler is fully stopped before schtest starts
-echo "Stopping pre-initialized scheduler..."
-kill ${SCHED_PID} 2>/dev/null || true
-wait ${SCHED_PID} 2>/dev/null || true
-
-# Wait a bit more to ensure scheduler state is fully cleared
-sleep 2
+# Note: schtest will start the scheduler itself
+# We don't pre-initialize because it causes scheduler state issues
+# (e.g., "disabling" status when schtest tries to query it)
+# Pre-initialization can leave the scheduler in a "disabling" state
+# which prevents schtest from properly starting and testing the scheduler
 
 # Run schtest - check if schtest has a test runner
 # Note: schtest will start the scheduler itself, we don't need to start it in background
