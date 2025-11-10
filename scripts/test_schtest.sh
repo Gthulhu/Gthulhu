@@ -1,7 +1,7 @@
 #!/bin/bash
 # Schtest integration script
 # This script runs schtest test cases against the Gthulhu scheduler
-# Note: schtest will start the scheduler itself, but we can pre-initialize it
+# It starts the Gthulhu scheduler first, then runs schtest against it
 
 set -e
 
@@ -112,155 +112,120 @@ EOF
     chmod 644 "${SCHEDULER_DIR}/api/jwt_public_key.pem" 2>/dev/null || true
 fi
 
-# Note: schtest will start the scheduler itself
-# We don't pre-initialize because it causes scheduler state issues
-# (e.g., "disabling" status when schtest tries to query it)
-
-# Create a wrapper script for the scheduler that adds a startup delay
-# This helps schtest avoid catching the scheduler in "disabling" transition state
-SCHEDULER_WRAPPER="${SCHEDULER_DIR}/scheduler_wrapper.sh"
-echo "Creating scheduler wrapper script..."
-cat > "${SCHEDULER_WRAPPER}" <<'WRAPPER_EOF'
-#!/bin/bash
-# Wrapper script to add startup delay for scheduler
-# This ensures schtest doesn't query the scheduler during state transitions
-
-# Get the real scheduler binary path (passed as first argument or from wrapper location)
-REAL_SCHEDULER="$(dirname "$0")/main"
-
-# Start the scheduler in background
-"${REAL_SCHEDULER}" "$@" &
+# Start the Gthulhu scheduler in the background
+echo "Starting Gthulhu scheduler..."
+cd "${SCHEDULER_DIR}"
+"${SCHEDULER_BINARY}" > "${LOGFILE}" 2>&1 &
 SCHEDULER_PID=$!
+cd - > /dev/null
 
-# Add a delay to let the scheduler fully initialize
-# This prevents schtest from catching it in "disabling" state
-sleep 2
+# Function to cleanup scheduler on exit
+cleanup_scheduler() {
+    echo ""
+    if [ -n "${SCHEDULER_PID:-}" ]; then
+        echo "Cleaning up scheduler (PID: $SCHEDULER_PID)..."
+        if kill -0 "$SCHEDULER_PID" 2>/dev/null; then
+            kill "$SCHEDULER_PID" 2>/dev/null || true
+            sleep 2
+            # Force kill if still running
+            kill -9 "$SCHEDULER_PID" 2>/dev/null || true
+        fi
+    fi
+    # Also kill any remaining scheduler processes
+    if [ -n "${SCHEDULER_BINARY:-}" ]; then
+        pkill -f "${SCHEDULER_BINARY}" 2>/dev/null || true
+        pkill -9 -f "${SCHEDULER_BINARY}" 2>/dev/null || true
+    fi
+}
 
-# Wait for the scheduler process
-wait $SCHEDULER_PID
-WRAPPER_EOF
+# Register cleanup function
+trap cleanup_scheduler EXIT INT TERM
 
-chmod +x "${SCHEDULER_WRAPPER}"
+# Wait for scheduler to fully start
+echo "Waiting for scheduler to initialize..."
+sleep 3
 
-# Use the wrapper instead of the real binary
-SCHEDULER_BINARY="${SCHEDULER_WRAPPER}"
-export SCHEDULER_BINARY
+# Check if scheduler is still running
+if ! kill -0 "$SCHEDULER_PID" 2>/dev/null; then
+    echo "✗✗✗ ERROR: Scheduler process died immediately after starting ✗✗✗"
+    echo "✗ Check scheduler logs:"
+    tail -50 "${LOGFILE}" 2>/dev/null || true
+    exit 1
+fi
 
-echo "Waiting for system to stabilize before running schtest..."
-sleep 2
+# Check scheduler state via sysfs (if available)
+if [ -f "/sys/kernel/sched_ext/state" ]; then
+    echo "Checking scheduler state..."
+    for i in {1..10}; do
+        CURRENT_STATE=$(cat /sys/kernel/sched_ext/state 2>/dev/null || echo "unknown")
+        echo "  Attempt $i: scheduler state = ${CURRENT_STATE}"
+        if [ "${CURRENT_STATE}" = "enabled" ] || [ "${CURRENT_STATE}" = "running" ]; then
+            echo "✓ Scheduler is running (state: ${CURRENT_STATE})"
+            break
+        elif [ "${CURRENT_STATE}" = "disabling" ]; then
+            echo "⚠ Scheduler is in 'disabling' state, waiting..."
+            sleep 2
+        elif [ "${CURRENT_STATE}" = "disabled" ] && [ $i -lt 10 ]; then
+            echo "⚠ Scheduler state is 'disabled', waiting for it to enable..."
+            sleep 2
+        fi
+        if [ $i -eq 10 ]; then
+            echo "⚠ Warning: Scheduler state is still '${CURRENT_STATE}' after 10 attempts"
+        fi
+    done
+fi
 
-# Run schtest - check if schtest has a test runner
-# Note: schtest will start the scheduler itself, we don't need to start it in background
+echo "✓ Scheduler is running (PID: $SCHEDULER_PID)"
+echo ""
+
+# Run schtest - use debug version if available, otherwise try release
 echo "Running schtest tests..."
 
-# Check if there's a built binary (preferred, works in vng environment)
-if [ -f "${SCHTEST_DIR}/target/release/schtest" ]; then
+# Check for schtest binary - prefer debug version, then release, then other locations
+SCHTEST_BIN=""
+if [ -f "${SCHTEST_DIR}/target/debug/schtest" ]; then
+    SCHTEST_BIN="${SCHTEST_DIR}/target/debug/schtest"
+    echo "Found schtest debug binary: ${SCHTEST_BIN}"
+elif [ -f "${SCHTEST_DIR}/target/release/schtest" ]; then
     SCHTEST_BIN="${SCHTEST_DIR}/target/release/schtest"
-    echo "Running schtest binary: ${SCHTEST_BIN}"
-    # Check schtest help to understand usage
-    echo "Checking schtest usage..."
-    "${SCHTEST_BIN}" --help 2>&1 | head -20 || true
-    
-    # Run schtest with retry logic to handle scheduler state transition timing
-    # Sometimes schtest catches the scheduler in "disabling" state during startup
-    MAX_RETRIES=3
-    RETRY_COUNT=0
-    SCHTEST_SUCCESS=false
-    
-    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
-        if "${SCHTEST_BIN}" "${SCHEDULER_BINARY}" 2>&1; then
-            SCHTEST_SUCCESS=true
-            break
-        else
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "⚠ Schtest attempt failed, retrying in 5 seconds..."
-                # Ensure any running scheduler processes are stopped
-                pkill -9 -f "${SCHEDULER_BINARY}" 2>/dev/null || true
-                sleep 5
-            fi
-        fi
-    done
-    
-    if [ "$SCHTEST_SUCCESS" = true ]; then
-        echo "✓ Schtest tests passed"
-    else
-        echo "✗ Schtest tests failed after $MAX_RETRIES attempts"
-        exit 1
-    fi
+    echo "Found schtest release binary: ${SCHTEST_BIN}"
 elif [ -f "${SCHTEST_DIR}/schtest" ]; then
     SCHTEST_BIN="${SCHTEST_DIR}/schtest"
-    echo "Running schtest binary: ${SCHTEST_BIN}"
-    
-    # Run schtest with retry logic
-    MAX_RETRIES=3
-    RETRY_COUNT=0
-    SCHTEST_SUCCESS=false
-    
-    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES..."
-        if "${SCHTEST_BIN}" "${SCHEDULER_BINARY}" 2>&1; then
-            SCHTEST_SUCCESS=true
-            break
-        else
-            RETRY_COUNT=$((RETRY_COUNT + 1))
-            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-                echo "⚠ Schtest attempt failed, retrying in 5 seconds..."
-                pkill -9 -f "${SCHEDULER_BINARY}" 2>/dev/null || true
-                sleep 5
-            fi
-        fi
-    done
-    
-    if [ "$SCHTEST_SUCCESS" = true ]; then
-        echo "✓ Schtest tests passed"
-    else
-        echo "✗ Schtest tests failed after $MAX_RETRIES attempts"
-        exit 1
-    fi
-# Check if schtest has a Makefile with test target
-elif [ -f "${SCHTEST_DIR}/Makefile" ]; then
-    echo "Running schtest via Makefile..."
-    cd "${SCHTEST_DIR}"
-    # Pass SCHEDULER_BINARY as environment variable, not as Makefile variable
-    if SCHEDULER_BINARY="${SCHEDULER_BINARY}" make test 2>&1; then
-        echo "✓ Schtest tests passed"
-        cd - > /dev/null
-    else
-        echo "✗ Schtest tests failed"
-        cd - > /dev/null
-        exit 1
-    fi
-# Check if schtest has Cargo.toml (Rust project) - only if cargo is available
-elif [ -f "${SCHTEST_DIR}/Cargo.toml" ] && command -v cargo >/dev/null 2>&1; then
-    echo "Running schtest via Cargo..."
-    cd "${SCHTEST_DIR}"
-    # Pass SCHEDULER_BINARY as environment variable for Rust tests
-    # Rust tests can access it via std::env::var("SCHEDULER_BINARY")
-    if SCHEDULER_BINARY="${SCHEDULER_BINARY}" cargo test --all --all-features -- --nocapture 2>&1; then
-        echo "✓ Schtest tests passed"
-        cd - > /dev/null
-    else
-        echo "✗ Schtest tests failed"
-        cd - > /dev/null
-        exit 1
-    fi
+    echo "Found schtest binary: ${SCHTEST_BIN}"
 else
-    echo "⚠ Could not find schtest test runner"
-    echo "Expected one of:"
-    echo "  - ${SCHTEST_DIR}/target/release/schtest (built binary)"
-    echo "  - ${SCHTEST_DIR}/schtest (binary)"
-    echo "  - ${SCHTEST_DIR}/Makefile (with test target)"
-    if [ -f "${SCHTEST_DIR}/Cargo.toml" ]; then
-        echo "  - ${SCHTEST_DIR}/Cargo.toml (Rust project, but cargo not available in vng environment)"
-        echo "    Note: schtest should be built before running in vng environment"
-    fi
+    echo ""
+    echo "✗✗✗ ERROR: Could not find schtest binary ✗✗✗"
+    echo "✗ Expected one of:"
+    echo "✗   - ${SCHTEST_DIR}/target/debug/schtest (preferred)"
+    echo "✗   - ${SCHTEST_DIR}/target/release/schtest"
+    echo "✗   - ${SCHTEST_DIR}/schtest"
+    echo ""
+    echo "✗ Directory contents:"
     ls -la "${SCHTEST_DIR}" 2>/dev/null | head -20 || true
+    echo ""
+    echo "✗ Debug directory contents:"
+    ls -la "${SCHTEST_DIR}/target/debug" 2>/dev/null | head -10 || true
+    echo ""
+    echo "✗ Release directory contents:"
     ls -la "${SCHTEST_DIR}/target/release" 2>/dev/null | head -10 || true
     exit 1
 fi
 
+# Run schtest with sudo (no scheduler binary argument needed since it's already running)
+echo "Executing: sudo ${SCHTEST_BIN}"
+if sudo "${SCHTEST_BIN}" 2>&1; then
+    echo "✓ Schtest tests passed"
+    SCHTEST_EXIT_CODE=0
+else
+    SCHTEST_EXIT_CODE=$?
+    echo ""
+    echo "✗✗✗ Schtest tests FAILED ✗✗✗"
+    echo "✗ Exit code: $SCHTEST_EXIT_CODE"
+    echo "✗ Please check the logs above for details"
+    exit 1
+fi
+
+echo ""
 echo "✓ Schtest integration test completed successfully"
 exit 0
 
