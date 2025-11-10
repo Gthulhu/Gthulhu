@@ -67,6 +67,20 @@ if [ -f "/sys/kernel/sched_ext/state" ]; then
             fi
         done
     fi
+    
+    # Ensure state is disabled before schtest starts
+    # This helps avoid "disabling" status when schtest queries
+    if [ "${CURRENT_STATE}" != "disabled" ] && [ "${CURRENT_STATE}" != "unknown" ]; then
+        echo "⚠ Scheduler state is not 'disabled' (${CURRENT_STATE}), waiting for it to clear..."
+        for i in {1..10}; do
+            sleep 1
+            CURRENT_STATE=$(cat /sys/kernel/sched_ext/state 2>/dev/null || echo "unknown")
+            if [ "${CURRENT_STATE}" = "disabled" ] || [ "${CURRENT_STATE}" = "unknown" ]; then
+                echo "✓ Scheduler state is now: ${CURRENT_STATE}"
+                break
+            fi
+        done
+    fi
 fi
 
 # Note: schtest will start the scheduler itself
