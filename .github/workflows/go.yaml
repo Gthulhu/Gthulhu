@@ -1,12 +1,13 @@
 name: Go
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'GTHULHU-43' ]
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
+      - 'GTHULHU-43'
   workflow_dispatch: # Allow manual trigger
   workflow_call:
 jobs:
