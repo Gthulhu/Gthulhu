@@ -36,11 +36,42 @@ fi
 # Export SCHEDULER_BINARY as environment variable for schtest cases
 export SCHEDULER_BINARY
 
+# Ensure no scheduler is running before schtest starts
+# This helps avoid "disabling" status issues
+echo "Checking for any running scheduler processes..."
+if pgrep -f "${SCHEDULER_BINARY}" > /dev/null 2>&1; then
+    echo "⚠ Found running scheduler processes, stopping them..."
+    pkill -f "${SCHEDULER_BINARY}" || true
+    sleep 2
+    # Force kill if still running
+    pkill -9 -f "${SCHEDULER_BINARY}" || true
+    sleep 1
+fi
+
+# Check scheduler status via sysfs (if available)
+# This helps ensure scheduler state is cleared
+if [ -f "/sys/kernel/sched_ext/state" ]; then
+    echo "Checking scheduler state..."
+    CURRENT_STATE=$(cat /sys/kernel/sched_ext/state 2>/dev/null || echo "unknown")
+    echo "Current scheduler state: ${CURRENT_STATE}"
+    
+    # Wait for state to clear if it's disabling
+    if [ "${CURRENT_STATE}" = "disabling" ]; then
+        echo "⚠ Scheduler is in 'disabling' state, waiting for it to clear..."
+        for i in {1..10}; do
+            sleep 1
+            CURRENT_STATE=$(cat /sys/kernel/sched_ext/state 2>/dev/null || echo "unknown")
+            if [ "${CURRENT_STATE}" != "disabling" ]; then
+                echo "✓ Scheduler state cleared: ${CURRENT_STATE}"
+                break
+            fi
+        done
+    fi
+fi
+
 # Note: schtest will start the scheduler itself
 # We don't pre-initialize because it causes scheduler state issues
 # (e.g., "disabling" status when schtest tries to query it)
-# Pre-initialization can leave the scheduler in a "disabling" state
-# which prevents schtest from properly starting and testing the scheduler
 
 # Run schtest - check if schtest has a test runner
 # Note: schtest will start the scheduler itself, we don't need to start it in background
