@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch: # Allow manual trigger 
+  workflow_dispatch: # Allow manual trigger
   workflow_call:
 jobs:
   analyze-code:
