@@ -44,11 +44,7 @@ func DefaultConfig() *Config {
 			SliceNsDefault: 5000 * 1000, // 5ms
 			SliceNsMin:     500 * 1000,  // 0.5ms
 		},
-		Api: ApiConfig{
-			Url:           "http://localhost:8080",
-			Interval:      10,
-			PublicKeyPath: "./api/jwt_public_key.pem", // Default path to public key
-		},
+		Api: ApiConfig{},
 	}
 }
 

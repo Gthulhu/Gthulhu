@@ -1,11 +1,5 @@
-github.com/Gthulhu/plugin v0.1.1-0.20251021154618-29335838f922 h1:fIuWozBiUbnUrP3EAkkl4wevpb9yjtMlGGldeQt5p7s=
-github.com/Gthulhu/plugin v0.1.1-0.20251021154618-29335838f922/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
-github.com/Gthulhu/plugin v1.0.1-0.20251107182849-17ba64e22ba6 h1:F3+LwXpHec4lnQP2mJI1/Yno25y7YMjRcNiB5ifuNgs=
-github.com/Gthulhu/plugin v1.0.1-0.20251107182849-17ba64e22ba6/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
-github.com/Gthulhu/plugin v1.0.1-0.20251107184931-7cb4d22684e1 h1:OkwKACxNpu9bD7NrD5JKNu5Pcvd88hQR+vtVk4tEdM4=
-github.com/Gthulhu/plugin v1.0.1-0.20251107184931-7cb4d22684e1/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
-github.com/Gthulhu/plugin v1.0.1 h1:RC76Xah9D6IsvSa1N/H3kTTVgHRuRyMM9+y4B1veilM=
-github.com/Gthulhu/plugin v1.0.1/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
+github.com/Gthulhu/plugin v1.0.2-0.20251110145329-08e5d6f49f44 h1:FWwE/DMtCUmBjTwqXww3PZHiq09RB8NrfCCGWsBZPT0=
+github.com/Gthulhu/plugin v1.0.2-0.20251110145329-08e5d6f49f44/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

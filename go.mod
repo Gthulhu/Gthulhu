@@ -3,7 +3,7 @@ module github.com/Gthulhu/Gthulhu
 go 1.22.6
 
 require (
-	github.com/Gthulhu/plugin v1.0.1
+	github.com/Gthulhu/plugin v1.0.2-0.20251110145329-08e5d6f49f44
 	github.com/Gthulhu/qumun v0.3.2-0.20250105095341-21d6627bc161
 	gopkg.in/yaml.v3 v3.0.1
 )
