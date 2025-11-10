@@ -2,11 +2,12 @@ name: Go
 on:
   push:
     branches: [ main ]
-    tags:
-      - 'v*'
+  tags:
+    - 'v*'
   pull_request:
     branches:
       - main
+  workflow_dispatch: # Allow manual trigger
   workflow_call:
 jobs:
   analyze-code:
