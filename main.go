@@ -196,7 +196,7 @@ func main() {
 
 			// Evaluate used task time slice.
 			nrWaiting := core.GetNrQueued() + core.GetNrScheduled() + 1
-			task.Vtime = t.Vtime
+			task.Vtime = t.Vtime + min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
 
 			// Check if a custom execution time was set by a scheduling strategy
 			customTime := bpfModule.DetermineTimeSlice(t)
