@@ -83,6 +83,22 @@ if [ -f "/sys/kernel/sched_ext/state" ]; then
     fi
 fi
 
+# Ensure necessary directories and files exist for scheduler startup
+# This helps avoid startup failures that could cause "disabling" status
+echo "Preparing scheduler environment..."
+SCHEDULER_DIR=$(dirname "${SCHEDULER_BINARY}")
+# Create API directory if it doesn't exist (for JWT public key)
+if [ ! -d "${SCHEDULER_DIR}/api" ]; then
+    mkdir -p "${SCHEDULER_DIR}/api/config" 2>/dev/null || true
+fi
+# Create a dummy JWT public key file if it doesn't exist (to avoid startup errors)
+# The scheduler will log a warning but should still start
+if [ ! -f "${SCHEDULER_DIR}/api/jwt_public_key.pem" ] && [ ! -f "${SCHEDULER_DIR}/api/config/jwt_public_key.pem" ]; then
+    echo "⚠ JWT public key file not found, creating dummy file to avoid startup errors..."
+    mkdir -p "${SCHEDULER_DIR}/api/config" 2>/dev/null || true
+    echo "# Dummy JWT public key for testing" > "${SCHEDULER_DIR}/api/config/jwt_public_key.pem" 2>/dev/null || true
+fi
+
 # Note: schtest will start the scheduler itself
 # We don't pre-initialize because it causes scheduler state issues
 # (e.g., "disabling" status when schtest tries to query it)
