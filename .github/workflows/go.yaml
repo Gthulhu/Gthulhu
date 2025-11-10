@@ -71,10 +71,45 @@ jobs:
           make build
           make test
         shell: bash
+  schtest-tests:
+    name: Schtest Integration Tests
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        go-version: [ 'stable' ]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+      - name: Install Dependencies
+        uses: ./.github/actions/build-dependencies
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Build Gthulhu
+        run: |
+          make dep
+          git submodule init
+          git submodule sync
+          git submodule update
+          cd scx
+          meson setup build --prefix ~
+          meson compile -C build
+          cd ..
+          cd libbpfgo
+          make
+          cd ..
+          make build
+        shell: bash
+      - name: Run Schtest Tests
+        run: |
+          make schtest KERNEL_VERSION=6.12.2
+        shell: bash
+        continue-on-error: true
   build-and-push-image:
     name: Build and Push Container Image
     runs-on: ubuntu-24.04
-    needs: [analyze-code, self-tests]
+    needs: [analyze-code, self-tests, schtest-tests]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: read

@@ -105,6 +105,10 @@ image-arm64:
 # Default kernel version for testing
 KERNEL_VERSION ?= 6.12.2
 
+# Schtest configuration
+SCHTEST_REPO = https://github.com/sched-ext/schtest.git
+SCHTEST_DIR = schtest
+
 test: build
 	@echo "Running scheduler test for $(KERNEL_VERSION)..."
 	@chmod +x scripts/test_scheduler.sh
@@ -117,6 +121,36 @@ test-arm64:
 	@echo "Running ARM64 scheduler test for $(KERNEL_VERSION)..."
 	@chmod +x scripts/test_scheduler.sh
 	@vng --arch arm64 -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh
+
+# Schtest targets
+.PHONY: schtest-dep
+schtest-dep:
+	@if [ ! -d "$(SCHTEST_DIR)" ]; then \
+		echo "Cloning schtest repository..."; \
+		git clone $(SCHTEST_REPO) $(SCHTEST_DIR); \
+	fi
+	@if [ -d "$(SCHTEST_DIR)" ]; then \
+		cd $(SCHTEST_DIR) && git pull || true; \
+	fi
+
+.PHONY: schtest-build
+schtest-build: schtest-dep
+	@if [ -d "$(SCHTEST_DIR)" ]; then \
+		echo "Building schtest..."; \
+		cd $(SCHTEST_DIR) && \
+		if [ -f "Makefile" ]; then \
+			$(MAKE) || echo "Warning: schtest build failed, continuing..."; \
+		elif [ -f "meson.build" ]; then \
+			meson setup build --prefix ~ || echo "Warning: schtest meson setup failed, continuing..."; \
+			meson compile -C build || echo "Warning: schtest meson compile failed, continuing..."; \
+		fi; \
+	fi
+
+.PHONY: schtest
+schtest: build schtest-build
+	@echo "Running schtest for $(KERNEL_VERSION)..."
+	@chmod +x scripts/test_schtest.sh
+	@vng -r v$(KERNEL_VERSION) -- bash scripts/test_schtest.sh
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
