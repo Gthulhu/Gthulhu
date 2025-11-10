@@ -37,8 +37,12 @@ runs:
     - name: Install Schtest
       run: |
         if [ ! -d "schtest" ]; then
+          echo "Cloning schtest repository..."
           git clone https://github.com/sched-ext/schtest.git schtest
+          echo "Schtest repository cloned successfully"
         else
+          echo "Updating existing schtest repository..."
           cd schtest && git pull || true
+          echo "Schtest repository updated"
         fi
       shell: bash
