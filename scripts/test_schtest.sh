@@ -6,7 +6,6 @@ set -e
 
 LOGFILE="/tmp/schtest_test.log"
 SCHTEST_DIR="schtest"
-SCHTEST_CASES_DIR="${SCHTEST_DIR}/src/cases"
 SCHEDULER_BINARY="./main"
 TIMEOUT_DURATION=300
 
@@ -24,11 +23,6 @@ if [ ! -f "${SCHEDULER_BINARY}" ]; then
     exit 1
 fi
 
-# Check if test cases directory exists
-if [ ! -d "${SCHTEST_CASES_DIR}" ]; then
-    echo "✗ Test cases directory not found at ${SCHTEST_CASES_DIR}"
-    exit 1
-fi
 
 # Start scheduler in background
 echo "Starting scheduler..."
@@ -50,58 +44,54 @@ fi
 
 echo "✓ Scheduler is running"
 
-# Run schtest cases from src/cases directory
-echo "Running schtest cases from ${SCHTEST_CASES_DIR}..."
+# Run schtest - check if schtest has a test runner
+echo "Running schtest tests..."
 
-TEST_COUNT=0
-PASSED_COUNT=0
-FAILED_COUNT=0
-
-for test_case in "${SCHTEST_CASES_DIR}"/*; do
-    if [ -f "${test_case}" ]; then
-        # Make executable if needed
-        if [ ! -x "${test_case}" ]; then
-            chmod +x "${test_case}" 2>/dev/null || true
-        fi
-        
-        # Run test case if it's executable or has shebang
-        if [ -x "${test_case}" ] || head -1 "${test_case}" 2>/dev/null | grep -q "^#!"; then
-            TEST_COUNT=$((TEST_COUNT + 1))
-            echo "Running test case: $(basename ${test_case})"
-            
-            # Run with bash if it has shebang, otherwise run directly
-            if head -1 "${test_case}" 2>/dev/null | grep -q "^#!"; then
-                RUN_CMD="bash ${test_case}"
-            else
-                RUN_CMD="${test_case}"
-            fi
-            
-            if ${RUN_CMD} --scheduler-pid ${SCHED_PID} 2>&1; then
-                PASSED_COUNT=$((PASSED_COUNT + 1))
-                echo "✓ Test case passed: $(basename ${test_case})"
-            else
-                FAILED_COUNT=$((FAILED_COUNT + 1))
-                echo "✗ Test case failed: $(basename ${test_case})"
-            fi
-        fi
+# Check if schtest has a Makefile with test target
+if [ -f "${SCHTEST_DIR}/Makefile" ]; then
+    echo "Running schtest via Makefile..."
+    cd "${SCHTEST_DIR}"
+    if make test SCHEDULER_PID=${SCHED_PID} 2>&1; then
+        echo "✓ Schtest tests passed"
+        cd - > /dev/null
+    else
+        echo "✗ Schtest tests failed"
+        cd - > /dev/null
+        kill ${SCHED_PID} 2>/dev/null || true
+        exit 1
     fi
-done
-
-if [ ${TEST_COUNT} -eq 0 ]; then
-    echo "⚠ No executable test cases found in ${SCHTEST_CASES_DIR}"
-    ls -la "${SCHTEST_CASES_DIR}" 2>/dev/null || true
-    kill ${SCHED_PID} 2>/dev/null || true
-    exit 1
-fi
-
-echo ""
-echo "Test Summary:"
-echo "  Total tests: ${TEST_COUNT}"
-echo "  Passed: ${PASSED_COUNT}"
-echo "  Failed: ${FAILED_COUNT}"
-
-if [ ${FAILED_COUNT} -gt 0 ]; then
-    echo "✗ Some tests failed"
+# Check if schtest has Cargo.toml (Rust project)
+elif [ -f "${SCHTEST_DIR}/Cargo.toml" ]; then
+    echo "Running schtest via Cargo..."
+    cd "${SCHTEST_DIR}"
+    if cargo test -- --scheduler-pid ${SCHED_PID} 2>&1; then
+        echo "✓ Schtest tests passed"
+        cd - > /dev/null
+    else
+        echo "✗ Schtest tests failed"
+        cd - > /dev/null
+        kill ${SCHED_PID} 2>/dev/null || true
+        exit 1
+    fi
+# Check if there's a built binary
+elif [ -f "${SCHTEST_DIR}/target/release/schtest" ] || [ -f "${SCHTEST_DIR}/schtest" ]; then
+    SCHTEST_BIN="${SCHTEST_DIR}/target/release/schtest"
+    [ ! -f "${SCHTEST_BIN}" ] && SCHTEST_BIN="${SCHTEST_DIR}/schtest"
+    echo "Running schtest binary: ${SCHTEST_BIN}"
+    if "${SCHTEST_BIN}" --scheduler-pid ${SCHED_PID} 2>&1; then
+        echo "✓ Schtest tests passed"
+    else
+        echo "✗ Schtest tests failed"
+        kill ${SCHED_PID} 2>/dev/null || true
+        exit 1
+    fi
+else
+    echo "⚠ Could not find schtest test runner"
+    echo "Expected one of:"
+    echo "  - ${SCHTEST_DIR}/Makefile (with test target)"
+    echo "  - ${SCHTEST_DIR}/Cargo.toml (Rust project)"
+    echo "  - ${SCHTEST_DIR}/schtest or ${SCHTEST_DIR}/target/release/schtest (binary)"
+    ls -la "${SCHTEST_DIR}" 2>/dev/null | head -20 || true
     kill ${SCHED_PID} 2>/dev/null || true
     exit 1
 fi

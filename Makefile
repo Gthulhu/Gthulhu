@@ -138,7 +138,9 @@ schtest-build: schtest-dep
 	@if [ -d "$(SCHTEST_DIR)" ]; then \
 		echo "Building schtest..."; \
 		cd $(SCHTEST_DIR) && \
-		if [ -f "Makefile" ]; then \
+		if [ -f "Cargo.toml" ]; then \
+			cargo build --release || echo "Warning: schtest cargo build failed, continuing..."; \
+		elif [ -f "Makefile" ]; then \
 			$(MAKE) || echo "Warning: schtest build failed, continuing..."; \
 		elif [ -f "meson.build" ]; then \
 			meson setup build --prefix ~ || echo "Warning: schtest meson setup failed, continuing..."; \
