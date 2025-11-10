@@ -1,12 +1,14 @@
 #!/bin/bash
 # Schtest integration script
 # This script runs schtest test cases against the Gthulhu scheduler
-# Note: schtest cases expect SCHEDULER_BINARY environment variable
+# Note: schtest will start the scheduler itself, but we can pre-initialize it
 
 set -e
 
 SCHTEST_DIR="schtest"
 SCHEDULER_BINARY_DEFAULT="./main"
+LOGFILE="/tmp/schtest_scheduler.log"
+WARMUP_TIME=15
 
 # Get absolute path of scheduler binary
 if [ -f "${SCHEDULER_BINARY_DEFAULT}" ]; then
@@ -33,6 +35,39 @@ fi
 
 # Export SCHEDULER_BINARY as environment variable for schtest cases
 export SCHEDULER_BINARY
+
+# Pre-initialize scheduler to ensure it's ready
+# This helps avoid watchdog timeouts by ensuring the scheduler is fully initialized
+echo "Pre-initializing scheduler..."
+timeout 30 "${SCHEDULER_BINARY}" > "${LOGFILE}" 2>&1 &
+SCHED_PID=$!
+
+echo "Scheduler PID: ${SCHED_PID}"
+
+# Wait for scheduler to initialize
+sleep ${WARMUP_TIME}
+
+# Check if scheduler is still running
+if ! ps -p ${SCHED_PID} > /dev/null 2>&1; then
+    echo "✗ Scheduler crashed during initialization"
+    echo "Log output:"
+    cat "${LOGFILE}"
+    exit 1
+fi
+
+# Check if scheduler started successfully
+if grep -q "scheduler started" "${LOGFILE}"; then
+    echo "✓ Scheduler initialized successfully"
+else
+    echo "⚠ Scheduler may not have started properly"
+    echo "Log output:"
+    cat "${LOGFILE}"
+fi
+
+# Stop the pre-initialized scheduler (schtest will start its own instance)
+echo "Stopping pre-initialized scheduler..."
+kill ${SCHED_PID} 2>/dev/null || true
+wait ${SCHED_PID} 2>/dev/null || true
 
 # Run schtest - check if schtest has a test runner
 # Note: schtest will start the scheduler itself, we don't need to start it in background
