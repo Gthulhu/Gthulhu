@@ -52,26 +52,44 @@ echo "✓ Scheduler is running"
 
 # Run schtest cases from src/cases directory
 echo "Running schtest cases from ${SCHTEST_CASES_DIR}..."
+
 TEST_COUNT=0
 PASSED_COUNT=0
 FAILED_COUNT=0
 
 for test_case in "${SCHTEST_CASES_DIR}"/*; do
-    if [ -f "${test_case}" ] && [ -x "${test_case}" ]; then
-        TEST_COUNT=$((TEST_COUNT + 1))
-        echo "Running test case: $(basename ${test_case})"
-        if "${test_case}" --scheduler-pid ${SCHED_PID} 2>&1; then
-            PASSED_COUNT=$((PASSED_COUNT + 1))
-            echo "✓ Test case passed: $(basename ${test_case})"
-        else
-            FAILED_COUNT=$((FAILED_COUNT + 1))
-            echo "✗ Test case failed: $(basename ${test_case})"
+    if [ -f "${test_case}" ]; then
+        # Make executable if needed
+        if [ ! -x "${test_case}" ]; then
+            chmod +x "${test_case}" 2>/dev/null || true
+        fi
+        
+        # Run test case if it's executable or has shebang
+        if [ -x "${test_case}" ] || head -1 "${test_case}" 2>/dev/null | grep -q "^#!"; then
+            TEST_COUNT=$((TEST_COUNT + 1))
+            echo "Running test case: $(basename ${test_case})"
+            
+            # Run with bash if it has shebang, otherwise run directly
+            if head -1 "${test_case}" 2>/dev/null | grep -q "^#!"; then
+                RUN_CMD="bash ${test_case}"
+            else
+                RUN_CMD="${test_case}"
+            fi
+            
+            if ${RUN_CMD} --scheduler-pid ${SCHED_PID} 2>&1; then
+                PASSED_COUNT=$((PASSED_COUNT + 1))
+                echo "✓ Test case passed: $(basename ${test_case})"
+            else
+                FAILED_COUNT=$((FAILED_COUNT + 1))
+                echo "✗ Test case failed: $(basename ${test_case})"
+            fi
         fi
     fi
 done
 
 if [ ${TEST_COUNT} -eq 0 ]; then
     echo "⚠ No executable test cases found in ${SCHTEST_CASES_DIR}"
+    ls -la "${SCHTEST_CASES_DIR}" 2>/dev/null || true
     kill ${SCHED_PID} 2>/dev/null || true
     exit 1
 fi
