@@ -41,6 +41,8 @@ func main() {
 
 	var p plugin.CustomScheduler
 	var SLICE_NS_DEFAULT, SLICE_NS_MIN uint64
+	SLICE_NS_DEFAULT = cfg.Scheduler.SliceNsDefault
+	SLICE_NS_MIN = cfg.Scheduler.SliceNsMin
 
 	ctx, cancel := context.WithCancel(context.Background())
 	config := &plugin.SchedConfig{

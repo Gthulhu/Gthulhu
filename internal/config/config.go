@@ -39,7 +39,7 @@ type Config struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Debug:           false,
-		EarlyProcessing: true,
+		EarlyProcessing: false,
 		Scheduler: SchedulerConfig{
 			SliceNsDefault: 5000 * 1000, // 5ms
 			SliceNsMin:     500 * 1000,  // 0.5ms
