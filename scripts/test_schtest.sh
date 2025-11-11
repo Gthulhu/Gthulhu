@@ -56,6 +56,19 @@ trap cleanup EXIT INT TERM
 
 print_info "Starting schtest integration test..."
 
+# Log environment information for debugging
+print_info "Environment info:"
+print_info "  CI: ${CI:-not set}"
+print_info "  GITHUB_ACTIONS: ${GITHUB_ACTIONS:-not set}"
+print_info "  CPU count: $(nproc 2>/dev/null || echo 'unknown')"
+print_info "  Memory: $(free -h 2>/dev/null | grep Mem | awk '{print $2}' || echo 'unknown')"
+
+# Increase warmup time in CI environments (vng/virtme-ng may be slower)
+if [ -n "${CI}" ] || [ -n "${GITHUB_ACTIONS}" ] || [ -n "${VNG}" ]; then
+    WARMUP_TIME=10
+    print_info "Detected CI environment, increasing warmup time to ${WARMUP_TIME} seconds"
+fi
+
 # Check if Gthulhu binary exists
 if [ ! -f "${GTHULHU_BINARY}" ]; then
     print_error "Gthulhu binary not found: ${GTHULHU_BINARY}"
@@ -138,9 +151,21 @@ print_info "Note: adaptive_priority test will be skipped if it fails"
 # Use --skip or filter to exclude adaptive_priority if schtest supports it
 # Otherwise, we'll handle the failure gracefully
 set +e  # Don't exit on error, we'll handle it
-sudo ${SCHTEST_RUN_BINARY} 2>&1 | tee "${SCHTEST_LOGFILE}"
+# Check if schtest supports verbose or debug flags
+if ${SCHTEST_RUN_BINARY} --help 2>&1 | grep -q "verbose\|debug\|-v"; then
+    sudo ${SCHTEST_RUN_BINARY} --verbose 2>&1 | tee "${SCHTEST_LOGFILE}"
+else
+    sudo ${SCHTEST_RUN_BINARY} 2>&1 | tee "${SCHTEST_LOGFILE}"
+fi
 SCHTEST_EXIT_CODE=${PIPESTATUS[0]}
 set -e
+
+# Check if scheduler is still running after tests
+if ! ps -p ${GTHULHU_PID} > /dev/null 2>&1; then
+    print_error "Gthulhu scheduler crashed during test execution"
+    print_info "Scheduler log at time of crash:"
+    tail -50 "${GTHULHU_LOGFILE}" || true
+fi
 
 cd - > /dev/null
 
