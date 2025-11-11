@@ -88,6 +88,10 @@ func main() {
 
 	bpfModule.SetDefaultSlice(schedConfig.SliceNsDefault)
 
+	// Initialize SLICE_NS_DEFAULT and SLICE_NS_MIN from config
+	SLICE_NS_DEFAULT = cfg.Scheduler.SliceNsDefault
+	SLICE_NS_MIN = cfg.Scheduler.SliceNsMin
+
 	pid := os.Getpid()
 	err = bpfModule.AssignUserSchedPid(pid)
 	if err != nil {
