@@ -139,7 +139,10 @@ schtest-build: schtest-dep
 		echo "Building schtest..."; \
 		cd $(SCHTEST_DIR) && \
 		if [ -f "Cargo.toml" ]; then \
-			cargo build --release || echo "Warning: schtest cargo build failed, continuing..."; \
+			echo "Building schtest debug version..."; \
+			cargo build || echo "Warning: schtest debug build failed, continuing..."; \
+			echo "Building schtest release version..."; \
+			cargo build --release || echo "Warning: schtest release build failed, continuing..."; \
 		elif [ -f "Makefile" ]; then \
 			$(MAKE) || echo "Warning: schtest build failed, continuing..."; \
 		elif [ -f "meson.build" ]; then \
