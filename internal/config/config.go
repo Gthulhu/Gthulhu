@@ -41,8 +41,8 @@ func DefaultConfig() *Config {
 		Debug:           false,
 		EarlyProcessing: false,
 		Scheduler: SchedulerConfig{
-			SliceNsDefault: 5000 * 1000, // 5ms
-			SliceNsMin:     500 * 1000,  // 0.5ms
+			SliceNsDefault: 20000 * 1000, // 20ms
+			SliceNsMin:     1000 * 1000,  // 1ms
 		},
 		Api: ApiConfig{},
 	}
