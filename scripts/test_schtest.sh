@@ -168,6 +168,12 @@ else
     print_error "schtest failed with exit code: ${SCHTEST_EXIT_CODE}"
     print_info "Test output:"
     cat "${SCHTEST_LOGFILE}"
+    print_info "Gthulhu scheduler log:"
+    if [ -f "${GTHULHU_LOGFILE}" ]; then
+        cat "${GTHULHU_LOGFILE}"
+    else
+        print_warn "Gthulhu log file not found: ${GTHULHU_LOGFILE}"
+    fi
     exit 1
 fi
 
