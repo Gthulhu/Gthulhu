@@ -153,9 +153,12 @@ else
     if grep -q "adaptive_priority" "${SCHTEST_LOGFILE}"; then
         print_warn "adaptive_priority test failed (known issue, can be skipped)"
         # Count how many test failures are mentioned
-        FAILURE_LINES=$(grep -E "---- [a-z_]+ ----" "${SCHTEST_LOGFILE}" | wc -l || echo "0")
-        # If only one failure line and it's adaptive_priority, consider it acceptable
-        if [ "${FAILURE_LINES}" -eq "1" ]; then
+        # Use -- to prevent grep from treating the pattern as an option
+        FAILURE_LINES=$(grep -E -- "^---- [a-z_]+ ----$" "${SCHTEST_LOGFILE}" 2>/dev/null | wc -l || echo "0")
+        # Count how many failures are NOT adaptive_priority
+        OTHER_FAILURES=$(grep -E -- "^---- [a-z_]+ ----$" "${SCHTEST_LOGFILE}" 2>/dev/null | grep -v "adaptive_priority" | wc -l || echo "0")
+        # If only adaptive_priority failed, consider it acceptable
+        if [ "${OTHER_FAILURES}" -eq "0" ] && [ "${FAILURE_LINES}" -gt "0" ]; then
             print_info "Only adaptive_priority failed, other tests passed"
             exit 0
         fi
