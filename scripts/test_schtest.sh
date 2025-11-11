@@ -199,6 +199,23 @@ else
     else
         print_warn "Gthulhu log file not found: ${GTHULHU_LOGFILE}"
     fi
+    
+    # Try to get system logs for debugging (may not be available in all environments)
+    print_info "Checking system logs for errors..."
+    if command -v dmesg >/dev/null 2>&1; then
+        print_info "Recent kernel messages (last 20 lines):"
+        sudo dmesg | tail -20 2>/dev/null || print_warn "Could not read dmesg"
+    fi
+    
+    # Check if this is a CI environment and if failures might be environment-related
+    if [ -n "${CI}" ] || [ -n "${GITHUB_ACTIONS}" ]; then
+        print_warn "Running in CI environment - some test failures may be environment-related"
+        print_warn "If spread_out and fairness fail only in CI but pass locally, this may be due to:"
+        print_warn "  - Resource constraints in vng/virtme-ng virtual environment"
+        print_warn "  - Timing issues in slower virtualized environment"
+        print_warn "  - Limited CPU/memory in GitHub Actions runners"
+    fi
+    
     exit 1
 fi
 
