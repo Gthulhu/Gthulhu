@@ -34,7 +34,7 @@ jobs:
           git submodule sync
           git submodule update
           cd scx
-          cargo build
+          cargo build --release -p scx_rustland
           cd ..
           cd libbpfgo
           make
@@ -61,7 +61,7 @@ jobs:
           git submodule sync
           git submodule update
           cd scx
-          cargo build
+          cargo build --release -p scx_rustland
           cd ..
           cd libbpfgo
           make
@@ -91,7 +91,7 @@ jobs:
           git submodule sync
           git submodule update
           cd scx
-          cargo build
+          cargo build --release -p scx_rustland
           cd ..
           cd libbpfgo
           make
