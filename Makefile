@@ -141,6 +141,8 @@ dep:
 	cd src && \
 	make && \
 	sudo make install
+	git clone -b v7.6.0 --recursive https://github.com/libbpf/bpftool.git && \
+	cd bpftool/src && make 
 
 
 $(BPF_OBJ): %.o: %.c
@@ -153,7 +155,7 @@ $(BPF_OBJ): %.o: %.c
 		-c $< -o $@
 
 wrapper:
-	scx/build/bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
+	bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
 	$(CGO_CC) -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 
