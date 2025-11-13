@@ -12,6 +12,10 @@ runs:
       uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
       with:
         go-version: "${{ inputs.go-version }}"
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
     - name: Install Compilers & Formatters
       run: |
         sudo apt-get update
@@ -33,4 +37,16 @@ runs:
         done
         # Install llvm-strip symlink to version 18 (scx meson.build requires llvm-strip executable)
         sudo update-alternatives --install /usr/bin/llvm-strip llvm-strip /usr/bin/llvm-strip-18 100
+      shell: bash
+    - name: Install Schtest
+      run: |
+        if [ ! -d "schtest" ]; then
+          echo "Cloning schtest repository..."
+          git clone https://github.com/sched-ext/schtest.git schtest
+          echo "Schtest repository cloned successfully"
+        else
+          echo "Updating existing schtest repository..."
+          cd schtest && git pull || true
+          echo "Schtest repository updated"
+        fi
       shell: bash
