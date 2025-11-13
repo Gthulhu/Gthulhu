@@ -1,5 +1,6 @@
 .vscode
 libbpf
+bpftool
 output
 *.ll
 *.o
