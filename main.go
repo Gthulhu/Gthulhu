@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"flag"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"syscall"
 	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/Gthulhu/Gthulhu/internal/config"
 	"github.com/Gthulhu/plugin/models"
@@ -182,6 +185,13 @@ func main() {
 	var cpu int32
 
 	slog.Info("scheduler started")
+
+	if cfg.IsDebugEnabled() {
+		// Start pprof server for debugging
+		go func() {
+			http.ListenAndServe(":6060", nil)
+		}()
+	}
 
 	for true {
 		select {
