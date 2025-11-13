@@ -36,8 +36,7 @@ jobs:
           git submodule sync
           git submodule update
           cd scx
-          meson setup build --prefix ~
-          meson compile -C build
+          cargo build --release -p scx_rustland
           cd ..
           cd libbpfgo
           make
@@ -64,8 +63,7 @@ jobs:
           git submodule sync
           git submodule update
           cd scx
-          meson setup build --prefix ~
-          meson compile -C build
+          cargo build --release -p scx_rustland
           cd ..
           cd libbpfgo
           make
@@ -130,8 +128,7 @@ jobs:
           git submodule sync
           git submodule update
           cd scx
-          meson setup build --prefix ~
-          meson compile -C build
+          cargo build --release -p scx_rustland
           cd ..
           cd libbpfgo
           make

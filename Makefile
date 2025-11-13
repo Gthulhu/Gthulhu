@@ -180,6 +180,8 @@ dep:
 	cd src && \
 	make && \
 	sudo make install
+	git clone -b v7.6.0 --recursive https://github.com/libbpf/bpftool.git && \
+	cd bpftool/src && make 
 
 
 $(BPF_OBJ): %.o: %.c
@@ -187,12 +189,12 @@ $(BPF_OBJ): %.o: %.c
 		-O2 -g -Wall -target bpf \
 		$(ARCH_DEFINE) $(ARCH_CPU_FLAGS) -mlittle-endian \
 		-idirafter $(CLANG_RESOURCE_DIR)/include -idirafter /usr/local/include -idirafter /usr/include/$(ARCH_INCLUDE_DIR) -idirafter /usr/include \
-		-I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib \
+		-I scx/scheds/vmlinux -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib \
 		-Wno-compare-distinct-pointer-types \
 		-c $< -o $@
 
 wrapper:
-	scx/build/bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
+	bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
 	$(CGO_CC) -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 

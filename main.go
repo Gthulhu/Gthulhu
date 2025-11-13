@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -41,6 +42,9 @@ func main() {
 
 	var p plugin.CustomScheduler
 	var SLICE_NS_DEFAULT, SLICE_NS_MIN uint64
+	SLICE_NS_DEFAULT = cfg.Scheduler.SliceNsDefault
+	SLICE_NS_MIN = cfg.Scheduler.SliceNsMin
+	slog.Info("Scheduler configuration", "SliceNsDefault", SLICE_NS_DEFAULT, "SliceNsMin", SLICE_NS_MIN)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	config := &plugin.SchedConfig{
@@ -85,12 +89,6 @@ func main() {
 	} else {
 		slog.Info("Early processing disabled")
 	}
-
-	bpfModule.SetDefaultSlice(schedConfig.SliceNsDefault)
-
-	// Initialize SLICE_NS_DEFAULT and SLICE_NS_MIN from config
-	SLICE_NS_DEFAULT = cfg.Scheduler.SliceNsDefault
-	SLICE_NS_MIN = cfg.Scheduler.SliceNsMin
 
 	pid := os.Getpid()
 	err = bpfModule.AssignUserSchedPid(pid)
@@ -167,6 +165,7 @@ func main() {
 					cont = false
 				}
 			}
+			runtime.Gosched()
 		}
 		cancel()
 		timer.Stop()
@@ -194,13 +193,15 @@ func main() {
 		bpfModule.DrainQueuedTask()
 		t = bpfModule.SelectQueuedTask()
 		if t == nil {
+			runtime.Gosched()
 			bpfModule.BlockTilReadyForDequeue(ctx)
-		} else if t.Pid != -1 {
+		} else {
 			task = core.NewDispatchedTask(t)
 
-			// Evaluate used task time slice.
-			nrWaiting := core.GetNrQueued() + core.GetNrScheduled() + 1
-			task.Vtime = t.Vtime + min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
+			task.Vtime = t.Vtime
+			if t.Vtime != 0 {
+				task.Vtime += min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
+			}
 
 			// Check if a custom execution time was set by a scheduling strategy
 			customTime := bpfModule.DetermineTimeSlice(t)
@@ -209,7 +210,7 @@ func main() {
 				task.SliceNs = min(customTime, (t.StopTs-t.StartTs)*11/10)
 			} else {
 				// No custom execution time, use default algorithm
-				task.SliceNs = max(SLICE_NS_DEFAULT/nrWaiting, SLICE_NS_MIN)
+				task.SliceNs = SLICE_NS_MIN * t.Weight / 100
 			}
 
 			err, cpu = bpfModule.SelectCPU(t)
