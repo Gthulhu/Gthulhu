@@ -71,11 +71,11 @@ BASEDIR = $(abspath .)
 LIBBPF_INCLUDE_UAPI = $(abspath ./libbpf/include/uapi)
 CLANG_BPF_SYS_INCLUDES := `shell $(CLANG) -v -E - </dev/null 2>&1 | sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }'`
 CGOFLAG = $(GOARCH_ENV) CC=$(CGO_CC) CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/qumun -I$(BASEDIR)/$(OUTPUT)" CGO_LDFLAGS="-lelf -lz $(LIBBPF_OBJ) -lzstd $(BASEDIR)/libwrapper.a"
-STATIC=-extldflags -static
+STATIC=
 
 .PHONY: build
 build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper
-	$(CGOFLAG) go build -ldflags "-w -s $(STATIC)" main.go
+	$(CGOFLAG) go build -ldflags "-w -s" main.go
 
 # Build for ARM64 architecture
 .PHONY: build-arm64
