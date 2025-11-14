@@ -52,8 +52,7 @@ git submodule init
 git submodule sync
 git submodule update
 cd scx
-meson setup build --prefix ~
-meson compile -C build
+cargo build --release -p scx_rustland
 ```
 
 This will clone libbpf and the custom libbpfgo fork needed for the project.
