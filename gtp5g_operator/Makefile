@@ -32,21 +32,21 @@ build: bpf go ## 編譯 eBPF + Go 程式
 bpf: ## 只編譯 eBPF 程式
 	@echo "🔨 編譯 eBPF 程式..."
 	@mkdir -p $(BPF_DIR)/output
-	@if [ -f $(BPF_DIR)/gtp5g_operator.bpf.c ]; then \
-		$(CLANG) $(CFLAGS) $(INCLUDES) -c $(BPF_DIR)/gtp5g_operator.bpf.c -o $(BPF_DIR)/output/gtp5g_operator.bpf.o; \
-		echo "✅ eBPF 編譯完成: $(BPF_DIR)/output/gtp5g_operator.bpf.o"; \
+	@if [ -f $(BPF_DIR)/gtp5g_toy.bpf.c ]; then \
+		$(CLANG) $(CFLAGS) $(INCLUDES) -c $(BPF_DIR)/gtp5g_toy.bpf.c -o $(BPF_DIR)/output/gtp5g_toy.bpf.o; \
+		echo "✅ eBPF 編譯完成: $(BPF_DIR)/output/gtp5g_toy.bpf.o"; \
 	else \
-		echo "⚠️  找不到 $(BPF_DIR)/gtp5g_operator.bpf.c，跳過編譯"; \
+		echo "⚠️  找不到 $(BPF_DIR)/gtp5g_toy.bpf.c，跳過編譯"; \
 	fi
 
 go: ## 只編譯 Go 程式
 	@echo "🔨 編譯 Go 程式..."
 	@mkdir -p $(OUTPUT_DIR)
-	@if [ -f $(CMD_DIR)/main.go ]; then \
-		$(GO) build -o $(OUTPUT_DIR)/gtp5g_operator $(CMD_DIR)/main.go; \
+	@if [ -f $(CMD_DIR)/toy_loader/main.go ]; then \
+		CGO_LDFLAGS="-lbpf" $(GO) build -o $(OUTPUT_DIR)/gtp5g_operator $(CMD_DIR)/toy_loader/main.go; \
 		echo "✅ Go 編譯完成: $(OUTPUT_DIR)/gtp5g_operator"; \
 	else \
-		echo "⚠️  找不到 $(CMD_DIR)/main.go，跳過編譯"; \
+		echo "⚠️  找不到 $(CMD_DIR)/toy_loader/main.go，跳過編譯"; \
 	fi
 
 test: ## 執行測試
