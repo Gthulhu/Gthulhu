@@ -1,0 +1,51 @@
+# GTP5G Operator Configuration File
+
+# Operator 核心設定
+operator:
+  # 日誌級別 (debug, info, warn, error)
+  log_level: "info"
+  
+  # 事件收集間隔
+  # 多久從 RingBuffer 或 Map 中讀取一次數據
+  collection_interval: "10s"
+  
+  # 報告發送間隔
+  # 多久將收集到的數據匯總並發送到 API Server
+  report_interval: "60s"
+
+# eBPF 相關設定
+bpf:
+  # 是否啟用 eBPF 追蹤功能
+  enabled: true
+  
+  # RingBuffer 大小
+  # 用於存儲從 Kernel Space 傳來的事件
+  # 格式支援 KB, MB (例如: 256KB, 1MB)
+  ringbuffer_size: "256KB"
+
+# API Server 連線設定
+api:
+  # API Server 的基礎 URL
+  server_url: "http://localhost:8080"
+  
+  # 數據上報的 Endpoint
+  endpoint: "/api/v1/metrics"
+  
+  # 認證 Token
+  # 建議留空，透過環境變數 GTP5G_API_TOKEN 注入
+  token: ""
+  
+  # 請求超時時間
+  timeout: "30s"
+
+# 追蹤目標設定
+# 定義要追蹤的 Kernel Functions (kfuncs)
+tracking:
+  functions:
+    # 處理 IPv4 封包的函數
+    - "gtp5g_handle_skb_ipv4"
+    
+    # 設備發送封包的函數
+    - "gtp5g_dev_xmit"
+    
+    # 未來可在此添加更多需要追蹤的函數
