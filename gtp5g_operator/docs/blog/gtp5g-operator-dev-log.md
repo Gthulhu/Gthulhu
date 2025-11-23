@@ -658,6 +658,68 @@ event: ts=... pid=... comm=nr-gnb func=1 pktlen=1420 teid=0x12345678 inner_src=1
 2. 考慮是否要切換到 fentry/fexit (需要重新編譯 GTP5G)
 3. 實作真正的 GTP 標頭解析邏輯
 
+---
+
+## 深入解析（繁體中文）— fentry/fexit vs kprobe、輸出方式與 BTF
+
+下面用繁體中文以淺顯易懂的方式說明 fentry/fexit 與 kprobe 的差別、常見輸出方式，還有什麼是 BTF：
+
+### fentry / fexit（現代、以類型為基礎的 hook）
+
+- 什麼是它們：fentry 與 fexit 可以把 eBPF 程式直接掛在函式進入與離開（entry/exit）處。
+   它依賴 BTF（BPF Type Format）提供的型別與函式簽章資訊，讓 eBPF 可以像 C 程式一樣安全地存取參數與結構欄位。
+- 優點：
+   - 型別安全（可直接使用 struct 欄位，例如 skb->len）
+   - 開銷小、精準（直接在函式邊界執行）
+   - 開發較簡潔：不用手動處理暫存器與 raw memory
+- 限制：
+   - 需要 BTF 可用（vmlinux 或 module 必須包含 BTF）
+   - 函式必須對外可見（不能是純 local/static），模組內通常要用 EXPORT_SYMBOL 導出
+   - 如果 BTF 中 linkage 顯示為 static，就無法 attach
+
+適用情境：你可以修改並重新編譯模組或內核，想要高效且安全的監控（生產環境首選）。
+
+### kprobe（傳統動態探針）
+
+- 什麼是它：kprobe 可以在運行時把探針動態放到任意內核函式（或特定地址），不需要編譯時 metadata。
+- 優點：
+   - 相容性高：能附到未導出或 static 的函式，無須重編碼或改模組
+   - 快速試驗或調試時非常實用
+- 缺點：
+   - 非型別安全：取得的是暫存器值或 raw memory，需要用 bpf_probe_read_kernel、安全檢查與手動解析
+   - 開銷略高、編碼更繁瑣且較容易出錯
+
+適用情境：無法修改目標模組、要快速驗證或在多種內核版本上通用時，選 kprobe。
+
+### 輸出方式：trace_pipe（bpf_printk） vs ring buffer
+
+- trace_pipe / bpf_printk：
+   - eBPF 以文字訊息寫入 trace 緩衝（/sys/kernel/debug/tracing/trace_pipe），可即時觀察。
+   - 優點：實作非常簡單、方便快速驗證或開發用
+   - 缺點：非結構化、在高流量下會丟失事件，不適合生產或高吞吐場景
+
+- Ring buffer（libbpf ring buffer API）：
+   - eBPF 將結構化（binary）事件寫入環形緩衝；user-space（例如 Go 程式）以 callback 讀取並解碼。
+   - 優點：高效、結構化、適合穩定生產觀測，較低的遺失率並有背壓控制
+   - 缺點：需要設計事件格式並在 user-space 實作解碼器，初期開發成本較高
+
+建議：開發階段用 trace_pipe 快速驗證；準備投入生產則改用 ring buffer。
+
+### BTF（BPF Type Format）是什麼？
+
+- BTF 是內核的型別與符號 metadata，類似一個濃縮的 C 標頭，描述結構體、函式簽章與型別。
+- 重要性：
+   - 讓 eBPF 能以型別安全的方式存取內核資料結構（例如 struct sk_buff）
+   - 支援 CO-RE（Compile Once — Run Everywhere），eBPF 程式可依 runtime 的 BTF 調整偏移與型別
+- 來源：
+   - 核心可在 /sys/kernel/btf/vmlinux 提供 BTF
+   - 模組在編譯時啟用 DEBUG_INFO_BTF 可把 BTF 嵌入 .ko
+   - 我們的 Makefile 使用 bpftool 從 vmlinux 和 gtp5g.ko 提取並合併成 vmlinux/vmlinux.h
+
+---
+
+如果你想，我可以把上述繁體中文部分拆成單獨的技術文件（例如 `docs/tech/fentry-vs-kprobe.md`），並加入小範例程式碼與簡單圖表以輔助理解。
+
 ## Step 10: 成功修復 GTP5G 模組以支援 fentry/fexit 追蹤 🎉
 
 📅 **日期**: 2025-11-22
