@@ -716,10 +716,59 @@ event: ts=... pid=... comm=nr-gnb func=1 pktlen=1420 teid=0x12345678 inner_src=1
    - 模組在編譯時啟用 DEBUG_INFO_BTF 可把 BTF 嵌入 .ko
    - 我們的 Makefile 使用 bpftool 從 vmlinux 和 gtp5g.ko 提取並合併成 vmlinux/vmlinux.h
 
+   ### 📌 關鍵概念補充（繁體中文） — `EXPORT_SYMBOL`、`vmlinux`、BTF 差異，以及 `linkage = static` 的影響
+
+   下面把在我們工作中出現的重要概念做一個集中、簡潔且新手友好的補充，讓讀者知道為什麼要做那些修改，以及如何檢查與修復常見問題：
+
+   - EXPORT_SYMBOL 是什麼？
+      - 功能：將模組中的函式或變數「導出」到內核的符號表（symbol table），讓其他模組或外部工具能夠查到並連結到該符號。
+      - 為什麼需要：像 fentry/fexit 這類 BPF attach 方式會透過 BTF（型別/符號資訊）找到要掛勾的函式；如果函式不是全域可見（static / 未導出），BTF 會把它當成模組專屬、外部不可見，libbpf 在載入時就會出現找不到 type ID 的錯誤。
+      - 範例：
+         ```c
+         #include <linux/module.h>
+
+         int gtp5g_encap_recv(struct sock *sk, struct sk_buff *skb) {
+               // ...
+         }
+         EXPORT_SYMBOL(gtp5g_encap_recv);  // 把這個函式導出到符號表
+         ```
+      - 驗證：
+         ```bash
+         nm /lib/modules/$(uname -r)/kernel/drivers/net/gtp5g.ko | grep gtp5g_encap_recv
+         # T 表示導出，t 表示本地(static)
+         ```
+
+   - vmlinux 與模組 BTF 有何差別？為什麼要合併？
+      - vmlinux：系統提供的全域內核 BTF（通常在 /sys/kernel/btf/vmlinux），包含核心內核型別（如 struct sk_buff、struct net_device 等）。
+      - 模組 BTF（例如 gtp5g.ko）：如果模組在編譯時啟用了 DEBUG_INFO_BTF，模組會把自己特有的型別（像 struct gtp5g_pktinfo）包含進去。但模組 BTF 只包含模組內的型別與符號，沒有 vmlinux 裡的內核型別。
+      - 為什麼要合併：eBPF 程式要同時知道內核 (vmlinux) 的型別與模組的客製型別，才能在 CO-RE / fentry 中安全且正確地存取參數與結構欄位。因此我們的 Makefile 會從 vmlinux 取出全域型別，然後把模組需要的特定 struct 貼到同一個 header（vmlinux/vmlinux.h），讓 eBPF 編譯有完整的型別資訊。
+
+   - BTF 中 linkage = static 是什麼意思？為何無法 attach？（舉例與檢查）
+      - linkage（連結性）基本上描述符號在 BTF 中的可見性：
+            - linkage = external（或在符號表看到大寫 T）→ 函式是對外可見，可供其他模組或 eBPF (fentry/fexit) 使用。
+            - linkage = static（或在符號表看到小寫 t）→ 函式是檔案內私有（static），並不會出現在外部符號表，BTF 會標注為 local/static。
+      - 為什麼會無法 attach：fentry/fexit 在執行時依賴 BTF 去查找 function 的型別與符號 ID。如果 BTF 表示 linkage=static（local），libbpf 在嘗試取得該函式的 type id 時會失敗，常見錯誤訊息像：
+         ```text
+         libbpf: prog 'gtp5g_xmit_skb_ipv4_entry': failed to find kernel BTF type ID of 'gtp5g_xmit_skb_ipv4': -3
+         ```
+      - 檢查方法：
+         1. 使用 bpftool 檢視模組 BTF：
+             ```bash
+             bpftool btf dump file /lib/modules/$(uname -r)/kernel/drivers/net/gtp5g.ko | grep -n "FUNC.*gtp5g_xmit_skb_ipv4" -n -C 3
+             # 會顯示 FUNC 紀錄，並有 linkage 欄位
+             ```
+         2. 使用 nm 檢查 `.ko`：
+             ```bash
+             nm -n /lib/modules/$(uname -r)/kernel/drivers/net/gtp5g.ko | grep gtp5g_xmit_skb_ipv4
+             # 若是小寫 t → 表示 static / 本地；大寫 T → 表示已導出
+             ```
+      - 解法：
+         - 最直接的方式：把函式由 `static` 改為非 static 並加入 `EXPORT_SYMBOL(函式名);`，重新編譯並安裝模組，然後重新生成 btf header（make btf）與重編譯 eBPF object（make build）。
+         - 如果不能修改模組原始碼（無法重新編譯模組），可改用 kprobe（kprobe 不需要函式在符號表可見，但需要手動處理參數、暫存器與 read-safe memory）。
+
+   以上補充能幫助新手清楚理解為何我們要導出符號、為何需要合併 vmlinux 與模組 BTF，以及在遇到 `linkage = static` 時有哪些檢查步驟與解法。
+
 ---
-
-如果你想，我可以把上述繁體中文部分拆成單獨的技術文件（例如 `docs/tech/fentry-vs-kprobe.md`），並加入小範例程式碼與簡單圖表以輔助理解。
-
 ## Step 10: 成功修復 GTP5G 模組以支援 fentry/fexit 追蹤 🎉
 
 📅 **日期**: 2025-11-22
@@ -1465,9 +1514,764 @@ kubectl rollout restart deployment -n free5gc free5gc-upf
    - 社群友好（考慮開源貢獻）
 
 **下一個 Step 的目標**：
-- Step 11: 實作 GTP 封包解析（提取 TEID, IP, Port 等關鍵資訊）
-- Step 12: 使用 Ring Buffer 傳送結構化數據到用戶空間
-- Step 13: 增強 Go 程式處理 eBPF events 並轉發到 API
+- Step 11: 解析 trace_pipe 並定期發送 nr-gnb PID 到 Gthulhu API Server
+- Step 12: 實作 GTP 封包解析（提取 TEID, IP, Port 等關鍵資訊）
+- Step 13: 使用 Ring Buffer 傳送結構化數據到用戶空間
+
+---
+
+## Step 11: 解析 trace_pipe 並發送 nr-gnb PID 到 Gthulhu API Server
+
+📅 **日期**: 2025-11-23
+🎯 **目標**: 開發 GTP5G Operator 服務，解析 gtp5g-tracer 的 trace_pipe 輸出，提取 nr-gnb 的 PID，並定期透過 HTTP POST 發送到 Gthulhu API Server 以更新排程策略。
+
+### 📋 需求分析
+
+根據你的需求，我們要完成以下幾件事：
+
+1. **監聽 trace_pipe**：持續讀取 `/sys/kernel/debug/tracing/trace_pipe` 的輸出
+2. **解析事件**：從 trace 輸出中提取 nr-gnb 相關的 PID 資訊
+3. **定期發送**：使用 curl（或 Go HTTP client）定期將 PID 資訊 POST 到 Gthulhu API Server
+4. **更新策略**：透過 API 更新排程策略，優化 nr-gnb 進程的調度優先級
+
+### 🎯 技術架構設計
+
+```mermaid
+graph TD
+    subgraph "Kernel Space"
+        GTP5G[GTP5G Module] -->|處理封包| eBPF[gtp5g-tracer eBPF]
+        eBPF -->|bpf_printk| TracePipe[/sys/kernel/debug/tracing/trace_pipe]
+    end
+
+    subgraph "GTP5G Operator (User Space)"
+        TracePipe -->|tail -f| Parser[Trace Parser]
+        Parser -->|提取 PID| Filter[nr-gnb Filter]
+        Filter -->|PID 列表| Aggregator[PID Aggregator]
+        Aggregator -->|定期| Sender[API Sender]
+    end
+
+    subgraph "Kubernetes Cluster"
+        Sender -->|POST /api/v1/scheduling/strategies| API[Gthulhu API Server Pod]
+        API -->|更新策略| Scheduler[Gthulhu Scheduler]
+    end
+
+    style Parser fill:#90EE90
+    style API fill:#FFB6C1
+    style Scheduler fill:#FFD700
+```
+
+### 📊 trace_pipe 輸出格式分析
+
+根據我們之前的測試，gtp5g-tracer 輸出格式如下：
+
+```text
+nr-gnb-1150369 [005] ..s21 34202.967769: bpf_trace_printk: fentry/gtp5g_encap_recv: DEV=n3
+nr-gnb-1150369 [005] ..s21 34202.967771: bpf_trace_printk: fentry/gtp5g_encap_recv: GTP packet detected (len >= 8)
+nr-gnb-1150369 [005] ..s21 34202.967772: bpf_trace_printk: fentry/gtp5g_encap_recv: PID=1150369, TGID=1150348, CPU=5
+<idle>-0       [001] b.s31 34202.971363: bpf_trace_printk: fentry/gtp5g_handle_skb_ipv4: PID=0, TGID=0, CPU=1
+```
+
+**關鍵資訊提取**：
+- **進程名稱**：`nr-gnb-1150369`（第一欄）
+- **PID**：`1150369`（從進程名稱或 `PID=` 欄位提取）
+- **TGID（Thread Group ID）**：`1150348`（主進程 PID）
+- **CPU**：`5`（執行的 CPU 編號）
+
+### 🔧 實作計劃
+
+#### 階段 1：基本架構（今天討論與實作）
+
+**1.1 建立 Go 程式結構**
+
+```go
+// cmd/gtp5g_operator/main.go
+package main
+
+import (
+    "bufio"
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "log"
+    "net/http"
+    "os"
+    "os/exec"
+    "regexp"
+    "strings"
+    "sync"
+    "time"
+)
+
+// 追蹤的 PID 集合（使用 map 實現 set）
+type PIDSet struct {
+    sync.RWMutex
+    pids map[int]bool  // key: PID, value: true
+}
+
+// Gthulhu API 排程策略結構
+type SchedulingStrategy struct {
+    Name         string `json:"name"`
+    PID          *int   `json:"pid,omitempty"`           // 指定特定 PID
+    Priority     *int   `json:"priority,omitempty"`      // 優先級
+    TimeSliceNs  *int64 `json:"time_slice_ns,omitempty"` // 時間片（奈秒）
+}
+
+type SchedulingStrategies struct {
+    Strategies []SchedulingStrategy `json:"strategies"`
+}
+
+const (
+    tracePipePath   = "/sys/kernel/debug/tracing/trace_pipe"
+    apiEndpoint     = "http://gthulhu-api:80/api/v1/scheduling/strategies"
+    sendInterval    = 10 * time.Second  // 每 10 秒發送一次
+    priorityBoost   = 10                // nr-gnb 優先級提升值
+    timeSliceBoost  = 20000000          // 20ms 時間片（20,000,000 ns）
+)
+```
+
+**1.2 解析 trace_pipe**
+
+```go
+// 正則表達式匹配 nr-gnb 相關的 trace 行
+var nrGnbRegex = regexp.MustCompile(`^(nr-gnb)-(\d+)\s+\[(\d+)\].*PID=(\d+)`)
+
+func parsePIDFromTraceLine(line string) (int, bool) {
+    matches := nrGnbRegex.FindStringSubmatch(line)
+    if len(matches) >= 5 {
+        pid, err := strconv.Atoi(matches[4])
+        if err == nil {
+            return pid, true
+        }
+    }
+    // 如果沒有 PID= 欄位，從進程名稱提取
+    if strings.HasPrefix(line, "nr-gnb-") {
+        parts := strings.Fields(line)
+        if len(parts) > 0 {
+            name := parts[0]
+            pidStr := strings.TrimPrefix(name, "nr-gnb-")
+            if pid, err := strconv.Atoi(pidStr); err == nil {
+                return pid, true
+            }
+        }
+    }
+    return 0, false
+}
+
+func tailTracePipe(ctx context.Context, pidSet *PIDSet) error {
+    cmd := exec.CommandContext(ctx, "tail", "-f", tracePipePath)
+    stdout, err := cmd.StdoutPipe()
+    if err != nil {
+        return fmt.Errorf("failed to get stdout pipe: %w", err)
+    }
+
+    if err := cmd.Start(); err != nil {
+        return fmt.Errorf("failed to start tail command: %w", err)
+    }
+
+    scanner := bufio.NewScanner(stdout)
+    for scanner.Scan() {
+        line := scanner.Text()
+        if pid, ok := parsePIDFromTraceLine(line); ok {
+            pidSet.Lock()
+            pidSet.pids[pid] = true
+            pidSet.Unlock()
+            log.Printf("Detected nr-gnb PID: %d", pid)
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        return fmt.Errorf("scanner error: %w", err)
+    }
+
+    return cmd.Wait()
+}
+```
+
+**1.3 發送到 Gthulhu API**
+
+```go
+func sendStrategiesToAPI(pidSet *PIDSet) error {
+    pidSet.RLock()
+    defer pidSet.RUnlock()
+
+    if len(pidSet.pids) == 0 {
+        log.Println("No nr-gnb PIDs to send")
+        return nil
+    }
+
+    strategies := SchedulingStrategies{
+        Strategies: make([]SchedulingStrategy, 0, len(pidSet.pids)),
+    }
+
+    for pid := range pidSet.pids {
+        pidCopy := pid
+        priorityCopy := priorityBoost
+        timeSliceCopy := int64(timeSliceBoost)
+        
+        strategies.Strategies = append(strategies.Strategies, SchedulingStrategy{
+            Name:        fmt.Sprintf("nr-gnb-%d", pid),
+            PID:         &pidCopy,
+            Priority:    &priorityCopy,
+            TimeSliceNs: &timeSliceCopy,
+        })
+    }
+
+    jsonData, err := json.Marshal(strategies)
+    if err != nil {
+        return fmt.Errorf("failed to marshal strategies: %w", err)
+    }
+
+    req, err := http.NewRequest("POST", apiEndpoint, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return fmt.Errorf("failed to create request: %w", err)
+    }
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{Timeout: 5 * time.Second}
+    resp, err := client.Do(req)
+    if err != nil {
+        return fmt.Errorf("failed to send request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return fmt.Errorf("API returned non-OK status: %d", resp.StatusCode)
+    }
+
+    log.Printf("Successfully sent %d strategies to Gthulhu API", len(strategies.Strategies))
+    return nil
+}
+
+func periodicSender(ctx context.Context, pidSet *PIDSet) {
+    ticker := time.NewTicker(sendInterval)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ticker.C:
+            if err := sendStrategiesToAPI(pidSet); err != nil {
+                log.Printf("Error sending strategies: %v", err)
+            }
+        case <-ctx.Done():
+            return
+        }
+    }
+}
+```
+
+**1.4 主程式入口**
+
+```go
+func main() {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+
+    pidSet := &PIDSet{
+        pids: make(map[int]bool),
+    }
+
+    // Goroutine 1: 解析 trace_pipe
+    go func() {
+        if err := tailTracePipe(ctx, pidSet); err != nil {
+            log.Printf("Error tailing trace_pipe: %v", err)
+        }
+    }()
+
+    // Goroutine 2: 定期發送到 API
+    go periodicSender(ctx, pidSet)
+
+    // 等待中斷信號
+    sigChan := make(chan os.Signal, 1)
+    signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+    <-sigChan
+
+    log.Println("Shutting down...")
+    cancel()
+}
+```
+
+#### 階段 2：Kubernetes 部署配置
+
+**2.1 Dockerfile**
+
+```dockerfile
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o gtp5g_operator ./cmd/gtp5g_operator
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates
+WORKDIR /root/
+COPY --from=builder /app/gtp5g_operator .
+
+CMD ["./gtp5g_operator"]
+```
+
+**2.2 Kubernetes Deployment**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gtp5g-operator
+  namespace: free5gc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gtp5g-operator
+  template:
+    metadata:
+      labels:
+        app: gtp5g-operator
+    spec:
+      hostPID: true  # 重要：需要訪問 host namespace 才能讀取 trace_pipe
+      hostNetwork: true
+      containers:
+      - name: gtp5g-operator
+        image: gtp5g-operator:latest
+        securityContext:
+          privileged: true  # 需要讀取 /sys/kernel/debug
+        volumeMounts:
+        - name: debugfs
+          mountPath: /sys/kernel/debug
+          readOnly: true
+        env:
+        - name: API_ENDPOINT
+          value: "http://gthulhu-api.default.svc.cluster.local:80/api/v1/scheduling/strategies"
+        - name: SEND_INTERVAL
+          value: "10s"
+      volumes:
+      - name: debugfs
+        hostPath:
+          path: /sys/kernel/debug
+          type: Directory
+```
+
+#### 階段 3：測試與驗證
+
+**3.1 本地測試**
+
+```bash
+# Terminal 1: 運行 gtp5g-tracer
+cd /home/ubuntu/gtp5g-tracer
+sudo ./main
+
+# Terminal 2: 運行 GTP5G Operator（模擬）
+cd /home/ubuntu/Gthulhu/gtp5g_operator
+sudo go run cmd/gtp5g_operator/main.go
+
+# Terminal 3: 生成流量（觸發 nr-gnb PID）
+kubectl exec -it -n free5gc ueransim-ue-<pod-id> -- ping -c 10 8.8.8.8
+```
+
+**3.2 驗證 API 呼叫**
+
+```bash
+# 檢查 Gthulhu API Server 日誌
+kubectl logs -n default <gthulhu-api-pod> -f
+
+# 手動測試 API endpoint
+curl -X POST http://gthulhu-api:80/api/v1/scheduling/strategies \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategies": [
+      {
+        "name": "nr-gnb-1150369",
+        "pid": 1150369,
+        "priority": 10,
+        "time_slice_ns": 20000000
+      }
+    ]
+  }'
+```
+
+### 💡 設計考量
+
+**1. PID 有效性管理**
+- **問題**：進程可能結束，PID 可能被重複使用
+- **解決方案**：
+  - 定期檢查 PID 是否仍存在（`os.FindProcess` + `Signal(0)`）
+  - 從 pidSet 移除失效的 PID
+  - API 策略設定 TTL（Time To Live）
+
+**2. API 認證**
+- Gthulhu API 使用 JWT 認證
+- 需要實作 `/api/v1/auth/token` 取得 token
+- 在每次 POST 請求時帶上 `Authorization: Bearer <token>`
+
+**3. 錯誤處理與重試**
+- trace_pipe 可能暫時不可用（debugfs 未掛載）
+- API Server 可能暫時離線
+- 實作指數退避（exponential backoff）重試機制
+
+**4. 性能優化**
+- 使用批次發送（每次收集多個 PID 後一次發送）
+- 限制 pidSet 大小（避免記憶體洩漏）
+- 使用 sync.RWMutex 減少鎖競爭
+
+### 📝 待討論問題
+
+在實作前，我們需要確認以下細節：
+
+1. **API 認證方式**：
+   - Gthulhu API Server 的認證是否已啟用？
+   - 是否需要提供 public key 或其他憑證？
+   - Token 過期時間與刷新策略？
+
+2. **策略更新邏輯**：
+   - 是否要「覆蓋」現有策略，還是「合併」？
+   - 如何處理其他來源（非 GTP5G Operator）設定的策略？
+   - 是否需要為不同 UPF 設定不同的策略？
+
+3. **部署位置**：
+   - GTP5G Operator 應該部署在哪個 node？
+   - 是否每個 UPF node 都需要一個 operator？
+   - 還是集中式管理（單一 operator 監控所有 UPF）？
+
+4. **監控與告警**：
+   - 需要哪些 metrics（PID 數量、API 成功率、延遲等）？
+   - 是否需要 Prometheus exporter？
+   - 日誌級別與格式？
+
+5. **測試範圍**：
+   - 單元測試：Parser、PIDSet、API Client
+   - 集成測試：與真實 API Server 互動
+   - 端到端測試：完整流程（trace → parse → send → verify）
+
+### 🔐 JWT Token 認證方式
+
+**實作完成後確認**：Gthulhu API 使用 JWT token 進行認證。以下是獲取 token 的方式：
+
+#### 方法 1：使用提供的查詢腳本（推薦）
+
+```bash
+cd /home/ubuntu/Gthulhu/gtp5g_operator
+./query_strategies.sh
+```
+
+#### 方法 2：手動獲取 Token
+
+```bash
+# 步驟 1：讀取 public key 並發送 POST 請求獲取 JWT token
+TOKEN=$(jq -n --arg pk "$(cat /tmp/jwt_public_key.pem)" '{public_key: $pk}' | \
+  curl -s -X POST http://localhost:8080/api/v1/auth/token \
+    -H "Content-Type: application/json" \
+    -d @- | jq -r '.token')
+
+# 步驟 2：使用 token 查詢當前的 scheduling strategies
+curl -X GET http://localhost:8080/api/v1/scheduling/strategies \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" | jq '.'
+```
+
+#### API 認證流程
+
+1. **請求 Token**：
+   - Endpoint: `POST /api/v1/auth/token`
+   - Body: `{"public_key": "<PEM格式的公鑰>"}`
+   - Response: `{"success": true, "token": "eyJhbGc..."}`
+
+2. **使用 Token**：
+   - 在所有 API 請求的 Header 中添加：`Authorization: Bearer <token>`
+   - Token 有效期：24 小時
+   - Operator 會在過期前 5 分鐘自動刷新
+
+3. **查詢 Strategies**：
+   - Endpoint: `GET /api/v1/scheduling/strategies`
+   - 需要 JWT token 認證
+   - Response 範例：
+   ```json
+   {
+     "success": true,
+     "message": "Scheduling strategies retrieved from cache",
+     "timestamp": "2025-11-23T13:10:19Z",
+     "scheduling": [
+       {
+         "priority": true,
+         "execution_time": 20000000,
+         "pid": 365193
+       }
+     ]
+   }
+   ```
+
+#### 實作中的認證邏輯
+
+GTP5G Operator 的 `pkg/auth/client.go` 實作了自動 token 管理：
+
+- 第一次呼叫時自動向 API 請求 token
+- Token 快過期時（剩餘 5 分鐘）自動刷新
+- 使用 sync.RWMutex 保證執行緒安全
+- 所有 API 請求自動帶上最新的 token
+
+### 🚀 下一步行動
+
+請確認以上設計是否符合你的需求，特別是：
+- API endpoint 與認證方式 ✅ **已確認使用 JWT token**
+- 策略更新邏輯（覆蓋 vs 合併）
+- 部署架構（集中式 vs 分散式）
+
+確認後我們可以立即開始實作 Step 11！
+
+---
+
+## Step 11 實作完成總結
+
+📅 **完成日期**: 2025-11-23
+✅ **狀態**: 已完成並成功部署
+
+### 🎯 實作成果
+
+成功開發並部署了 GTP5G Operator，實現以下功能：
+
+1. **追蹤 5GC 進程**
+   - ✅ 解析 trace_pipe 輸出
+   - ✅ 檢測 nr-gnb（gNodeB）相關進程
+   - ✅ 檢測 nr-ue（UE）相關進程
+   - ✅ 支援多種 trace 格式（TGID, PID, pid=(procname)）
+
+2. **策略管理**
+   - ✅ 自動聚合檢測到的 PIDs
+   - ✅ 每 10 秒定期發送到 Gthulhu API
+   - ✅ 使用 JWT token 認證
+   - ✅ 自動 token 刷新機制
+
+3. **K8s 整合**
+   - ✅ 正確連接到 K8s 內的 Gthulhu API
+   - ✅ 使用 port-forward 進行本地測試
+   - ✅ 支援環境變數配置
+
+### 📊 最終效果
+
+operator 成功發送 **22 個策略**到 K8s 內的 Gthulhu API：
+
+- **nr-gnb 相關**: 主進程 365162 + 10 個工作線程
+- **nr-ue 相關**: 主進程 365012 + 11 個工作線程
+- **策略參數**: priority=true, execution_time=20ms
+
+```json
+{
+  "total": 22,
+  "nr_gnb_main": {
+    "priority": true,
+    "execution_time": 20000000,
+    "pid": 365162
+  },
+  "nr_ue_main": {
+    "priority": true,
+    "execution_time": 20000000,
+    "pid": 365012
+  }
+}
+```
+
+### 🔧 關鍵技術突破
+
+#### 1. Trace Parser 實作
+
+**問題**: trace_pipe 輸出格式多樣，需要可靠地提取 PIDs
+
+**解決方案**: 實作多層次匹配策略
+
+```go
+// 優先級順序：
+// 1. TGID= (thread group ID，主進程)
+// 2. nr-gnb-<PID> / nr-ue-<PID> (進程名稱格式)
+// 3. pid=<num> (procname) 格式
+// 4. PID= 欄位
+```
+
+**實際 trace 範例**：
+```
+nr-gnb-365189 [003] d..31 21039.948599: bpf_trace_printk: stop: pid=365189 (nr-gnb)
+nr-ue-365012 [004] d..31 22353.878390: bpf_trace_printk: stop: pid=365012 (nr-ue)
+<idle>-0 [005] d.h51 21039.908232: bpf_trace_printk: enqueue: pid=365189 (nr-gnb)
+```
+
+#### 2. JWT 認證流程
+
+**問題**: 需要向 API 認證才能更新策略
+
+**實作**: 自動 token 管理
+
+```go
+// pkg/auth/client.go
+// - 首次請求時自動獲取 token
+// - Token 快過期時（剩餘 5 分鐘）自動刷新
+// - 使用 sync.RWMutex 保證執行緒安全
+```
+
+**API 認證流程**：
+1. POST `/api/v1/auth/token` 帶上 public key
+2. 獲得 24 小時有效的 JWT token
+3. 所有 API 請求帶上 `Authorization: Bearer <token>`
+
+#### 3. K8s 連接問題排查
+
+**問題發現**: operator 一直發送到 `localhost:8080`，但實際 Gthulhu 在 K8s 內部
+
+**排查過程**:
+```bash
+# 1. 發現策略沒有生效
+# 2. 檢查 localhost:8080 → 發現是其他服務
+# 3. 檢查 K8s 內的 Gthulhu API
+sudo microk8s.kubectl get svc | grep gthulhu
+# gthulhu-api   ClusterIP   10.152.183.178   <none>   80/TCP
+
+# 4. 使用 port-forward 橋接
+sudo microk8s.kubectl port-forward gthulhu-api-pod 8081:8080
+```
+
+**解決方案**:
+- ✅ 修改預設 endpoint 為 `http://gthulhu-api:80`
+- ✅ 本地測試使用 `http://localhost:8081`（透過 port-forward）
+- ✅ 從 K8s pod 獲取正確的 JWT public key
+
+#### 4. 同時追蹤 nr-gnb 和 nr-ue
+
+**需求**: UE ping 延遲高，需要同時優化 gNodeB 和 UE 進程
+
+**實作**: 擴展 parser 支援兩種進程類型
+
+```go
+// Before: 只檢測 nr-gnb
+if !strings.Contains(lineLower, "nr-gnb") { return 0, false }
+
+// After: 同時檢測 nr-gnb 和 nr-ue
+hasNrGnb := strings.Contains(lineLower, "nr-gnb")
+hasNrUe := strings.Contains(lineLower, "nr-ue")
+if !hasNrGnb && !hasNrUe { return 0, false }
+```
+
+**效果**: 策略數從 11 個增加到 22 個，覆蓋所有關鍵進程
+
+### 📁 專案結構
+
+```
+gtp5g_operator/
+├── cmd/gtp5g_operator/
+│   └── main.go                    # 主程式入口
+├── pkg/
+│   ├── api/
+│   │   └── client.go              # Gthulhu API 客戶端
+│   ├── auth/
+│   │   └── client.go              # JWT 認證管理
+│   └── parser/
+│       └── trace_parser.go        # trace_pipe 解析器
+├── docs/
+│   └── blog/
+│       └── gtp5g-operator-dev-log.md  # 開發日誌
+├── K8S_CONNECTION.md              # K8s 連接說明
+├── start_operator.sh              # 啟動腳本
+├── query_strategies.sh            # 查詢腳本
+└── gtp5g_operator                 # 編譯後的執行檔
+```
+
+### 🚀 使用方式
+
+#### 快速啟動
+
+```bash
+# 終端 1: 啟動 port-forward
+sudo microk8s.kubectl port-forward \
+  $(sudo microk8s.kubectl get pods -l app=gthulhu-api -o jsonpath='{.items[0].metadata.name}') \
+  8081:8080
+
+# 終端 2: 啟動 operator
+cd /home/ubuntu/Gthulhu/gtp5g_operator
+./start_operator.sh
+```
+
+#### 驗證效果
+
+```bash
+# 查詢當前策略
+TOKEN=$(jq -n --arg pk "$(cat /tmp/k8s_jwt_public_key.pem)" '{public_key: $pk}' | \
+  curl -s -X POST http://localhost:8081/api/v1/auth/token \
+    -H "Content-Type: application/json" -d @- | jq -r '.token')
+
+curl -s -X GET http://localhost:8081/api/v1/scheduling/strategies \
+  -H "Authorization: Bearer $TOKEN" | jq '.'
+```
+
+#### Web UI 管理
+
+訪問 `http://localhost:8081/static/` 使用圖形化介面查看和管理策略。
+
+### 🎓 學到的知識
+
+1. **eBPF Tracing**
+   - trace_pipe 是 BPF 程式輸出的主要介面
+   - `bpf_trace_printk()` 的輸出格式
+   - 如何可靠地解析多變的 trace 格式
+
+2. **Go 並行編程**
+   - 使用 channel 進行 goroutine 間通訊
+   - sync.RWMutex 實現執行緒安全的資料結構
+   - context 實現優雅的關閉機制
+
+3. **Kubernetes 網路**
+   - ClusterIP service 只在集群內可訪問
+   - port-forward 用於本地開發測試
+   - 從 host 訪問 K8s 內部服務的方法
+
+4. **JWT 認證**
+   - RSA 公私鑰對的使用
+   - Token 生命週期管理
+   - 如何實作自動刷新機制
+
+### 🐛 遇到的問題與解決
+
+| 問題 | 原因 | 解決方案 |
+|------|------|----------|
+| "No nr-gnb PIDs to send" | trace_pipe 格式過濾太嚴格 | 放寬匹配條件，支援多種格式 |
+| trace_pipe busy | 多個進程同時讀取 | 終止其他 cat 進程 |
+| 使用 tail -f 無輸出 | Buffer 問題 | 改用 cat 直接讀取 |
+| Public key verification failed | 使用了本地的 key | 從 K8s pod 獲取正確的 key |
+| 策略不生效 | 發送到錯誤的 API | 修正為 K8s 內的 API endpoint |
+| UE 延遲高 | 只優化了 nr-gnb | 同時追蹤 nr-ue 進程 |
+
+### 📈 性能影響
+
+實施調度策略後的改善（待測量）：
+- UE ping 延遲降低
+- GTP5G 封包處理更穩定
+- 5GC 核心網元回應時間改善
+
+### 🔮 未來改進方向
+
+1. **動態策略調整**
+   - 根據實際流量動態調整 execution_time
+   - 實作自適應優先級算法
+
+2. **監控與告警**
+   - 整合 Prometheus metrics
+   - 實作健康檢查 endpoint
+   - 策略發送失敗告警
+
+3. **K8s 原生部署**
+   - 建立 DaemonSet 部署
+   - 使用 ConfigMap 管理 public key
+   - 實作 RBAC 權限控制
+
+4. **進階分析**
+   - 解析 GTP 封包內容（IP, TEID, Ports）
+   - 使用 Ring Buffer 傳送結構化數據
+   - 實作更細粒度的流量識別
+
+### 📚 相關文檔
+
+- [K8s 連接說明](../../K8S_CONNECTION.md)
+- [實作總結](../../IMPLEMENTATION.md)
+- [部署指南](../../README.md)
+
+---
 
 ## 附錄：每日工作記錄模板
 
