@@ -98,6 +98,12 @@ func main() {
 	if err != nil {
 		slog.Warn("AssignUserSchedPid failed", "error", err)
 	}
+
+	err = cache.ImportScxEnums()
+	if err != nil {
+		slog.Warn("GetScxEnums failed", "error", err)
+	}
+
 	bpfModule.Start()
 
 	topo, err := cache.GetTopology()
@@ -239,6 +245,7 @@ func main() {
 			if err != nil {
 				slog.Warn("NotifyComplete failed", "error", err)
 			}
+			runtime.Gosched()
 		}
 	}
 

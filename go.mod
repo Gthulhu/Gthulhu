@@ -1,6 +1,8 @@
 module github.com/Gthulhu/Gthulhu
 
-go 1.22.6
+go 1.24.0
+
+toolchain go1.24.2
 
 require (
 	github.com/Gthulhu/plugin v1.0.2-0.20251110160030-cf1e25ec09e3
@@ -10,7 +12,8 @@ require (
 
 require (
 	github.com/aquasecurity/libbpfgo v0.8.0-libbpf-1.5 // indirect
-	golang.org/x/sys v0.26.0 // indirect
+	github.com/cilium/ebpf v0.20.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
 )
 
 replace (
