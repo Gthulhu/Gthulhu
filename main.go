@@ -168,13 +168,14 @@ func main() {
 							p.SendMetrics(metricsData)
 						}
 					}
+				} else {
+					runtime.Gosched()
 				}
 				if bpfModule.Stopped() {
 					slog.Info("bpfModule stopped")
 					cont = false
 				}
 			}
-			runtime.Gosched()
 		}
 		cancel()
 		timer.Stop()
@@ -186,10 +187,6 @@ func main() {
 		}
 	}()
 
-	var t *models.QueuedTask
-	var task *core.DispatchedTask
-	var cpu int32
-
 	slog.Info("scheduler started")
 
 	if cfg.IsDebugEnabled() {
@@ -199,14 +196,31 @@ func main() {
 		}()
 	}
 
-	for true {
+	runSchedulerLoop(ctx, bpfModule, p, SLICE_NS_DEFAULT, SLICE_NS_MIN)
+	slog.Info("scheduler exit")
+}
+
+func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.CustomScheduler, SLICE_NS_DEFAULT, SLICE_NS_MIN uint64) {
+	var t *models.QueuedTask
+	var task *core.DispatchedTask
+	var cpu int32
+	var err error
+
+	slog.Info("scheduler loop started")
+
+	for {
 		select {
 		case <-ctx.Done():
 			slog.Info("context done, exiting scheduler loop")
 			return
 		default:
 		}
+
+		// Drain all pending tasks from ringbuf (like scx_rustland)
 		bpfModule.DrainQueuedTask()
+
+		// Dispatch ONE task per iteration (like scx_rustland)
+		// This ensures low-latency response for newly enqueued tasks
 		t = bpfModule.SelectQueuedTask()
 		if t == nil {
 			runtime.Gosched()
@@ -214,6 +228,8 @@ func main() {
 		} else {
 			task = core.NewDispatchedTask(t)
 
+			// Deadline calculation:
+			// deadline = vtime + min(exec_runtime, 100 * slice_ns)
 			task.Vtime = t.Vtime
 			if t.Vtime != 0 {
 				task.Vtime += min(t.SumExecRuntime, SLICE_NS_DEFAULT*100)
@@ -225,7 +241,7 @@ func main() {
 				// Use the custom execution time from the scheduling strategy
 				task.SliceNs = min(customTime, (t.StopTs-t.StartTs)*11/10)
 			} else {
-				// No custom execution time, use default algorithm
+				// Assign minimum time slice scaled by task weight
 				task.SliceNs = SLICE_NS_MIN * t.Weight / 100
 			}
 
@@ -235,12 +251,13 @@ func main() {
 			}
 			task.Cpu = cpu
 
-			err = bpfModule.DispatchTask(task)
+			err = bpfModule.DispatchTaskSync(task)
 			if err != nil {
 				slog.Warn("DispatchTask failed", "error", err)
 				continue
 			}
 
+			// Notify completion with pending task count
 			err = core.NotifyComplete(bpfModule.GetPoolCount())
 			if err != nil {
 				slog.Warn("NotifyComplete failed", "error", err)
@@ -248,6 +265,4 @@ func main() {
 			runtime.Gosched()
 		}
 	}
-
-	slog.Info("scheduler exit")
 }
