@@ -23,6 +23,7 @@ type ApiConfig struct {
 	Url           string `yaml:"url"`
 	Interval      int    `yaml:"interval"`        // Interval in seconds
 	PublicKeyPath string `yaml:"public_key_path"` // Path to JWT public key for authentication
+	Enabled       bool   `yaml:"enabled,omitempty"`
 }
 
 // Config represents the application configuration

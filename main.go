@@ -23,6 +23,7 @@ import (
 )
 
 func main() {
+	runtime.GOMAXPROCS(1)
 	// Initialize structured logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -60,6 +61,7 @@ func main() {
 			BaseURL:       cfg.Api.Url,
 			Interval:      cfg.Api.Interval,
 			PublicKeyPath: cfg.Api.PublicKeyPath,
+			Enabled:       cfg.Api.Enabled,
 		},
 	}
 	if config.Mode == "" {
@@ -128,8 +130,10 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	timer := time.NewTicker(1 * time.Second)
-	notifyCount := 0
+	timer := time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
+	if !cfg.Api.Enabled {
+		timer.Stop()
+	}
 	cont := true
 	go func() {
 		for cont {
@@ -138,38 +142,33 @@ func main() {
 				slog.Info("receive os signal")
 				cont = false
 			case <-timer.C:
-				notifyCount++
-				if notifyCount%10 == 0 {
-					bss, err := bpfModule.GetBssData()
-					if err != nil {
-						slog.Warn("GetBssData failed", "error", err)
-					} else {
-						b, err := json.Marshal(bss)
-						if err != nil {
-							slog.Warn("json.Marshal failed", "error", err)
-						} else {
-							slog.Info("bss data", "data", string(b))
-
-							// Send metrics to API server if metrics client is available
-							// Convert BSS data to metrics format
-							metricsData := gthulhu.BssData{
-								UserschedLastRunAt: bss.Usersched_last_run_at,
-								NrQueued:           bss.Nr_queued,
-								NrScheduled:        bss.Nr_scheduled,
-								NrRunning:          bss.Nr_running,
-								NrOnlineCpus:       bss.Nr_online_cpus,
-								NrUserDispatches:   bss.Nr_user_dispatches,
-								NrKernelDispatches: bss.Nr_kernel_dispatches,
-								NrCancelDispatches: bss.Nr_cancel_dispatches,
-								NrBounceDispatches: bss.Nr_bounce_dispatches,
-								NrFailedDispatches: bss.Nr_failed_dispatches,
-								NrSchedCongested:   bss.Nr_sched_congested,
-							}
-							p.SendMetrics(metricsData)
-						}
-					}
+				bss, err := bpfModule.GetBssData()
+				if err != nil {
+					slog.Warn("GetBssData failed", "error", err)
 				} else {
-					runtime.Gosched()
+					b, err := json.Marshal(bss)
+					if err != nil {
+						slog.Warn("json.Marshal failed", "error", err)
+					} else {
+						slog.Info("bss data", "data", string(b))
+
+						// Send metrics to API server if metrics client is available
+						// Convert BSS data to metrics format
+						metricsData := gthulhu.BssData{
+							UserschedLastRunAt: bss.Usersched_last_run_at,
+							NrQueued:           bss.Nr_queued,
+							NrScheduled:        bss.Nr_scheduled,
+							NrRunning:          bss.Nr_running,
+							NrOnlineCpus:       bss.Nr_online_cpus,
+							NrUserDispatches:   bss.Nr_user_dispatches,
+							NrKernelDispatches: bss.Nr_kernel_dispatches,
+							NrCancelDispatches: bss.Nr_cancel_dispatches,
+							NrBounceDispatches: bss.Nr_bounce_dispatches,
+							NrFailedDispatches: bss.Nr_failed_dispatches,
+							NrSchedCongested:   bss.Nr_sched_congested,
+						}
+						p.SendMetrics(metricsData)
+					}
 				}
 				if bpfModule.Stopped() {
 					slog.Info("bpfModule stopped")
@@ -262,7 +261,6 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 			if err != nil {
 				slog.Warn("NotifyComplete failed", "error", err)
 			}
-			runtime.Gosched()
 		}
 	}
 }

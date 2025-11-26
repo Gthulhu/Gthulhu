@@ -16,6 +16,7 @@ api:
   url: http://127.0.0.1:8080
   interval: 5
   public_key_path: ./api/config/jwt_public_key.pem
+  enabled: true
 debug: false
 early_processing: false
 builtin_idle: false

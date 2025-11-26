@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.2
 
 require (
-	github.com/Gthulhu/plugin v1.0.2-0.20251126094708-69b9300e12e5
+	github.com/Gthulhu/plugin v1.0.2-0.20251126160332-d7cf51106ba8
 	github.com/Gthulhu/qumun v0.3.2-0.20250105095341-21d6627bc161
 	gopkg.in/yaml.v3 v3.0.1
 )
