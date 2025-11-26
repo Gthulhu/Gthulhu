@@ -261,6 +261,7 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 			if err != nil {
 				slog.Warn("NotifyComplete failed", "error", err)
 			}
+			runtime.Gosched()
 		}
 	}
 }
