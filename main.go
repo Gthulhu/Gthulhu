@@ -130,9 +130,9 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	timer := time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
-	if !cfg.Api.Enabled {
-		timer.Stop()
+	timer := &time.Ticker{}
+	if cfg.Api.Enabled {
+		timer = time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
 	}
 	cont := true
 	go func() {
@@ -177,7 +177,9 @@ func main() {
 			}
 		}
 		cancel()
-		timer.Stop()
+		if cfg.Api.Enabled {
+			timer.Stop()
+		}
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {
 			slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
