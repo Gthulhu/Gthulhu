@@ -130,10 +130,7 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	timer := &time.Ticker{}
-	if cfg.Api.Enabled {
-		timer = time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
-	}
+	timer := time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
 	cont := true
 	go func() {
 		for cont {
@@ -151,23 +148,24 @@ func main() {
 						slog.Warn("json.Marshal failed", "error", err)
 					} else {
 						slog.Info("bss data", "data", string(b))
-
-						// Send metrics to API server if metrics client is available
-						// Convert BSS data to metrics format
-						metricsData := gthulhu.BssData{
-							UserschedLastRunAt: bss.Usersched_last_run_at,
-							NrQueued:           bss.Nr_queued,
-							NrScheduled:        bss.Nr_scheduled,
-							NrRunning:          bss.Nr_running,
-							NrOnlineCpus:       bss.Nr_online_cpus,
-							NrUserDispatches:   bss.Nr_user_dispatches,
-							NrKernelDispatches: bss.Nr_kernel_dispatches,
-							NrCancelDispatches: bss.Nr_cancel_dispatches,
-							NrBounceDispatches: bss.Nr_bounce_dispatches,
-							NrFailedDispatches: bss.Nr_failed_dispatches,
-							NrSchedCongested:   bss.Nr_sched_congested,
+						if cfg.Api.Enabled {
+							// Send metrics to API server if metrics client is available
+							// Convert BSS data to metrics format
+							metricsData := gthulhu.BssData{
+								UserschedLastRunAt: bss.Usersched_last_run_at,
+								NrQueued:           bss.Nr_queued,
+								NrScheduled:        bss.Nr_scheduled,
+								NrRunning:          bss.Nr_running,
+								NrOnlineCpus:       bss.Nr_online_cpus,
+								NrUserDispatches:   bss.Nr_user_dispatches,
+								NrKernelDispatches: bss.Nr_kernel_dispatches,
+								NrCancelDispatches: bss.Nr_cancel_dispatches,
+								NrBounceDispatches: bss.Nr_bounce_dispatches,
+								NrFailedDispatches: bss.Nr_failed_dispatches,
+								NrSchedCongested:   bss.Nr_sched_congested,
+							}
+							p.SendMetrics(metricsData)
 						}
-						p.SendMetrics(metricsData)
 					}
 				}
 				if bpfModule.Stopped() {
@@ -177,9 +175,7 @@ func main() {
 			}
 		}
 		cancel()
-		if cfg.Api.Enabled {
-			timer.Stop()
-		}
+		timer.Stop()
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {
 			slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
@@ -224,7 +220,6 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 		// This ensures low-latency response for newly enqueued tasks
 		t = bpfModule.SelectQueuedTask()
 		if t == nil {
-			runtime.Gosched()
 			bpfModule.BlockTilReadyForDequeue(ctx)
 		} else {
 			task = core.NewDispatchedTask(t)
@@ -252,7 +247,7 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 			}
 			task.Cpu = cpu
 
-			err = bpfModule.DispatchTaskSync(task)
+			err = bpfModule.DispatchTask(task)
 			if err != nil {
 				slog.Warn("DispatchTask failed", "error", err)
 				continue
