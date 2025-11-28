@@ -130,6 +130,9 @@ func main() {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+	if (cfg.Api.Interval <= 0) || (!cfg.Api.Enabled) {
+		cfg.Api.Interval = 5
+	}
 	timer := time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
 	cont := true
 	go func() {
