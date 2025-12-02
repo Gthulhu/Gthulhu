@@ -244,9 +244,13 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 				task.SliceNs = SLICE_NS_MIN * t.Weight / 100
 			}
 
-			err, cpu = bpfModule.SelectCPU(t)
-			if err != nil {
-				slog.Warn("SelectCPU failed", "error", err)
+			if t.NrCpusAllowed == 1 {
+				cpu = t.Cpu
+			} else {
+				err, cpu = bpfModule.SelectCPU(t)
+				if err != nil {
+					slog.Warn("SelectCPU failed", "error", err)
+				}
 			}
 			task.Cpu = cpu
 
