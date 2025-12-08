@@ -133,16 +133,32 @@ func main() {
 	if (cfg.Api.Interval <= 0) || (!cfg.Api.Enabled) {
 		cfg.Api.Interval = 5
 	}
+	oldBss, err := bpfModule.GetBssData()
+	if err != nil {
+		slog.Warn("GetBssData failed", "error", err)
+	}
 	timer := time.NewTicker(time.Duration(cfg.Api.Interval) * time.Second)
 	cont := true
 	go func() {
+		defer timer.Stop()
 		for cont {
 			select {
+			case <-ctx.Done():
+				slog.Info("context done, exiting signal handler")
+				return
 			case <-signalChan:
 				slog.Info("receive os signal")
 				cont = false
 			case <-timer.C:
 				bss, err := bpfModule.GetBssData()
+				if oldBss.Nr_kernel_dispatches == bss.Nr_kernel_dispatches {
+					if bpfModule.Stopped() {
+						slog.Info("No progress detected and scheduler stopped, exiting")
+						cont = false
+					}
+				}
+				oldBss = bss
+				bss.Nr_scheduled = bpfModule.GetPoolCount()
 				if err != nil {
 					slog.Warn("GetBssData failed", "error", err)
 				} else {
@@ -171,14 +187,9 @@ func main() {
 						}
 					}
 				}
-				if bpfModule.Stopped() {
-					slog.Info("bpfModule stopped")
-					cont = false
-				}
 			}
 		}
 		cancel()
-		timer.Stop()
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {
 			slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
@@ -196,11 +207,26 @@ func main() {
 		}()
 	}
 
-	runSchedulerLoop(ctx, bpfModule, p, SLICE_NS_DEFAULT, SLICE_NS_MIN)
+	if err = runSchedulerLoop(ctx, bpfModule, p, SLICE_NS_DEFAULT, SLICE_NS_MIN); err != nil {
+		slog.Info("Scheduler loop exited with error", "error", err)
+		uei, err := bpfModule.GetUeiData()
+		if err == nil {
+			slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
+		} else {
+			slog.Warn("GetUeiData failed", "error", err)
+		}
+		cancel()
+	}
 	slog.Info("scheduler exit")
 }
 
-func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.CustomScheduler, SLICE_NS_DEFAULT, SLICE_NS_MIN uint64) {
+func runSchedulerLoop(
+	ctx context.Context,
+	bpfModule *core.Sched,
+	p plugin.CustomScheduler,
+	SLICE_NS_DEFAULT,
+	SLICE_NS_MIN uint64,
+) error {
 	var t *models.QueuedTask
 	var task *core.DispatchedTask
 	var cpu int32
@@ -212,12 +238,19 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 		select {
 		case <-ctx.Done():
 			slog.Info("context done, exiting scheduler loop")
-			return
+			return nil
 		default:
 		}
 
 		// Drain all pending tasks from ringbuf (like scx_rustland)
-		bpfModule.DrainQueuedTask()
+		cnt := bpfModule.DrainQueuedTask()
+		if cnt > 0 {
+			err = bpfModule.DecNrQueued(cnt)
+			if err != nil {
+				slog.Warn("DecNrQueued failed", "error", err)
+				return err
+			}
+		}
 
 		// Dispatch ONE task per iteration (like scx_rustland)
 		// This ensures low-latency response for newly enqueued tasks
@@ -226,7 +259,6 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 			bpfModule.BlockTilReadyForDequeue(ctx)
 		} else {
 			task = core.NewDispatchedTask(t)
-
 			// Deadline calculation:
 			// deadline = vtime + min(exec_runtime, 100 * slice_ns)
 			task.Vtime = t.Vtime
@@ -243,29 +275,27 @@ func runSchedulerLoop(ctx context.Context, bpfModule *core.Sched, p plugin.Custo
 				// Assign minimum time slice scaled by task weight
 				task.SliceNs = SLICE_NS_MIN * t.Weight / 100
 			}
-
-			if t.NrCpusAllowed == 1 {
-				cpu = t.Cpu
-			} else {
-				err, cpu = bpfModule.SelectCPU(t)
-				if err != nil {
-					slog.Warn("SelectCPU failed", "error", err)
-				}
+			err, cpu = bpfModule.SelectCPU(t)
+			if err != nil {
+				slog.Warn("SelectCPU failed", "error", err)
+				return err
 			}
 			task.Cpu = cpu
 
 			err = bpfModule.DispatchTask(task)
 			if err != nil {
 				slog.Warn("DispatchTask failed", "error", err)
-				continue
+				return err
 			}
 
 			// Notify completion with pending task count
-			err = core.NotifyComplete(bpfModule.GetPoolCount())
-			if err != nil {
-				slog.Warn("NotifyComplete failed", "error", err)
+			if bpfModule.GetPoolCount() == 0 {
+				err = core.NotifyComplete(0)
+				if err != nil {
+					slog.Warn("NotifyComplete failed", "error", err)
+					return err
+				}
 			}
-			runtime.Gosched()
 		}
 	}
 }
