@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2025 Gthulhu Team
+//
+// SPDX-License-Identifier: Apache-2.0
+// Author: Ian Chen <ychen.desl@gmail.com>
+
 package main
 
 import (
