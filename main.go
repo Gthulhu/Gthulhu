@@ -62,6 +62,7 @@ func main() {
 			Interval:      cfg.Api.Interval,
 			PublicKeyPath: cfg.Api.PublicKeyPath,
 			Enabled:       cfg.Api.Enabled,
+			AuthEnabled:   cfg.Api.AuthEnabled,
 		},
 	}
 	if config.Mode == "" {

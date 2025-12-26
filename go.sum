@@ -2,6 +2,10 @@ github.com/Gthulhu/plugin v1.0.2-0.20251126094708-69b9300e12e5 h1:SIL92eEX24C4m0
 github.com/Gthulhu/plugin v1.0.2-0.20251126094708-69b9300e12e5/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
 github.com/Gthulhu/plugin v1.0.2-0.20251126160332-d7cf51106ba8 h1:IKnHvIXBDT0KgEqzB/D18aZj1UrrRof35+jgsiV2N6Y=
 github.com/Gthulhu/plugin v1.0.2-0.20251126160332-d7cf51106ba8/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
+github.com/Gthulhu/plugin v1.0.2-0.20251224060621-defdc4f18ee8 h1:p/dJVWipgUE2DzGHPnXFjrggX2q8uCEnQG7omT4BWio=
+github.com/Gthulhu/plugin v1.0.2-0.20251224060621-defdc4f18ee8/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
+github.com/Gthulhu/plugin v1.0.2-0.20251224060905-f5bc844b917c h1:OjF9E1VW2wCby532WZrX1B8Zo5UXlHLJLhIxYdsNy4g=
+github.com/Gthulhu/plugin v1.0.2-0.20251224060905-f5bc844b917c/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
 github.com/cilium/ebpf v0.20.0 h1:atwWj9d3NffHyPZzVlx3hmw1on5CLe9eljR8VuHTwhM=
 github.com/cilium/ebpf v0.20.0/go.mod h1:pzLjFymM+uZPLk/IXZUL63xdx5VXEo+enTzxkZXdycw=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
