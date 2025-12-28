@@ -62,7 +62,7 @@ LIBBPF_OBJDIR = $(abspath ./$(OUTPUT)/libbpf)
 LIBBPF_DESTDIR = $(abspath ./$(OUTPUT))
 
 
-TARGET = qumun/main
+TARGET = qumun/ebpf/main
 BPF_TARGET = ${TARGET:=.bpf}
 BPF_C = ${BPF_TARGET:=.c}
 BPF_OBJ = ${BPF_C:.c=.o}
@@ -194,8 +194,8 @@ $(BPF_OBJ): %.o: %.c
 		-c $< -o $@
 
 wrapper:
-	bpftool/src/bpftool gen skeleton qumun/main.bpf.o > qumun/main.skeleton.h
-	$(CGO_CC) -g -O2 -Wall -fPIC -I scx/build/libbpf/src/usr/include -I scx/build/libbpf/include/uapi -I scx/scheds/include $(ARCH_SCHED_INCLUDE) -I scx/scheds/include/bpf-compat -I scx/scheds/include/lib -c qumun/wrapper.c -o wrapper.o
+	bpftool/src/bpftool gen skeleton qumun/ebpf/main.bpf.o > main.skeleton.h
+	$(CGO_CC) -g -O2 -Wall -fPIC -I ./ -c qumun/wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 
 clean:
