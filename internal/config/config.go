@@ -17,6 +17,7 @@ type SchedulerConfig struct {
 	SliceNsDefault uint64 `yaml:"slice_ns_default"`
 	SliceNsMin     uint64 `yaml:"slice_ns_min"`
 	Mode           string `yaml:"mode,omitempty"` // Optional mode field
+	KernelMode     bool   `yaml:"kernel_mode,omitempty"`
 }
 
 type SimpleSchedulerConfig struct {

@@ -9,6 +9,7 @@ scheduler:
   slice_ns_min: 1000000
   # Mode could be: simple, simple-fifo, gthulhu
   mode: gthulhu
+  kernel_mode: false # experimental feature
 # simple_scheduler is only applied if mode = simple
 simple_scheduler:
   enable_fifo: true

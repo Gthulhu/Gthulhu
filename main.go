@@ -94,6 +94,10 @@ func main() {
 		bpfModule.SetBuiltinIdle(true)
 	}
 
+	if cfg.Scheduler.KernelMode {
+		bpfModule.EnableKernelMode()
+	}
+
 	if cfg.EarlyProcessing {
 		slog.Info("Early processing enabled")
 		bpfModule.SetEarlyProcessing(true)
