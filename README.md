@@ -55,7 +55,7 @@ Moreover, when these applications run in a distributed architecture, traditional
 Gthulhu allows users to configure scheduling strategies via REST APIs. The Gthulhu Control Plane (https://github.com/Gthulhu/api) then distributes these strategies to the Gthulhu Scheduler on each node, enabling cross-node coordinated scheduling and resource management.
 
 Here is important information about Gthulhu:
-- Gthulhu is a scheduler developed using eBPF and Golang, with core components defined in the [qumun framework](https://github.com/Gthulhu/qumun).
+- Gthulhu is a scheduler developed using eBPF and Golang, with core components defined in the [qumun framework](https://github.com/Gthulhu/qumun), which allows you to develop custom Linux schedulers in Go without modifying the kernel directly—leveraging the eBPF/sched_ext mechanism to implement customized scheduling policies. This is also the technical foundation that enables Gthulhu to provide an orchestrable, distributed scheduler.
 - Gthulhu provides a [helm chart](https://github.com/Gthulhu/chart/tree/main/gthulhu) for easy deployment on Kubernetes clusters, which includes the tech stack that Gthulhu depends on.
 - For real-world use cases of Gthulhu, please refer to [Improving Network Performance with Custom eBPF-based Schedulers](https://free5gc.org/blog/20250726/index.en/).
 
