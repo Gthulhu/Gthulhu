@@ -10,10 +10,55 @@
 
 ## Overview
 
-Gthulhu is a next-generation scheduler designed for the cloud-native ecosystem, built with Golang and powered by the [qumun](https://github.com/Gthulhu/qumun) framework.
-- The qumun provides a series of API and abstractions to facilitate the development of custom Linux kernel schedulers using eBPF and Go.
-- Gthulhu implements a virtual runtime (vruntime) based scheduling policy, inspired by the concepts of proportional share scheduling and the needs of modern cloud-native applications.
-- Gthulhu supports preemptive multitasking, latency-sensitive task prioritization, and dynamic time slice adjustment to optimize CPU utilization and responsiveness. User can define what kind of tasks should be prioritized by invoking HTTP based APIs, provided by the [api server](https://github.com/Gthulhu/api).
+Gthulhu aims to provide an orchestrable, distributed scheduler solution for the cloud-native ecosystem to meet the dynamic and diverse needs of cloud-native applications, such as:
+- Trading systems requiring low-latency processing capabilities
+- Big data analytics requiring high-throughput computing resources
+- Machine learning tasks requiring flexible resource allocation
+
+The default Linux Kernel scheduler emphasizes fairness and cannot be optimized for the specific needs of different applications.
+Moreover, when these applications run in a distributed architecture, traditional schedulers often fail to effectively coordinate and allocate resources, leading to performance bottlenecks and resource waste.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              Gthulhu Architecture                               │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   ┌─────────────┐         ┌─────────────────────┐         ┌─────────────────┐   │
+│   │    User     │ ──────▶ │      Manager        │ ──────▶ │    MongoDB      │   │
+│   │  (Web UI)   │         │ (Central Management)│         │  (Persistence)  │   │
+│   └─────────────┘         └──────────┬──────────┘         └─────────────────┘   │
+│                                      │                                          │
+│                                      │ Query Pods via K8s API                   │
+│                                      ▼                                          │
+│                           ┌─────────────────────┐                               │
+│                           │   Kubernetes API    │                               │
+│                           │   (Pod Informer)    │                               │
+│                           └─────────────────────┘                               │
+│                                      │                                          │
+│              ┌───────────────────────┼───────────────────────┐                  │
+│              │                       │                       │                  │
+│              ▼                       ▼                       ▼                  │
+│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐           │
+│   │ Decision Maker  │     │ Decision Maker  │     │ Decision Maker  │           │
+│   │   (Node 1)      │     │   (Node 2)      │     │   (Node N)      │           │
+│   └────────┬────────┘     └────────┬────────┘     └────────┬────────┘           │
+│            │                       │                       │                    │
+│            ▼                       ▼                       ▼                    │
+│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐           │
+│   │  sched_ext      │     │  sched_ext      │     │  sched_ext      │           │
+│   │ (eBPF Scheduler)│     │ (eBPF Scheduler)│     │ (eBPF Scheduler)│           │
+│   └─────────────────┘     └─────────────────┘     └─────────────────┘           │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Gthulhu allows users to configure scheduling strategies via REST APIs. The Gthulhu Control Plane (https://github.com/Gthulhu/api) then distributes these strategies to the Gthulhu Scheduler on each node, enabling cross-node coordinated scheduling and resource management.
+
+Here is important information about Gthulhu:
+- Gthulhu is a scheduler developed using eBPF and Golang, with core components defined in the [qumun framework](https://github.com/Gthulhu/qumun).
+- Gthulhu provides a [helm chart](https://github.com/Gthulhu/chart/tree/main/gthulhu) for easy deployment on Kubernetes clusters, which includes the tech stack that Gthulhu depends on.
+- For real-world use cases of Gthulhu, please refer to [Improving Network Performance with Custom eBPF-based Schedulers](https://free5gc.org/blog/20250726/index.en/).
+
 
 ### Meaning of the Name
 
@@ -162,7 +207,7 @@ See [Installation guide](https://gthulhu.org/installation/#troubleshooting).
 
 ## License
 
-This software is distributed under the terms of the GNU General Public License version 2.
+This software is distributed under the terms of the Apache License 2.0.
 
 ## Contributing
 
