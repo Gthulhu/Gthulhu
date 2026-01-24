@@ -10,6 +10,8 @@ github.com/Gthulhu/plugin v1.0.2-0.20251224061441-ad838137f738 h1:LY2s3MLDxVJzqS
 github.com/Gthulhu/plugin v1.0.2-0.20251224061441-ad838137f738/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
 github.com/Gthulhu/plugin v1.0.2-0.20251228145509-f9b1fa4c977e h1:lTmcVMScEn+Yuio78SrQ3aXkt+K9m3M2tsjhCQ1P7GI=
 github.com/Gthulhu/plugin v1.0.2-0.20251228145509-f9b1fa4c977e/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
+github.com/Gthulhu/plugin v1.1.0 h1:vXbtfM/kDpha6XPSSw2x7ydTgNyES67bYaHLwa95G0g=
+github.com/Gthulhu/plugin v1.1.0/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
 github.com/cilium/ebpf v0.20.0 h1:atwWj9d3NffHyPZzVlx3hmw1on5CLe9eljR8VuHTwhM=
 github.com/cilium/ebpf v0.20.0/go.mod h1:pzLjFymM+uZPLk/IXZUL63xdx5VXEo+enTzxkZXdycw=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=

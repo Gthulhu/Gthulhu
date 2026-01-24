@@ -217,15 +217,60 @@ func main() {
 		}()
 	}
 
-	if err = runSchedulerLoop(ctx, bpfModule, p, SLICE_NS_DEFAULT, SLICE_NS_MIN); err != nil {
-		slog.Info("Scheduler loop exited with error", "error", err)
-		uei, err := bpfModule.GetUeiData()
-		if err == nil {
-			slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
-		} else {
-			slog.Warn("GetUeiData failed", "error", err)
+	if cfg.Scheduler.KernelMode {
+		for {
+			changed, removed := p.GetChangedStrategies()
+			if len(changed) > 0 || len(removed) > 0 {
+				for _, strategy := range changed {
+					if strategy.Priority {
+						err = bpfModule.UpdatePriorityTask(uint32(strategy.PID), strategy.ExecutionTime)
+						if err != nil {
+							slog.Warn("UpdatePriorityTask failed", "error", err, "pid", strategy.PID)
+						} else {
+							slog.Info("Updated priority task", "pid", strategy.PID, "executionTime", strategy.ExecutionTime)
+						}
+					} else {
+						// Non-priority strategy, we're not handling it for now
+						slog.Info("Non-priority strategy changed, no action taken", "pid", strategy.PID)
+					}
+				}
+				for _, strategy := range removed {
+					err = bpfModule.RemovePriorityTask(uint32(strategy.PID))
+					if err != nil {
+						slog.Warn("RemovePriorityTask failed", "error", err, "pid", strategy.PID)
+					} else {
+						slog.Info("Removed priority task", "pid", strategy.PID)
+					}
+				}
+			}
+			if bpfModule.Stopped() {
+				uei, err := bpfModule.GetUeiData()
+				if err == nil {
+					slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
+				} else {
+					slog.Warn("GetUeiData failed", "error", err)
+				}
+				return
+			}
+			select {
+			case <-ctx.Done():
+				slog.Info("context done, exiting kernel mode scheduler loop")
+				return
+			default:
+			}
+			time.Sleep(1 * time.Second)
 		}
-		cancel()
+	} else {
+		if err = runSchedulerLoop(ctx, bpfModule, p, SLICE_NS_DEFAULT, SLICE_NS_MIN); err != nil {
+			slog.Info("Scheduler loop exited with error", "error", err)
+			uei, err := bpfModule.GetUeiData()
+			if err == nil {
+				slog.Info("uei", "kind", uei.Kind, "exitCode", uei.ExitCode, "reason", uei.GetReason(), "message", uei.GetMessage())
+			} else {
+				slog.Warn("GetUeiData failed", "error", err)
+			}
+			cancel()
+		}
 	}
 	slog.Info("scheduler exit")
 }
