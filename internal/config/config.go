@@ -18,6 +18,7 @@ type SchedulerConfig struct {
 	SliceNsMin     uint64 `yaml:"slice_ns_min"`
 	Mode           string `yaml:"mode,omitempty"` // Optional mode field
 	KernelMode     bool   `yaml:"kernel_mode,omitempty"`
+	MaxTimeWatchdog bool  `yaml:"max_time_watchdog,omitempty"`
 }
 
 type SimpleSchedulerConfig struct {
@@ -49,8 +50,9 @@ func DefaultConfig() *Config {
 		Debug:           false,
 		EarlyProcessing: false,
 		Scheduler: SchedulerConfig{
-			SliceNsDefault: 20000 * 1000, // 20ms
-			SliceNsMin:     1000 * 1000,  // 1ms
+			SliceNsDefault:  20000 * 1000, // 20ms
+			SliceNsMin:      1000 * 1000,  // 1ms
+			MaxTimeWatchdog: true,
 		},
 		Api: ApiConfig{},
 	}

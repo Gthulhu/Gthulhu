@@ -98,6 +98,11 @@ func main() {
 		bpfModule.EnableKernelMode()
 	}
 
+	if !cfg.Scheduler.MaxTimeWatchdog {
+		slog.Info("Max time watchdog disabled")
+		bpfModule.DisableMaxTimeWatchdog()
+	}
+
 	if cfg.EarlyProcessing {
 		slog.Info("Early processing enabled")
 		bpfModule.SetEarlyProcessing(true)
