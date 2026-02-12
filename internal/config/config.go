@@ -14,11 +14,11 @@ import (
 
 // SchedulerConfig represents scheduler-specific configuration
 type SchedulerConfig struct {
-	SliceNsDefault uint64 `yaml:"slice_ns_default"`
-	SliceNsMin     uint64 `yaml:"slice_ns_min"`
-	Mode           string `yaml:"mode,omitempty"` // Optional mode field
-	KernelMode     bool   `yaml:"kernel_mode,omitempty"`
-	MaxTimeWatchdog bool  `yaml:"max_time_watchdog,omitempty"`
+	SliceNsDefault  uint64 `yaml:"slice_ns_default"`
+	SliceNsMin      uint64 `yaml:"slice_ns_min"`
+	Mode            string `yaml:"mode,omitempty"` // Optional mode field
+	KernelMode      bool   `yaml:"kernel_mode,omitempty"`
+	MaxTimeWatchdog bool   `yaml:"max_time_watchdog,omitempty"`
 }
 
 type SimpleSchedulerConfig struct {
