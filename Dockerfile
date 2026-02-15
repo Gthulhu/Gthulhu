@@ -9,6 +9,7 @@ RUN apt-get update && \
     llvm \
     libelf-dev \
     libpcap-dev \
+    libseccomp-dev \
     build-essential \
     make \
     git \
