@@ -179,7 +179,7 @@ dep:
 	git checkout 09b9e83 && \
 	cd src && \
 	make && \
-	sudo make install
+	if command -v sudo >/dev/null 2>&1; then sudo make install; else make install; fi
 	git clone -b v7.6.0 --recursive https://github.com/libbpf/bpftool.git && \
 	cd bpftool/src && make 
 
