@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile
+# Multi-stage Dockerfile for multi-architecture builds
 # Builder stage
 FROM ubuntu:25.04 AS builder
 
@@ -9,7 +9,6 @@ RUN apt-get update && \
     llvm \
     libelf-dev \
     libpcap-dev \
-    libseccomp-dev \
     build-essential \
     make \
     git \
@@ -30,24 +29,29 @@ RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Install Rust/Cargo for building scx_rustland
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
 WORKDIR /build
 
 # Copy source files
 COPY . .
 
 # Build dependencies and binary
-RUN make dep && \
-    cd scx && \
-    cargo build --release -p scx_rustland && \
-    cd .. && \
+ARG TARGETPLATFORM
+RUN set -e; \
+    case "$TARGETPLATFORM" in \
+        "linux/arm64") \
+            export ARCH=arm64 ;; \
+        "linux/amd64") \
+            export ARCH=x86_64 ;; \
+        *) \
+            echo "Unsupported platform: $TARGETPLATFORM" >&2; \
+            exit 1 ;; \
+    esac && \
+    export BUILD_ARCH=${ARCH} && \
+    make dep && \
     cd libbpfgo && \
-    make && \
+    unset ARCH && make && \
     cd .. && \
-    make build
+    make build ARCH=${BUILD_ARCH}
 
 # Runtime stage
 FROM ubuntu:25.04
