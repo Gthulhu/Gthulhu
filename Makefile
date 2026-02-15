@@ -125,7 +125,7 @@ test: build
 	@echo "Running scheduler test for $(KERNEL_VERSION)..."
 	@chmod +x scripts/test_scheduler.sh
 	@vng --verbose -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh || \
-		(echo "Retrying scheduler test..." && vng --verbose -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh)
+		(echo "Retrying scheduler test (attempt 2 of 2)..." && vng --verbose -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh)
 
 # Test with ARM64 build
 .PHONY: test-arm64
@@ -134,7 +134,7 @@ test-arm64:
 	@echo "Running ARM64 scheduler test for $(KERNEL_VERSION)..."
 	@chmod +x scripts/test_scheduler.sh
 	@vng --verbose --arch arm64 -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh || \
-		(echo "Retrying ARM64 scheduler test..." && vng --verbose --arch arm64 -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh)
+		(echo "Retrying ARM64 scheduler test (attempt 2 of 2)..." && vng --verbose --arch arm64 -r v$(KERNEL_VERSION) -- bash scripts/test_scheduler.sh)
 
 # Schtest targets
 .PHONY: schtest-dep
@@ -170,7 +170,7 @@ schtest: build schtest-build
 	@echo "Running schtest for $(KERNEL_VERSION)..."
 	@chmod +x scripts/test_schtest.sh
 	@vng --verbose -r v$(KERNEL_VERSION) -- bash scripts/test_schtest.sh || \
-		(echo "Retrying schtest..." && vng --verbose -r v$(KERNEL_VERSION) -- bash scripts/test_schtest.sh)
+		(echo "Retrying schtest (attempt 2 of 2)..." && vng --verbose -r v$(KERNEL_VERSION) -- bash scripts/test_schtest.sh)
 
 .PHONY: libbpf-uapi
 libbpf-uapi: $(LIBBPF_SRC)
