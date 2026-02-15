@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for multi-architecture builds
+# Multi-stage Dockerfile
 # Builder stage
 FROM ubuntu:25.04 AS builder
 
@@ -40,26 +40,14 @@ WORKDIR /build
 COPY . .
 
 # Build dependencies and binary
-ARG TARGETPLATFORM
-RUN set -e; \
-    case "$TARGETPLATFORM" in \
-        "linux/arm64") \
-            export ARCH=arm64 ;; \
-        "linux/amd64") \
-            export ARCH=x86_64 ;; \
-        *) \
-            echo "Unsupported platform: $TARGETPLATFORM" >&2; \
-            exit 1 ;; \
-    esac && \
-    export BUILD_ARCH=${ARCH} && \
-    make dep && \
+RUN make dep && \
     cd scx && \
     cargo build --release -p scx_rustland && \
     cd .. && \
     cd libbpfgo && \
-    unset ARCH && make && \
+    make && \
     cd .. && \
-    make build ARCH=${BUILD_ARCH}
+    make build
 
 # Runtime stage
 FROM ubuntu:25.04
