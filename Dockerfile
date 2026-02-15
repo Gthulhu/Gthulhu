@@ -39,17 +39,18 @@ WORKDIR /build
 COPY . .
 
 # Build dependencies and binary
-# Note: We need to handle architecture-specific builds
 ARG TARGETPLATFORM
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-        export ARCH=arm64; \
-    else \
-        export ARCH=x86_64; \
-    fi && \
+RUN set -e; \
+    case "$TARGETPLATFORM" in \
+        "linux/arm64") \
+            export ARCH=arm64 ;; \
+        "linux/amd64") \
+            export ARCH=x86_64 ;; \
+        *) \
+            echo "Unsupported platform: $TARGETPLATFORM" >&2; \
+            exit 1 ;; \
+    esac && \
     make dep && \
-    git submodule init && \
-    git submodule sync && \
-    git submodule update && \
     cd scx && \
     cargo build --release -p scx_rustland && \
     cd .. && \
