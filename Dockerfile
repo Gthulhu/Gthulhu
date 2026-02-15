@@ -25,6 +25,8 @@ RUN set -e; \
     pkg-config \
     libzstd-dev \
     zlib1g-dev; \
+    # Cross-compilation toolchain: only arm64 from amd64 is supported since
+    # GitHub Actions runners and most CI environments use x86_64 hosts.
     if [ "$TARGETARCH" != "$BUILDARCH" ] && [ "$TARGETARCH" = "arm64" ]; then \
         dpkg --add-architecture arm64 && \
         apt-get update && \
