@@ -1,9 +1,15 @@
 # Multi-stage Dockerfile for multi-architecture builds
-# Builder stage
-FROM ubuntu:25.04 AS builder
+# Builder stage: always runs on the build host's native platform to avoid
+# slow QEMU emulation (especially for the Rust/cargo scx_rustland build).
+# Cross-compilation is used when TARGETARCH differs from BUILDARCH.
+FROM --platform=$BUILDPLATFORM ubuntu:25.04 AS builder
 
-# Install build dependencies
-RUN apt-get update && \
+ARG TARGETARCH
+ARG BUILDARCH
+
+# Install build dependencies and cross-compilation toolchains when needed
+RUN set -e; \
+    apt-get update && \
     apt-get install -y --no-install-recommends \
     clang \
     llvm \
@@ -18,19 +24,27 @@ RUN apt-get update && \
     curl \
     pkg-config \
     libzstd-dev \
-    zlib1g-dev \
-    && rm -rf /var/lib/apt/lists/*
+    zlib1g-dev; \
+    if [ "$TARGETARCH" != "$BUILDARCH" ] && [ "$TARGETARCH" = "arm64" ]; then \
+        dpkg --add-architecture arm64 && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+        gcc-aarch64-linux-gnu \
+        libelf-dev:arm64 \
+        libzstd-dev:arm64 \
+        zlib1g-dev:arm64; \
+    fi; \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Go
-ARG TARGETARCH
+# Install Go for the BUILD platform (runs natively, cross-compiles via GOARCH)
 ARG GO_VERSION=1.22.10
-RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
-    tar -C /usr/local -xzf go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
-    rm go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${BUILDARCH}.tar.gz && \
+    tar -C /usr/local -xzf go${GO_VERSION}.linux-${BUILDARCH}.tar.gz && \
+    rm go${GO_VERSION}.linux-${BUILDARCH}.tar.gz
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 
-# Install Rust/Cargo for building scx_rustland
+# Install Rust/Cargo for building scx_rustland (runs natively, no QEMU needed)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
 
@@ -39,19 +53,18 @@ WORKDIR /build
 # Copy source files
 COPY . .
 
-# Build dependencies and binary
-ARG TARGETPLATFORM
+# Build: scx_rustland runs natively on the build host (fast), then
+# cross-compile the Go binary for the target architecture via make build.
 RUN set -e; \
-    case "$TARGETPLATFORM" in \
-        "linux/arm64") \
-            export ARCH=arm64 ;; \
-        "linux/amd64") \
-            export ARCH=x86_64 ;; \
+    case "$TARGETARCH" in \
+        "arm64") \
+            export BUILD_ARCH=arm64 ;; \
+        "amd64") \
+            export BUILD_ARCH=x86_64 ;; \
         *) \
-            echo "Unsupported platform: $TARGETPLATFORM" >&2; \
+            echo "Unsupported target arch: $TARGETARCH" >&2; \
             exit 1 ;; \
     esac && \
-    export BUILD_ARCH=${ARCH} && \
     make dep && \
     cd scx && \
     cargo build --release -p scx_rustland && \
@@ -61,7 +74,7 @@ RUN set -e; \
     cd .. && \
     make build ARCH=${BUILD_ARCH}
 
-# Runtime stage
+# Runtime stage: uses the actual target platform
 FROM ubuntu:25.04
 
 RUN apt-get update && \
