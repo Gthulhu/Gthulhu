@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for multi-architecture builds
 # Builder stage
-FROM --platform=$BUILDPLATFORM ubuntu:25.04 AS builder
+FROM ubuntu:25.04 AS builder
 
 # Install build dependencies
 RUN apt-get update && \
@@ -21,12 +21,11 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Go
-ARG GO_VERSION=1.22.10
-ARG TARGETOS
 ARG TARGETARCH
-RUN wget -q https://go.dev/dl/go${GO_VERSION}.${TARGETOS:-linux}-${TARGETARCH:-amd64}.tar.gz && \
-    tar -C /usr/local -xzf go${GO_VERSION}.${TARGETOS:-linux}-${TARGETARCH:-amd64}.tar.gz && \
-    rm go${GO_VERSION}.${TARGETOS:-linux}-${TARGETARCH:-amd64}.tar.gz
+ARG GO_VERSION=1.22.10
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
+    tar -C /usr/local -xzf go${GO_VERSION}.linux-${TARGETARCH}.tar.gz && \
+    rm go${GO_VERSION}.linux-${TARGETARCH}.tar.gz
 
 ENV PATH="/usr/local/go/bin:${PATH}"
 
