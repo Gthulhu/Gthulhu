@@ -55,6 +55,9 @@ else
     LIBBPF_CC = gcc
 endif
 
+# Detect sudo availability (empty in Docker/root environments)
+SUDO := $(shell command -v sudo 2>/dev/null)
+
 OUTPUT = output
 LIBBPF_SRC = $(abspath libbpf/src)
 LIBBPF_OBJ = $(abspath $(OUTPUT)/libbpf.a)
@@ -179,7 +182,7 @@ dep:
 	git checkout 09b9e83 && \
 	cd src && \
 	make && \
-	sudo make install
+	$(SUDO) make install
 	git clone -b v7.6.0 --recursive https://github.com/libbpf/bpftool.git && \
 	cd bpftool/src && make 
 
