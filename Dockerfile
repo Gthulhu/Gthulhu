@@ -51,14 +51,15 @@ RUN set -e; \
             echo "Unsupported platform: $TARGETPLATFORM" >&2; \
             exit 1 ;; \
     esac && \
+    export BUILD_ARCH=${ARCH} && \
     make dep && \
     cd scx && \
     cargo build --release -p scx_rustland && \
     cd .. && \
     cd libbpfgo && \
-    make && \
+    unset ARCH && make && \
     cd .. && \
-    make build ARCH=${ARCH}
+    make build ARCH=${BUILD_ARCH}
 
 # Runtime stage
 FROM ubuntu:25.04
