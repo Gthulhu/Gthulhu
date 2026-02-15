@@ -36,6 +36,9 @@ $(info Clang resource directory: $(CLANG_RESOURCE_DIR))
 # Architecture configuration (default: x86_64, can override with ARCH=arm64)
 ARCH ?= x86_64
 
+# Detect host architecture for determining native vs cross-compilation
+HOST_ARCH := $(shell uname -m)
+
 # Architecture-specific settings
 ifeq ($(ARCH),arm64)
     ARCH_DEFINE = -D__TARGET_ARCH_arm64
@@ -43,8 +46,14 @@ ifeq ($(ARCH),arm64)
     ARCH_SCHED_INCLUDE = -I scx/scheds/include/arch/aarch64
     ARCH_INCLUDE_DIR = aarch64-linux-gnu
     GOARCH_ENV = CGO_ENABLED=1 GOARCH=arm64
-    CGO_CC = aarch64-linux-gnu-gcc
-    LIBBPF_CC = aarch64-linux-gnu-gcc
+    # Use native compilers if building natively on aarch64, otherwise use cross-compilation tools
+    ifeq ($(HOST_ARCH),aarch64)
+        CGO_CC = gcc
+        LIBBPF_CC = gcc
+    else
+        CGO_CC = aarch64-linux-gnu-gcc
+        LIBBPF_CC = aarch64-linux-gnu-gcc
+    endif
 else
     ARCH_DEFINE = -D__TARGET_ARCH_x86
     ARCH_CPU_FLAGS = -mcpu=v3
