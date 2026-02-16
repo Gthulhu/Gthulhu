@@ -31,7 +31,7 @@ RUN apt-get update && \
 ARG TARGETARCH
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
         dpkg --add-architecture arm64 && \
-        sed -i "s/^Types: deb$/Architectures: amd64\nTypes: deb/" /etc/apt/sources.list.d/ubuntu.sources && \
+        sed -i "s/^Types: deb$/Types: deb\nArchitectures: amd64/" /etc/apt/sources.list.d/ubuntu.sources && \
         . /etc/os-release && \
         printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports/\nSuites: %s %s-updates\nComponents: main universe restricted multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
             "$VERSION_CODENAME" "$VERSION_CODENAME" \
