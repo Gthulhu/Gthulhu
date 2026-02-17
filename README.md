@@ -127,7 +127,7 @@ make build ARCH=arm64
 
 ### Testing the Scheduler
 
-To test the scheduler in a virtual environment using kernel v6.12.2:
+To test the scheduler in a virtual environment using kernel v6.12:
 
 ```bash
 make test
@@ -138,7 +138,7 @@ This uses `vng` (virtual kernel playground) to run the scheduler with the approp
 You can also test with a specific kernel version:
 
 ```bash
-make test KERNEL_VERSION=6.13
+make test KERNEL_VERSION=6.12
 ```
 
 #### Portability Testing

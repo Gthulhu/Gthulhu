@@ -101,7 +101,7 @@ jobs:
         shell: bash
       - name: Run Schtest Tests
         run: |
-          make schtest KERNEL_VERSION=6.12.2
+          make schtest KERNEL_VERSION=6.12
         shell: bash
         continue-on-error: true
   build-and-push-image:
