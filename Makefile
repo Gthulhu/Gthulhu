@@ -115,7 +115,7 @@ image-arm64:
 	docker build -t 127.0.0.1:32000/gthulhu:latest-arm64 .
 
 # Default kernel version for testing
-KERNEL_VERSION ?= 6.13
+KERNEL_VERSION ?= 6.12
 
 # Schtest configuration
 SCHTEST_REPO = https://github.com/sched-ext/schtest.git
