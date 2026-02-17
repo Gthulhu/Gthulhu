@@ -127,7 +127,7 @@ make build ARCH=arm64
 
 ### Testing the Scheduler
 
-To test the scheduler in a virtual environment using kernel v6.12.2:
+To test the scheduler in a virtual environment using kernel v6.13:
 
 ```bash
 make test
