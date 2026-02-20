@@ -227,12 +227,12 @@ func main() {
 			changed, removed := p.GetChangedStrategies()
 			if len(changed) > 0 || len(removed) > 0 {
 				for _, strategy := range changed {
-					if strategy.Priority {
-						err = bpfModule.UpdatePriorityTask(uint32(strategy.PID), strategy.ExecutionTime)
+					if strategy.Priority > 0 {
+						err = bpfModule.UpdatePriorityTaskWithPrio(uint32(strategy.PID), strategy.ExecutionTime, uint32(strategy.Priority))
 						if err != nil {
-							slog.Warn("UpdatePriorityTask failed", "error", err, "pid", strategy.PID)
+							slog.Warn("UpdatePriorityTaskWithPrio failed", "error", err, "pid", strategy.PID)
 						} else {
-							slog.Info("Updated priority task", "pid", strategy.PID, "executionTime", strategy.ExecutionTime)
+							slog.Info("Updated priority task", "pid", strategy.PID, "executionTime", strategy.ExecutionTime, "priority", strategy.Priority)
 						}
 					} else {
 						// Non-priority strategy, we're not handling it for now
