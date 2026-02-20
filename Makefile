@@ -210,7 +210,7 @@ $(BPF_OBJ): %.o: %.c
 
 wrapper:
 	bpftool/src/bpftool gen skeleton qumun/ebpf/main.bpf.o > main.skeleton.h
-	$(CGO_CC) -g -O2 -Wall -fPIC -I ./ -c qumun/wrapper.c -o wrapper.o
+	$(CGO_CC) -g -O2 -Wall -fPIC -I ./ -I qumun/ -c wrapper.c -o wrapper.o
 	ar rcs libwrapper.a wrapper.o
 
 clean:
