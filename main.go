@@ -68,6 +68,12 @@ func main() {
 			PublicKeyPath: cfg.Api.PublicKeyPath,
 			Enabled:       cfg.Api.Enabled,
 			AuthEnabled:   cfg.Api.AuthEnabled,
+			MTLS: plugin.MTLSConfig{
+				Enable:  cfg.Api.MTLS.Enable,
+				CertPem: cfg.Api.MTLS.CertPem,
+				KeyPem:  cfg.Api.MTLS.KeyPem,
+				CAPem:   cfg.Api.MTLS.CAPem,
+			},
 		},
 	}
 	if config.Mode == "" {
