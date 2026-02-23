@@ -60,7 +60,7 @@ func runPriorityMap(cmd *cobra.Command, args []string) error {
 
 // runLocalPriorityMap dumps the priority_tasks BPF map on the local host.
 func runLocalPriorityMap() error {
-	out, err := execCommand("bpftool", "map", "dump", "name", "priority_task")
+	out, err := execCommand("bpftool", "map", "dump", "name", "priority_tasks")
 	if err != nil {
 		return fmt.Errorf("bpftool: %w\n%s", err, out)
 	}
@@ -105,7 +105,7 @@ func runK8sPriorityMap() error {
 
 		execArgs := append(kubecfgArgs,
 			"exec", podName, "--",
-			"bpftool", "map", "dump", "name", "priority_task",
+			"bpftool", "map", "dump", "name", "priority_tasks",
 		)
 		mapOut, err := execCommand("kubectl", execArgs...)
 		if err != nil {
