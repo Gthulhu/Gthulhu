@@ -25,13 +25,24 @@ type SimpleSchedulerConfig struct {
 	EnableFifo bool `yaml:"enable_fifo,omitempty"` // Optional FIFO scheduling flag
 }
 
+// MTLSConfig holds the mutual TLS configuration used for scheduler → API server communication.
+// CertPem and KeyPem are the scheduler's own certificate/key pair signed by the private CA.
+// CAPem is the private CA certificate used to verify the API server's certificate.
+type MTLSConfig struct {
+	Enable  bool   `yaml:"enable"`
+	CertPem string `yaml:"cert_pem"`
+	KeyPem  string `yaml:"key_pem"`
+	CAPem   string `yaml:"ca_pem"`
+}
+
 // ApiConfig represents API-specific configuration
 type ApiConfig struct {
-	Url           string `yaml:"url"`
-	Interval      int    `yaml:"interval"`        // Interval in seconds
-	PublicKeyPath string `yaml:"public_key_path"` // Path to JWT public key for authentication
-	Enabled       bool   `yaml:"enabled,omitempty"`
-	AuthEnabled   bool   `yaml:"auth_enabled,omitempty"`
+	Url           string     `yaml:"url"`
+	Interval      int        `yaml:"interval"`        // Interval in seconds
+	PublicKeyPath string     `yaml:"public_key_path"` // Path to JWT public key for authentication
+	Enabled       bool       `yaml:"enabled,omitempty"`
+	AuthEnabled   bool       `yaml:"auth_enabled,omitempty"`
+	MTLS          MTLSConfig `yaml:"mtls,omitempty"`
 }
 
 // Config represents the application configuration
