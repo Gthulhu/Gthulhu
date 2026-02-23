@@ -7,3 +7,4 @@ output
 *.skeleton.h
 main
 libwrapper.a
+gthulhu-cli

@@ -105,6 +105,15 @@ lint: build
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./internal/...
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./util/...
 
+# Build the gthulhu-cli tool (pure Go, no BPF dependencies)
+.PHONY: cli
+cli:
+	cd cli && go build -ldflags "-w -s" -o ../gthulhu-cli .
+
+.PHONY: cli-test
+cli-test:
+	cd cli && go test ./...
+
 image: build
 	docker build -t 127.0.0.1:32000/gthulhu:latest .
 
