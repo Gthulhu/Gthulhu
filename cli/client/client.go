@@ -38,7 +38,7 @@ func NewClient(baseURL string, authEnabled bool) *Client {
 			Timeout: 30 * time.Second,
 		},
 	}
-	
+
 	// Try to load existing token from storage
 	if authEnabled {
 		token, expiresAt, err := LoadToken()
@@ -47,7 +47,7 @@ func NewClient(baseURL string, authEnabled bool) *Client {
 			c.tokenExpiresAt = expiresAt
 		}
 	}
-	
+
 	return c
 }
 
@@ -100,13 +100,13 @@ func (c *Client) Login(username, password string) (*LoginResponse, error) {
 	// For login, we don't have an expiration time in the response,
 	// so we'll set a reasonable default (e.g., 24 hours from now)
 	c.tokenExpiresAt = time.Now().Add(24 * time.Hour)
-	
+
 	// Save token to disk
 	if err := SaveToken(c.token, c.tokenExpiresAt); err != nil {
 		// Log warning but don't fail the login
 		fmt.Fprintf(os.Stderr, "Warning: failed to save token: %v\n", err)
 	}
-	
+
 	return &loginResp, nil
 }
 
@@ -213,7 +213,7 @@ func (c *Client) DeleteStrategy(strategyID string) (*EmptyDataResponse, error) {
 	req := DeleteScheduleStrategyRequest{
 		StrategyID: strategyID,
 	}
-	
+
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)

@@ -68,7 +68,7 @@ Example using JSON file (-f):
   }`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var req client.CreateScheduleStrategyRequest
-		
+
 		if createStrategyFile != "" {
 			// Load from file
 			data, err := os.ReadFile(createStrategyFile)
@@ -83,13 +83,13 @@ Example using JSON file (-f):
 			if createStrategyNamespace == "" {
 				return fmt.Errorf("--namespace is required")
 			}
-			
+
 			req.StrategyNamespace = createStrategyNamespace
 			req.Priority = createStrategyPriority
 			req.ExecutionTime = createStrategyExecTime
 			req.CommandRegex = createStrategyCommand
 			req.K8sNamespace = createStrategyK8sNS
-			
+
 			// Parse label selectors
 			for _, label := range createStrategyLabels {
 				parts := strings.SplitN(label, "=", 2)
@@ -102,7 +102,7 @@ Example using JSON file (-f):
 				})
 			}
 		}
-		
+
 		c := newAPIClient()
 		resp, err := c.CreateStrategy(&req)
 		if err != nil {
@@ -128,7 +128,7 @@ var strategiesDeleteCmd = &cobra.Command{
 		if deleteStrategyID == "" {
 			return fmt.Errorf("--id is required")
 		}
-		
+
 		c := newAPIClient()
 		resp, err := c.DeleteStrategy(deleteStrategyID)
 		if err != nil {
@@ -153,10 +153,10 @@ func init() {
 	strategiesCreateCmd.Flags().StringVar(&createStrategyCommand, "command", "", "Command regex pattern")
 	strategiesCreateCmd.Flags().StringSliceVar(&createStrategyK8sNS, "k8s-namespace", nil, "Kubernetes namespace(s)")
 	strategiesCreateCmd.Flags().StringSliceVar(&createStrategyLabels, "label", nil, "Label selector (key=value), can be specified multiple times")
-	
+
 	// Delete command flags
 	strategiesDeleteCmd.Flags().StringVar(&deleteStrategyID, "id", "", "Strategy ID to delete (required)")
-	
+
 	strategiesCmd.AddCommand(strategiesListCmd, strategiesCreateCmd, strategiesDeleteCmd)
 	rootCmd.AddCommand(strategiesCmd)
 }

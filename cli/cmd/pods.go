@@ -42,7 +42,7 @@ func init() {
 	// Use 'nodes pids --node-id <id>' to query pod-PID mappings for specific nodes.
 	// The /api/v1/pods/pids endpoint is from decisionmaker service and should not be
 	// directly exposed in Manager Mode CLI.
-	
+
 	// podsCmd.AddCommand(podsPidsCmd)
 	// rootCmd.AddCommand(podsCmd)
 }

@@ -44,7 +44,7 @@ var nodesPidsCmd = &cobra.Command{
 		if nodesPidsNodeID == "" {
 			return fmt.Errorf("--node-id is required")
 		}
-		
+
 		c := newAPIClient()
 		resp, err := c.GetNodePodPIDMapping(nodesPidsNodeID)
 		if err != nil {
@@ -61,7 +61,7 @@ var nodesPidsCmd = &cobra.Command{
 
 func init() {
 	nodesPidsCmd.Flags().StringVar(&nodesPidsNodeID, "node-id", "", "Node ID to query (required)")
-	
+
 	nodesCmd.AddCommand(nodesListCmd, nodesPidsCmd)
 	rootCmd.AddCommand(nodesCmd)
 }

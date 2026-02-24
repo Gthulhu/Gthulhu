@@ -15,11 +15,11 @@ import (
 )
 
 var (
-	priorityMapNode  string
-	priorityMapLabel string
+	priorityMapNode      string
+	priorityMapLabel     string
 	priorityMapContainer string
-	priorityMapNames []string
-	priorityMapLocal bool
+	priorityMapNames     []string
+	priorityMapLocal     bool
 )
 
 var priorityMapCmd = &cobra.Command{

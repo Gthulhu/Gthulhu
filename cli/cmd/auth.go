@@ -25,7 +25,7 @@ var authCmd = &cobra.Command{
 var authLoginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Login with username and password",
-	Long:  `Authenticate to the API server using username and password to obtain a JWT token.
+	Long: `Authenticate to the API server using username and password to obtain a JWT token.
 The token will be saved to /tmp/gthulhu-token-{UID}.json for subsequent requests.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if username == "" {
@@ -64,7 +64,7 @@ var authLogoutCmd = &cobra.Command{
 func init() {
 	authLoginCmd.Flags().StringVarP(&username, "username", "U", "", "Username for login")
 	authLoginCmd.Flags().StringVarP(&password, "password", "P", "", "Password for login")
-	
+
 	authCmd.AddCommand(authLoginCmd)
 	authCmd.AddCommand(authLogoutCmd)
 	rootCmd.AddCommand(authCmd)

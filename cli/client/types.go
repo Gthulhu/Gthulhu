@@ -30,13 +30,13 @@ type LabelSelector struct {
 
 // ScheduleStrategy represents a scheduling strategy in the response.
 type ScheduleStrategy struct {
-	ID               string          `json:"id"`
-	Priority         int             `json:"priority"`
-	ExecutionTime    int             `json:"executionTime"`
-	CommandRegex     string          `json:"commandRegex"`
-	K8sNamespace     []string        `json:"k8sNamespace"`
-	LabelSelectors   []LabelSelector `json:"labelSelectors"`
-	StrategyNamespace string         `json:"strategyNamespace"`
+	ID                string          `json:"id"`
+	Priority          int             `json:"priority"`
+	ExecutionTime     int             `json:"executionTime"`
+	CommandRegex      string          `json:"commandRegex"`
+	K8sNamespace      []string        `json:"k8sNamespace"`
+	LabelSelectors    []LabelSelector `json:"labelSelectors"`
+	StrategyNamespace string          `json:"strategyNamespace"`
 }
 
 // ListSchedulerStrategiesData holds the list of strategies.
@@ -53,12 +53,12 @@ type ListSchedulerStrategiesResponse struct {
 
 // CreateScheduleStrategyRequest is the request body for creating a strategy.
 type CreateScheduleStrategyRequest struct {
-	Priority         int             `json:"priority"`
-	ExecutionTime    int             `json:"executionTime"`
-	CommandRegex     string          `json:"commandRegex"`
-	K8sNamespace     []string        `json:"k8sNamespace"`
-	LabelSelectors   []LabelSelector `json:"labelSelectors"`
-	StrategyNamespace string         `json:"strategyNamespace"`
+	Priority          int             `json:"priority"`
+	ExecutionTime     int             `json:"executionTime"`
+	CommandRegex      string          `json:"commandRegex"`
+	K8sNamespace      []string        `json:"k8sNamespace"`
+	LabelSelectors    []LabelSelector `json:"labelSelectors"`
+	StrategyNamespace string          `json:"strategyNamespace"`
 }
 
 // DeleteScheduleStrategyRequest is the request body for deleting a strategy.
@@ -68,9 +68,9 @@ type DeleteScheduleStrategyRequest struct {
 
 // EmptyDataResponse represents a successful response with empty data.
 type EmptyDataResponse struct {
-	Success   bool   `json:"success"`
+	Success   bool     `json:"success"`
 	Data      struct{} `json:"data"`
-	Timestamp string `json:"timestamp"`
+	Timestamp string   `json:"timestamp"`
 }
 
 // BssData mirrors the scheduler BSS metrics structure.
@@ -177,9 +177,9 @@ type GetPodsPIDsData struct {
 
 // GetPodsPIDsResponse is the API response for /api/v1/pods/pids (decisionmaker endpoint).
 type GetPodsPIDsResponse struct {
-	Success   bool             `json:"success"`
-	Data      GetPodsPIDsData  `json:"data"`
-	Timestamp string           `json:"timestamp"`
+	Success   bool            `json:"success"`
+	Data      GetPodsPIDsData `json:"data"`
+	Timestamp string          `json:"timestamp"`
 }
 
 // LoginRequest represents the request body for user login.
