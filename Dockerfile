@@ -94,6 +94,8 @@ RUN apt-get update && \
     vim \
     libelf-dev \
     libpcap-dev \
+    linux-tools-$(uname -r) \
+    linux-tools-generic \
     build-essential \
     make \
     sudo \

@@ -22,38 +22,55 @@ type TokenResponse struct {
 	Timestamp string    `json:"timestamp"`
 }
 
-// SchedulingStrategy represents a scheduling strategy entry.
-type SchedulingStrategy struct {
-	Priority      int    `json:"priority"`
-	ExecutionTime uint64 `json:"execution_time"`
-	PID           int    `json:"pid"`
-}
-
-// SchedulingStrategiesResponse is the API response for strategy queries.
-type SchedulingStrategiesResponse struct {
-	Success    bool                 `json:"success"`
-	Message    string               `json:"message,omitempty"`
-	Timestamp  string               `json:"timestamp,omitempty"`
-	Scheduling []SchedulingStrategy `json:"scheduling"`
-}
-
-// SchedulingStrategiesRequest is the request body for setting strategies.
-type SchedulingStrategiesRequest struct {
-	Strategies []StrategyInput `json:"strategies"`
-}
-
-// StrategyInput represents a single strategy in a set-strategies request.
-type StrategyInput struct {
-	Priority      bool              `json:"priority"`
-	ExecutionTime uint64            `json:"execution_time"`
-	Selectors     []SelectorEntry   `json:"selectors,omitempty"`
-	CommandRegex  string            `json:"command_regex,omitempty"`
-}
-
-// SelectorEntry is a key-value label selector used in strategy requests.
-type SelectorEntry struct {
+// LabelSelector represents a Kubernetes label selector.
+type LabelSelector struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+// ScheduleStrategy represents a scheduling strategy in the response.
+type ScheduleStrategy struct {
+	ID               string          `json:"id"`
+	Priority         int             `json:"priority"`
+	ExecutionTime    int             `json:"executionTime"`
+	CommandRegex     string          `json:"commandRegex"`
+	K8sNamespace     []string        `json:"k8sNamespace"`
+	LabelSelectors   []LabelSelector `json:"labelSelectors"`
+	StrategyNamespace string         `json:"strategyNamespace"`
+}
+
+// ListSchedulerStrategiesData holds the list of strategies.
+type ListSchedulerStrategiesData struct {
+	Strategies []ScheduleStrategy `json:"strategies"`
+}
+
+// ListSchedulerStrategiesResponse is the API response for listing strategies.
+type ListSchedulerStrategiesResponse struct {
+	Success   bool                        `json:"success"`
+	Data      ListSchedulerStrategiesData `json:"data"`
+	Timestamp string                      `json:"timestamp"`
+}
+
+// CreateScheduleStrategyRequest is the request body for creating a strategy.
+type CreateScheduleStrategyRequest struct {
+	Priority         int             `json:"priority"`
+	ExecutionTime    int             `json:"executionTime"`
+	CommandRegex     string          `json:"commandRegex"`
+	K8sNamespace     []string        `json:"k8sNamespace"`
+	LabelSelectors   []LabelSelector `json:"labelSelectors"`
+	StrategyNamespace string         `json:"strategyNamespace"`
+}
+
+// DeleteScheduleStrategyRequest is the request body for deleting a strategy.
+type DeleteScheduleStrategyRequest struct {
+	StrategyID string `json:"strategyId"`
+}
+
+// EmptyDataResponse represents a successful response with empty data.
+type EmptyDataResponse struct {
+	Success   bool   `json:"success"`
+	Data      struct{} `json:"data"`
+	Timestamp string `json:"timestamp"`
 }
 
 // BssData mirrors the scheduler BSS metrics structure.
@@ -79,19 +96,108 @@ type MetricsResponse struct {
 	Data      *BssData `json:"data,omitempty"`
 }
 
-// PodPIDEntry represents a single pod-to-PID mapping.
-type PodPIDEntry struct {
-	PodName   string `json:"pod_name"`
-	Namespace string `json:"namespace"`
-	PID       int    `json:"pid"`
+// ---------------------------------------------------------------------------
+// Nodes
+// ---------------------------------------------------------------------------
+
+// NodeInfo represents a Kubernetes node.
+type NodeInfo struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
 }
 
-// PodPIDsResponse is the API response for pod PID queries.
-type PodPIDsResponse struct {
+// ListNodesData holds the list of nodes.
+type ListNodesData struct {
+	Nodes []NodeInfo `json:"nodes"`
+}
+
+// ListNodesResponse is the API response for listing nodes.
+type ListNodesResponse struct {
 	Success   bool          `json:"success"`
-	Message   string        `json:"message,omitempty"`
-	Timestamp string        `json:"timestamp,omitempty"`
-	Data      []PodPIDEntry `json:"data,omitempty"`
+	Data      ListNodesData `json:"data"`
+	Timestamp string        `json:"timestamp"`
+}
+
+// PodPIDProcess represents a process in a pod.
+type PodPIDProcess struct {
+	PID         int    `json:"pid"`
+	PPID        int    `json:"ppid"`
+	Command     string `json:"command"`
+	ContainerID string `json:"container_id"`
+}
+
+// PodPIDInfo holds pod and process information.
+type PodPIDInfo struct {
+	PodID     string          `json:"pod_id"`
+	PodUID    string          `json:"pod_uid"`
+	Processes []PodPIDProcess `json:"processes"`
+}
+
+// GetNodePodPIDMappingData holds the node's pod-PID mapping data.
+type GetNodePodPIDMappingData struct {
+	NodeID    string       `json:"node_id"`
+	NodeName  string       `json:"node_name"`
+	Pods      []PodPIDInfo `json:"pods"`
+	Timestamp string       `json:"timestamp"`
+}
+
+// GetNodePodPIDMappingResponse is the API response for node pod-PID mappings.
+type GetNodePodPIDMappingResponse struct {
+	Success   bool                     `json:"success"`
+	Data      GetNodePodPIDMappingData `json:"data"`
+	Timestamp string                   `json:"timestamp"`
+}
+
+// ---------------------------------------------------------------------------
+// Pods (/api/v1/pods/pids - decisionmaker endpoint)
+// ---------------------------------------------------------------------------
+
+// PodProcess represents a process in a pod (decisionmaker format).
+type PodProcess struct {
+	PID         int    `json:"pid"`
+	PPID        int    `json:"ppid"`
+	Command     string `json:"command"`
+	ContainerID string `json:"container_id"`
+}
+
+// PodInfo holds pod and process information (decisionmaker format).
+type PodInfo struct {
+	PodID     string       `json:"pod_id"`
+	PodUID    string       `json:"pod_uid"`
+	Processes []PodProcess `json:"processes"`
+}
+
+// GetPodsPIDsData holds the pod-PID mapping data.
+type GetPodsPIDsData struct {
+	NodeID    string    `json:"node_id"`
+	NodeName  string    `json:"node_name"`
+	Pods      []PodInfo `json:"pods"`
+	Timestamp string    `json:"timestamp"`
+}
+
+// GetPodsPIDsResponse is the API response for /api/v1/pods/pids (decisionmaker endpoint).
+type GetPodsPIDsResponse struct {
+	Success   bool             `json:"success"`
+	Data      GetPodsPIDsData  `json:"data"`
+	Timestamp string           `json:"timestamp"`
+}
+
+// LoginRequest represents the request body for user login.
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// LoginData holds the JWT token returned from login.
+type LoginData struct {
+	Token string `json:"token"`
+}
+
+// LoginResponse is the API response for login requests.
+type LoginResponse struct {
+	Success   bool      `json:"success"`
+	Data      LoginData `json:"data"`
+	Timestamp string    `json:"timestamp"`
 }
 
 // ErrorResponse represents a generic API error response.

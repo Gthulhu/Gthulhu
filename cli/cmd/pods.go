@@ -19,6 +19,9 @@ var podsCmd = &cobra.Command{
 var podsPidsCmd = &cobra.Command{
 	Use:   "pids",
 	Short: "Get pod-to-PID mappings from the API server",
+	Long: `Get pod-to-PID mappings from the API server.
+Note: This calls the decisionmaker endpoint /api/v1/pods/pids.
+For Manager Mode, consider using 'nodes pids --node-id <id>' instead.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		c := newAPIClient()
 		resp, err := c.GetPodPIDs()
@@ -35,6 +38,11 @@ var podsPidsCmd = &cobra.Command{
 }
 
 func init() {
-	podsCmd.AddCommand(podsPidsCmd)
-	rootCmd.AddCommand(podsCmd)
+	// pods command is disabled in Manager Mode.
+	// Use 'nodes pids --node-id <id>' to query pod-PID mappings for specific nodes.
+	// The /api/v1/pods/pids endpoint is from decisionmaker service and should not be
+	// directly exposed in Manager Mode CLI.
+	
+	// podsCmd.AddCommand(podsPidsCmd)
+	// rootCmd.AddCommand(podsCmd)
 }

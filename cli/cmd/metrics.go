@@ -36,5 +36,7 @@ var metricsGetCmd = &cobra.Command{
 
 func init() {
 	metricsCmd.AddCommand(metricsGetCmd)
-	rootCmd.AddCommand(metricsCmd)
+	// NOTE: Metrics endpoint (/api/v1/metrics) is not available in Manager Mode.
+	// This command is disabled. If you need metrics, check the decisionmaker service.
+	// rootCmd.AddCommand(metricsCmd)
 }
