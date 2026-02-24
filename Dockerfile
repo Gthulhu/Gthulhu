@@ -94,12 +94,12 @@ RUN apt-get update && \
     vim \
     libelf-dev \
     libpcap-dev \
-    linux-tools-$(uname -r) \
-    linux-tools-generic \
     build-essential \
     make \
     sudo \
     && rm -rf /var/lib/apt/lists/*
+
+COPY ./bpftool/src/bpftool /usr/local/bin/bpftool
 
 WORKDIR /gthulhu
 
