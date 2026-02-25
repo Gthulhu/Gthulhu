@@ -99,11 +99,10 @@ RUN apt-get update && \
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ./bpftool/src/bpftool /usr/local/bin/bpftool
-
 WORKDIR /gthulhu
 
 # Copy the built binary from builder stage
 COPY --from=builder /build/main ./main
+COPY --from=builder /build/bpftool/src/bpftool /usr/local/bin/bpftool
 
 ENTRYPOINT ["bash"]
