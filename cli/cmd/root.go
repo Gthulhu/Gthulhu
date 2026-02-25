@@ -39,6 +39,9 @@ func Execute() {
 }
 
 func init() {
+	// Disable the auto-generated completion command
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+
 	rootCmd.PersistentFlags().StringVarP(&apiURL, "api-url", "u", "http://127.0.0.1:8080", "Gthulhu API server URL")
 	rootCmd.PersistentFlags().BoolVar(&noAuth, "no-auth", false, "Skip JWT authentication")
 	rootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", "", "Path to kubeconfig file (defaults to ~/.kube/config)")
