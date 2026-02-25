@@ -15,6 +15,7 @@ This document lists the maintainers and contributors of Gthulhu project.
 |------|-------|--------|
 | Yun Tang Chang | -- | @Andrewtangtang |
 | Vic Xu | -- | @vx416 |
+| Yanun Yang | yanun0323@gmail.com | @yanun0323 |
 | Po-Ying Chiu | -- | @charliechiou |
 | Cheng-Yang Chou | -- | @EricccTaiwan |
 | hctsai | hctsai1006@cs.nctu.edu.tw | @thc1006 |
