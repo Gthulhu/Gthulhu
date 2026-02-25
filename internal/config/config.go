@@ -8,51 +8,53 @@ package config
 import (
 	"fmt"
 	"os"
+	"reflect"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 // SchedulerConfig represents scheduler-specific configuration
 type SchedulerConfig struct {
-	SliceNsDefault  uint64 `yaml:"slice_ns_default"`
-	SliceNsMin      uint64 `yaml:"slice_ns_min"`
-	Mode            string `yaml:"mode,omitempty"` // Optional mode field
-	KernelMode      bool   `yaml:"kernel_mode,omitempty"`
-	MaxTimeWatchdog bool   `yaml:"max_time_watchdog,omitempty"`
+	SliceNsDefault  uint64 `yaml:"slice_ns_default" description:"Default time slice in nanoseconds for task scheduling"`
+	SliceNsMin      uint64 `yaml:"slice_ns_min" description:"Minimum time slice in nanoseconds for task scheduling"`
+	Mode            string `yaml:"mode,omitempty" description:"Scheduler mode (e.g. 'simple' or 'gthulhu')"`
+	KernelMode      bool   `yaml:"kernel_mode,omitempty" description:"Enable kernel-mode scheduling (BPF-only dispatching without user-space loop)"`
+	MaxTimeWatchdog bool   `yaml:"max_time_watchdog,omitempty" description:"Enable watchdog to detect scheduling stalls"`
 }
 
 type SimpleSchedulerConfig struct {
-	EnableFifo bool `yaml:"enable_fifo,omitempty"` // Optional FIFO scheduling flag
+	EnableFifo bool `yaml:"enable_fifo,omitempty" description:"Enable FIFO scheduling in simple scheduler mode"`
 }
 
 // MTLSConfig holds the mutual TLS configuration used for scheduler → API server communication.
 // CertPem and KeyPem are the scheduler's own certificate/key pair signed by the private CA.
 // CAPem is the private CA certificate used to verify the API server's certificate.
 type MTLSConfig struct {
-	Enable  bool   `yaml:"enable"`
-	CertPem string `yaml:"cert_pem"`
-	KeyPem  string `yaml:"key_pem"`
-	CAPem   string `yaml:"ca_pem"`
+	Enable  bool   `yaml:"enable" description:"Enable mutual TLS for scheduler-API communication"`
+	CertPem string `yaml:"cert_pem" description:"Path to scheduler client certificate PEM file"`
+	KeyPem  string `yaml:"key_pem" description:"Path to scheduler client private key PEM file"`
+	CAPem   string `yaml:"ca_pem" description:"Path to CA certificate PEM file for server verification"`
 }
 
 // ApiConfig represents API-specific configuration
 type ApiConfig struct {
-	Url           string     `yaml:"url"`
-	Interval      int        `yaml:"interval"`        // Interval in seconds
-	PublicKeyPath string     `yaml:"public_key_path"` // Path to JWT public key for authentication
-	Enabled       bool       `yaml:"enabled,omitempty"`
-	AuthEnabled   bool       `yaml:"auth_enabled,omitempty"`
-	MTLS          MTLSConfig `yaml:"mtls,omitempty"`
+	Url           string     `yaml:"url" description:"Base URL of the Gthulhu API server"`
+	Interval      int        `yaml:"interval" description:"Interval in seconds for fetching strategies and sending metrics"`
+	PublicKeyPath string     `yaml:"public_key_path" description:"Path to JWT public key for API authentication"`
+	Enabled       bool       `yaml:"enabled,omitempty" description:"Enable communication with the API server"`
+	AuthEnabled   bool       `yaml:"auth_enabled,omitempty" description:"Enable JWT authentication for API requests"`
+	MTLS          MTLSConfig `yaml:"mtls,omitempty" description:"Mutual TLS configuration for API communication"`
 }
 
 // Config represents the application configuration
 type Config struct {
-	Scheduler       SchedulerConfig       `yaml:"scheduler"`
-	SimpleScheduler SimpleSchedulerConfig `yaml:"simple_scheduler,omitempty"`
-	Debug           bool                  `yaml:"debug,omitempty"`            // Optional debug flag
-	EarlyProcessing bool                  `yaml:"early_processing,omitempty"` // Optional early processing flag
-	BuiltinIdle     bool                  `yaml:"builtin_idle,omitempty"`     // Optional flag for built-in idle CPU selection
-	Api             ApiConfig             `yaml:"api"`
+	Scheduler       SchedulerConfig       `yaml:"scheduler" description:"Scheduler-specific configuration"`
+	SimpleScheduler SimpleSchedulerConfig `yaml:"simple_scheduler,omitempty" description:"Simple scheduler mode configuration"`
+	Debug           bool                  `yaml:"debug,omitempty" description:"Enable debug mode (pprof server on :6060)"`
+	EarlyProcessing bool                  `yaml:"early_processing,omitempty" description:"Enable early processing of tasks in BPF before user-space dispatch"`
+	BuiltinIdle     bool                  `yaml:"builtin_idle,omitempty" description:"Enable built-in idle CPU selection in BPF"`
+	Api             ApiConfig             `yaml:"api" description:"API server connection configuration"`
 }
 
 // DefaultConfig returns the default configuration
@@ -113,4 +115,41 @@ func (c *Config) IsBuiltinIdleEnabled() bool {
 // GetApiConfig returns the API configuration
 func (c *Config) GetApiConfig() ApiConfig {
 	return c.Api
+}
+
+// ExplainConfig prints all configuration keys with their descriptions.
+func ExplainConfig() string {
+	var sb strings.Builder
+	sb.WriteString("Gthulhu Configuration Keys:\n\n")
+	explainStruct(&sb, reflect.TypeOf(Config{}), "")
+	return sb.String()
+}
+
+func explainStruct(sb *strings.Builder, t reflect.Type, prefix string) {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		yamlTag := field.Tag.Get("yaml")
+		desc := field.Tag.Get("description")
+
+		// Extract yaml key name (before any comma options)
+		yamlKey := yamlTag
+		if idx := strings.Index(yamlTag, ","); idx != -1 {
+			yamlKey = yamlTag[:idx]
+		}
+
+		fullKey := yamlKey
+		if prefix != "" {
+			fullKey = prefix + "." + yamlKey
+		}
+
+		if desc != "" {
+			sb.WriteString(fmt.Sprintf("  %-40s %s\n", fullKey, desc))
+		}
+
+		// Recurse into nested structs
+		ft := field.Type
+		if ft.Kind() == reflect.Struct {
+			explainStruct(sb, ft, fullKey)
+		}
+	}
 }

@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,6 +30,13 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(1)
+
+	// Handle "explain" subcommand before flag parsing
+	if len(os.Args) > 1 && os.Args[1] == "explain" {
+		fmt.Print(config.ExplainConfig())
+		return
+	}
+
 	// Initialize structured logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
