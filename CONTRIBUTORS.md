@@ -20,3 +20,4 @@ This document lists the maintainers and contributors of Gthulhu project.
 | Cheng-Yang Chou | -- | @EricccTaiwan |
 | hctsai | hctsai1006@cs.nctu.edu.tw | @thc1006 |
 | Guan-Hao Huang | -- | @rich7420 |
+| Yu-Wei Hsu | -- | @weiso131 |
