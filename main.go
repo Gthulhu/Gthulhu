@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ import (
 
 func main() {
 	runtime.GOMAXPROCS(1)
+
 	// Initialize structured logger
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -37,7 +39,19 @@ func main() {
 
 	// Parse command line flags
 	configFile := flag.String("config", "", "Path to YAML configuration file")
+	showHelper := flag.Bool("help", false, "Show help message")
+	showExplain := flag.Bool("explain", false, "Explain configuration options")
 	flag.Parse()
+
+	if *showHelper {
+		flag.Usage()
+		return
+	}
+
+	if *showExplain {
+		fmt.Println(config.ExplainConfig())
+		return
+	}
 
 	// Load configuration
 	cfg, err := config.LoadConfig(*configFile)
