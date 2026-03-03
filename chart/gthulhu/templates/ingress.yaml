@@ -1,0 +1,62 @@
+{{- if and .Values.manager.enabled .Values.manager.ingress.enabled -}}
+{{- $fullName := include "gthulhu.fullname" . -}}
+{{- $svcPort := .Values.manager.service.port -}}
+{{- if and .Values.manager.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey .Values.manager.ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set .Values.manager.ingress.annotations "kubernetes.io/ingress.class" .Values.manager.ingress.className}}
+  {{- end }}
+{{- end }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+  {{- with .Values.manager.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if and .Values.manager.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.manager.ingress.className }}
+  {{- end }}
+  {{- if .Values.manager.ingress.tls }}
+  tls:
+    {{- range .Values.manager.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.manager.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}-manager
+                port:
+                  number: {{ $svcPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}-manager
+              servicePort: {{ $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

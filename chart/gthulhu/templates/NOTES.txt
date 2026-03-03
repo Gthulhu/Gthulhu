@@ -1,0 +1,80 @@
+1. Gthulhu has been deployed to your Kubernetes cluster!
+
+{{- if .Values.scheduler.enabled }}
+
+** Gthulhu Scheduler **
+The BPF scheduler is running as a DaemonSet on all nodes.
+You can check the scheduler status with:
+
+  kubectl get daemonset {{ include "gthulhu.fullname" . }}-scheduler -n {{ .Release.Namespace }}
+  kubectl logs -l app.kubernetes.io/component=scheduler -n {{ .Release.Namespace }}
+
+{{- end }}
+
+{{- if .Values.manager.enabled }}
+
+** Gthulhu Manager **
+The Manager is running as a Deployment (replicas=1).
+Manager provides frontend and user-related APIs, accepts user intents.
+
+You can check the manager status with:
+  kubectl get deployment {{ include "gthulhu.fullname" . }}-manager -n {{ .Release.Namespace }}
+  kubectl logs -l app.kubernetes.io/component=manager -n {{ .Release.Namespace }}
+
+{{- if .Values.manager.ingress.enabled }}
+Manager API is accessible at:
+{{- range $host := .Values.manager.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.manager.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else if contains "ClusterIP" .Values.manager.service.type }}
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/component=manager,app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  echo "Visit http://127.0.0.1:8080 to access Manager API"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:{{ .Values.manager.port }}
+{{- end }}
+
+{{- end }}
+
+{{- if and .Values.scheduler.enabled .Values.scheduler.sidecar.enabled }}
+
+** Gthulhu Scheduler Sidecar **
+The Scheduler Sidecar is running alongside the scheduler in the DaemonSet.
+Sidecar shares PID namespace with the host and finds matching PIDs based on intent from Manager.
+
+You can check the sidecar logs with:
+  kubectl logs -l app.kubernetes.io/component=scheduler -c scheduler-sidecar -n {{ .Release.Namespace }}
+
+{{- end }}
+
+{{- if .Values.mongodb.enabled }}
+
+** MongoDB **
+MongoDB is running as a StatefulSet for data persistence.
+
+You can check the MongoDB status with:
+  kubectl get statefulset {{ .Release.Name }}-mongodb -n {{ .Release.Namespace }}
+  kubectl logs -l app.kubernetes.io/component=mongodb -n {{ .Release.Namespace }}
+
+{{- end }}
+
+** API Endpoints (Manager) **
+  POST /api/v1/intents   - Submit scheduling intents
+  GET  /api/v1/nodes     - Get node load distribution
+  GET  /health           - Health check
+  GET  /                 - API information
+
+** Monitoring **
+{{- if .Values.monitoring.enabled }}
+Prometheus ServiceMonitor has been created to scrape metrics.
+{{- else }}
+To enable monitoring, set monitoring.enabled=true in your values.yaml
+{{- end }}
+
+** Important Notes **
+- The scheduler requires Linux kernel 6.12+ with sched_ext support
+- Nodes must have the necessary BPF capabilities
+- The scheduler runs with privileged access for BPF operations
+- Decision Maker requires hostPID access to discover process PIDs
+
+For more information, visit: https://github.com/Gthulhu/Gthulhu

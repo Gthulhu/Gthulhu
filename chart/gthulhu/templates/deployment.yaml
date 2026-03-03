@@ -1,0 +1,311 @@
+{{- if .Values.scheduler.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-scheduler
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  selector:
+    matchLabels:
+      {{- include "gthulhu.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "gthulhu.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: scheduler
+        {{- if .Values.scheduler.sidecar.enabled }}
+        app: decisionmaker
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "gthulhu.serviceAccountName" . }}
+      hostPID: {{ .Values.scheduler.hostPID }}
+      {{- if .Values.scheduler.sidecar.enabled }}
+      subdomain: {{ include "gthulhu.fullname" . }}-scheduler-sidecar
+      {{- end }}
+      containers:
+        - name: gthulhu-scheduler
+          image: "{{ .Values.scheduler.image.repository }}:{{ .Values.scheduler.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.scheduler.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.scheduler.securityContext | nindent 12 }}
+          command:
+            - /gthulhu/main 
+          args: ["-config", "/etc/gthulhu/config.yaml"]
+          volumeMounts:
+            - name: sys-kernel-debug
+              mountPath: /sys/kernel/debug
+              readOnly: true
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+            - name: config-volume
+              mountPath: /etc/gthulhu
+              readOnly: true
+          resources:
+            {{- toYaml .Values.scheduler.resources | nindent 12 }}
+        {{- if .Values.scheduler.sidecar.enabled }}
+        - name: scheduler-sidecar
+          image: "{{ .Values.scheduler.sidecar.image.repository }}:{{ .Values.scheduler.sidecar.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.scheduler.sidecar.image.pullPolicy }}
+          command:
+            - /app/main
+            - decisionmaker
+          env:
+            - name: DM_SERVER_HOST
+              value: {{ .Values.scheduler.sidecar.env.serverHost | quote }}
+            - name: DM_LOGGING_LEVEL
+              value: {{ .Values.scheduler.sidecar.env.loggingLevel | quote }}
+            - name: TZ
+              value: {{ .Values.global.timezone | quote }}
+            {{- if .Values.mtls.enabled }}
+            - name: DM_MTLS_ENABLE
+              value: "true"
+            - name: DM_MTLS_CERT_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mtlsSecretName" . }}
+                  key: dm.crt
+            - name: DM_MTLS_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mtlsSecretName" . }}
+                  key: dm.key
+            - name: DM_MTLS_CA_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mtlsSecretName" . }}
+                  key: ca.crt
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.scheduler.sidecar.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.scheduler.sidecar.port }}
+              protocol: TCP
+          {{- if .Values.scheduler.sidecar.healthCheck.enabled }}
+          {{- if .Values.mtls.enabled }}
+          readinessProbe:
+            tcpSocket:
+              port: {{ .Values.scheduler.sidecar.port }}
+            initialDelaySeconds: {{ .Values.scheduler.sidecar.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.scheduler.sidecar.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.scheduler.sidecar.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.scheduler.sidecar.healthCheck.failureThreshold }}
+          livenessProbe:
+            tcpSocket:
+              port: {{ .Values.scheduler.sidecar.port }}
+            initialDelaySeconds: {{ add .Values.scheduler.sidecar.healthCheck.initialDelaySeconds 5 }}
+            periodSeconds: {{ mul .Values.scheduler.sidecar.healthCheck.periodSeconds 2 }}
+            timeoutSeconds: {{ .Values.scheduler.sidecar.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.scheduler.sidecar.healthCheck.failureThreshold }}
+          {{- else }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.scheduler.sidecar.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.scheduler.sidecar.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.scheduler.sidecar.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.scheduler.sidecar.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.scheduler.sidecar.healthCheck.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.scheduler.sidecar.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ add .Values.scheduler.sidecar.healthCheck.initialDelaySeconds 5 }}
+            periodSeconds: {{ mul .Values.scheduler.sidecar.healthCheck.periodSeconds 2 }}
+            timeoutSeconds: {{ .Values.scheduler.sidecar.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.scheduler.sidecar.healthCheck.failureThreshold }}
+          {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: proc
+              mountPath: /proc
+              readOnly: true
+            - name: var-run
+              mountPath: /var/run
+          resources:
+            {{- toYaml .Values.scheduler.sidecar.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+        - name: proc
+          hostPath:
+            path: /proc
+        {{- if .Values.mtls.enabled }}
+        - name: config-volume
+          projected:
+            sources:
+              - configMap:
+                  name: {{ include "gthulhu.fullname" . }}-scheduler-config
+                  items:
+                    - key: jwt_public_key.pem
+                      path: jwt_public_key.pem
+              - secret:
+                  name: {{ include "gthulhu.fullname" . }}-scheduler-mtls-config
+                  items:
+                    - key: config.yaml
+                      path: config.yaml
+        {{- else }}
+        - name: config-volume
+          configMap:
+            name: {{ include "gthulhu.fullname" . }}-scheduler-config
+        {{- end }}
+        - name: var-run
+          hostPath:
+            path: /var/run
+            type: Directory
+      {{- with .Values.scheduler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.scheduler.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+---
+{{- if .Values.manager.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+spec:
+  replicas: {{ .Values.manager.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "gthulhu.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: manager
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "gthulhu.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: manager
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "gthulhu.fullname" . }}-manager
+      containers:
+        - name: manager
+          image: "{{ .Values.manager.image.repository }}:{{ .Values.manager.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.manager.image.pullPolicy }}
+          command:
+            - /app/main
+            - manager
+          env:
+            - name: MANAGER_SERVER_HOST
+              value: {{ .Values.manager.env.serverHost | quote }}
+            - name: MANAGER_LOGGING_LEVEL
+              value: {{ .Values.manager.env.loggingLevel | quote }}
+            - name: MANAGER_K8S_IN_CLUSTER
+              value: {{ .Values.manager.env.inCluster | quote }}
+            - name: TZ
+              value: {{ .Values.global.timezone | quote }}
+            {{- if .Values.mtls.enabled }}
+            - name: MANAGER_MTLS_ENABLE
+              value: "true"
+            - name: MANAGER_MTLS_CERT_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mtlsSecretName" . }}
+                  key: manager.crt
+            - name: MANAGER_MTLS_KEY_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mtlsSecretName" . }}
+                  key: manager.key
+            - name: MANAGER_MTLS_CA_PEM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mtlsSecretName" . }}
+                  key: ca.crt
+            {{- if .Values.mtls.serverName }}
+            - name: MANAGER_MTLS_SERVER_NAME
+              value: {{ .Values.mtls.serverName | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.mongodb.enabled }}
+            - name: MANAGER_MONGODB_HOST
+              value: {{ include "gthulhu.mongodbHost" . | quote }}
+            - name: MANAGER_MONGODB_PORT
+              value: "27017"
+            - name: MANAGER_MONGODB_DATABASE
+              value: {{ .Values.mongodb.database | quote }}
+            - name: MANAGER_MONGODB_OPTIONS
+              value: {{ .Values.mongodb.connectionOptions | quote }}
+            - name: MANAGER_MONGODB_CA_PEM
+              value: ""
+            - name: MANAGER_MONGODB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mongodbAuthSecretName" . }}
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MANAGER_MONGODB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gthulhu.mongodbAuthSecretName" . }}
+                  key: MONGO_INITDB_ROOT_PASSWORD
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.manager.port }}
+              protocol: TCP
+          {{- if .Values.manager.healthCheck.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.manager.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.manager.healthCheck.initialDelaySeconds }}
+            periodSeconds: {{ .Values.manager.healthCheck.periodSeconds }}
+            timeoutSeconds: {{ .Values.manager.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.manager.healthCheck.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.manager.healthCheck.path }}
+              port: http
+            initialDelaySeconds: {{ add .Values.manager.healthCheck.initialDelaySeconds 5 }}
+            periodSeconds: {{ mul .Values.manager.healthCheck.periodSeconds 2 }}
+            timeoutSeconds: {{ .Values.manager.healthCheck.timeoutSeconds }}
+            failureThreshold: {{ .Values.manager.healthCheck.failureThreshold }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.manager.resources | nindent 12 }}
+      {{- with .Values.manager.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.manager.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+

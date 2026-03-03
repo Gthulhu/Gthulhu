@@ -1,0 +1,8 @@
+{{- if .Values.enabled }}
+** MongoDB **
+MongoDB is running as a StatefulSet for data persistence.
+
+You can check the MongoDB status with:
+  kubectl get statefulset {{ include "mongodb.fullname" . }} -n {{ .Release.Namespace }}
+  kubectl logs -l app.kubernetes.io/component=mongodb -n {{ .Release.Namespace }}
+{{- end }}

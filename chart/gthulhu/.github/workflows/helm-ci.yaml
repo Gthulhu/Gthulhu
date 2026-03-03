@@ -1,0 +1,186 @@
+name: Helm Chart CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'chart/gthulhu/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'chart/gthulhu/**'
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  CHART_PATH: chart/gthulhu
+
+jobs:
+  lint-and-test:
+    name: Lint and Test Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.1
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.4.0
+
+      - name: Run chart-testing (list)
+        run: ct list --target-branch ${{ github.event.repository.default_branch }} --chart-dirs chart
+
+      - name: Run chart-testing (lint)
+        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --chart-dirs chart
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.7.0
+        if: github.event_name == 'pull_request'
+
+      - name: Run chart-testing (install)
+        if: github.event_name == 'pull_request'
+        run: ct install --target-branch ${{ github.event.repository.default_branch }} --chart-dirs chart
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner in repo mode
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'chart/gthulhu'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  build-and-publish:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    needs: [lint-and-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.1
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Package Helm Chart
+        run: |
+          cd chart
+          helm package gthulhu
+
+      - name: Push Helm Chart to OCI Registry
+        run: |
+          cd chart
+          helm push gthulhu-*.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}
+
+  release:
+    name: Release Helm Chart
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, security-scan]
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.12.1
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Chart Version
+        run: |
+          cd chart/gthulhu
+          VERSION=${GITHUB_REF#refs/tags/v}
+          sed -i "s/version: .*/version: $VERSION/" Chart.yaml
+          sed -i "s/appVersion: .*/appVersion: \"$VERSION\"/" Chart.yaml
+
+      - name: Package and Release Helm Chart
+        run: |
+          cd chart
+          helm package gthulhu
+          helm push gthulhu-*.tgz oci://${{ env.REGISTRY }}/${{ github.repository_owner }}
+
+      - name: Create Release Assets
+        run: |
+          cd chart
+          cp gthulhu-*.tgz ../gthulhu-helm-chart.tgz
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./gthulhu-helm-chart.tgz
+          asset_name: gthulhu-helm-chart.tgz
+          asset_content_type: application/gzip
+
+  docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install helm-docs
+        run: |
+          cd /tmp
+          wget https://github.com/norwoodj/helm-docs/releases/download/v1.11.0/helm-docs_1.11.0_Linux_x86_64.tar.gz
+          tar -xzf helm-docs_1.11.0_Linux_x86_64.tar.gz
+          sudo mv helm-docs /usr/local/bin
+
+      - name: Generate docs
+        run: |
+          cd chart/gthulhu
+          helm-docs
+
+      - name: Commit documentation changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add chart/gthulhu/README.md
+          git diff --staged --quiet || git commit -m "docs: update Helm chart documentation [skip ci]"
+          git push

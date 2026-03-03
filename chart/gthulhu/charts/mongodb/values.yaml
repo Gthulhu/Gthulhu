@@ -1,0 +1,56 @@
+# Default values for mongodb.
+# This is a YAML-formatted file.
+
+# Enable or disable MongoDB deployment
+enabled: true
+
+image:
+  repository: mongo
+  tag: "8.2.2"
+  pullPolicy: IfNotPresent
+
+# MongoDB replica set configuration
+replicaSet:
+  name: rs0
+  replicas: 1
+
+# Authentication
+auth:
+  # Existing secret name containing MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD
+  existingSecret: ""
+  # If existingSecret is not set, use these values
+  rootUsername: admin
+  rootPassword: changeme
+
+# Database name for manager
+database: manager
+
+# Connection options
+connectionOptions: "authSource=admin&tls=false&directConnection=true"
+
+# Persistence configuration
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 5Gi
+
+# Resources for MongoDB
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Security context
+securityContext:
+  runAsUser: 999
+  runAsGroup: 999
+  fsGroup: 999
+
+# Service configuration
+service:
+  port: 27017
+  targetPort: 27017

@@ -1,0 +1,205 @@
+{{- if .Values.enabled }}
+# MongoDB StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mongodb.fullname" . }}
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mongodb
+spec:
+  serviceName: {{ include "mongodb.fullname" . }}
+  replicas: {{ .Values.replicaSet.replicas }}
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      {{- include "mongodb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mongodb
+  template:
+    metadata:
+      labels:
+        {{- include "mongodb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mongodb
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      initContainers:
+        - name: fix-keyfile-permissions
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              cp /etc/mongo-keyfile-source/keyfile /etc/mongo-keyfile/keyfile
+              chmod 400 /etc/mongo-keyfile/keyfile
+              chown 999:999 /etc/mongo-keyfile/keyfile
+          volumeMounts:
+            - name: keyfile-source
+              mountPath: /etc/mongo-keyfile-source
+              readOnly: true
+            - name: mongo-keyfile-processed
+              mountPath: /etc/mongo-keyfile
+
+      containers:
+        - name: mongo
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          command:
+            - mongod
+          args:
+            - --bind_ip_all
+            - --replSet
+            - {{ .Values.replicaSet.name }}
+            - --dbpath
+            - /data/db
+            - --auth
+            - --keyFile
+            - /etc/mongo-keyfile/keyfile
+
+          ports:
+            - name: mongo
+              containerPort: 27017
+
+          # Replica set initialization via postStart lifecycle hook
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    set -e
+
+                    # Only initialize on the first pod (mongo-0)
+                    HOSTNAME=$(hostname)
+                    if [ "$HOSTNAME" != "{{ include "mongodb.fullname" . }}-0" ]; then
+                      echo "[postStart] Not the primary pod, skip init"
+                      exit 0
+                    fi
+
+                    echo "[postStart] Waiting for mongod to be ready..."
+                    until mongosh --host localhost:27017 --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1; do
+                      sleep 2
+                    done
+
+                    # Check if we can connect with authentication (existing data)
+                    if mongosh --host localhost:27017 -u "$MONGO_ROOT_USERNAME" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1; then
+                      echo "[postStart] MongoDB already initialized with auth, checking replica set..."
+                      mongosh --host localhost:27017 -u "$MONGO_ROOT_USERNAME" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --quiet --eval '
+                        try {
+                          const status = rs.status();
+                          print("Replica set status: " + status.ok);
+                          print("MongoDB already configured, skipping initialization");
+                        } catch (e) {
+                          print("Error checking replica set: " + e.message);
+                        }
+                      '
+                      echo "[postStart] MongoDB initialization complete (existing data)"
+                      exit 0
+                    fi
+
+                    echo "[postStart] Fresh install detected, initializing replica set..."
+                    mongosh --host localhost:27017 --quiet --eval '
+                      try {
+                        rs.status();
+                        print("Replica set already initialized");
+                      } catch (e) {
+                        rs.initiate({
+                          _id: "{{ .Values.replicaSet.name }}",
+                          members: [
+                            { _id: 0, host: "{{ include "mongodb.fullname" . }}-0.{{ include "mongodb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:27017" }
+                          ]
+                        });
+                        print("Replica set initiated");
+                      }
+
+                      // Wait for primary election
+                      print("Waiting for primary election...");
+                      while (true) {
+                        const hello = db.hello();
+                        if (hello.isWritablePrimary) {
+                          print("Primary is ready");
+                          break;
+                        }
+                        sleep(1000);
+                      }
+
+                      // Create admin user if not exists
+                      db = db.getSiblingDB("admin");
+                      try {
+                        db.getUser("'"$MONGO_ROOT_USERNAME"'");
+                        print("Admin user already exists");
+                      } catch (e) {
+                        db.createUser({
+                          user: "'"$MONGO_ROOT_USERNAME"'",
+                          pwd: "'"$MONGO_ROOT_PASSWORD"'",
+                          roles: [{ role: "root", db: "admin" }]
+                        });
+                        print("Admin user created");
+                      }
+                    '
+
+                    echo "[postStart] MongoDB initialization complete"
+
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+            - name: mongo-keyfile-processed
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+
+          env:
+            - name: MONGO_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb.authSecretName" . }}
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb.authSecretName" . }}
+                  key: MONGO_INITDB_ROOT_PASSWORD
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+
+      volumes:
+        - name: keyfile-source
+          secret:
+            secretName: {{ include "mongodb.fullname" . }}-keyfile
+            defaultMode: 0400
+        - name: mongo-keyfile-processed
+          emptyDir: {}
+
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["{{ .Values.persistence.accessMode }}"]
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        {{- end }}
+  {{- else }}
+      - name: mongo-data
+        emptyDir: {}
+  {{- end }}
+{{- end }}

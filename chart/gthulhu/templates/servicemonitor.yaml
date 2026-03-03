@@ -1,0 +1,43 @@
+{{- if and .Values.manager.enabled .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "gthulhu.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: manager
+  endpoints:
+    - port: http
+      path: {{ .Values.monitoring.path }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+{{- end }}
+---
+{{- if and .Values.scheduler.enabled .Values.scheduler.sidecar.enabled .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-scheduler-sidecar
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "gthulhu.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  endpoints:
+    - port: http
+      path: {{ .Values.monitoring.path }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+{{- end }}

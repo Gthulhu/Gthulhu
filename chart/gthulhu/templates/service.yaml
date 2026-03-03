@@ -1,0 +1,40 @@
+{{- if .Values.manager.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+spec:
+  type: {{ .Values.manager.service.type }}
+  ports:
+    - port: {{ .Values.manager.service.port }}
+      targetPort: {{ .Values.manager.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "gthulhu.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+{{- end }}
+---
+{{- if and .Values.scheduler.enabled .Values.scheduler.sidecar.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-scheduler-sidecar
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  # Headless service for DaemonSet
+  clusterIP: None
+  ports:
+    - port: {{ .Values.scheduler.sidecar.service.port }}
+      targetPort: {{ .Values.scheduler.sidecar.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "gthulhu.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+{{- end }}

@@ -1,0 +1,83 @@
+{{- if .Values.scheduler.enabled }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-scheduler
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-scheduler
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "gthulhu.fullname" . }}-scheduler
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gthulhu.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+---
+{{- if .Values.manager.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-manager
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "gthulhu.fullname" . }}-manager
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gthulhu.fullname" . }}-manager
+    namespace: {{ .Release.Namespace }}
+{{- end }}
+

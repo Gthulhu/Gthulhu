@@ -1,0 +1,133 @@
+{{- /* 
+  MongoDB initialization is now handled by the StatefulSet's postStart lifecycle hook.
+  This Job is disabled to avoid race conditions.
+  The postStart hook runs directly in the MongoDB container, ensuring:
+  1. The mongod process is ready before initialization
+  2. No network latency or DNS resolution issues
+  3. Proper localhost exception for initial user creation
+*/ -}}
+{{- if false }}
+# MongoDB Initialization Job
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "mongodb.fullname" . }}-init
+  labels:
+    {{- include "mongodb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mongodb-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10
+  template:
+    metadata:
+      labels:
+        {{- include "mongodb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mongodb-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongodb-init
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              MONGO_HOST="{{ include "mongodb.fullname" . }}-0.{{ include "mongodb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:27017"
+              
+              echo "[init] Waiting for MongoDB to be ready..."
+              until mongosh --host "$MONGO_HOST" --quiet --eval 'db.adminCommand({ ping: 1 })' 2>/dev/null; do
+                echo "[init] MongoDB not ready, retrying in 5 seconds..."
+                sleep 5
+              done
+
+              echo "[init] MongoDB is ready. Checking replica set status..."
+              
+              # Check if replica set is already initialized (try without auth first, then with auth)
+              RS_STATUS=$(mongosh --host "$MONGO_HOST" --quiet --eval 'try { rs.status().ok } catch(e) { 0 }' 2>/dev/null || echo "0")
+              
+              if [ "$RS_STATUS" = "1" ]; then
+                echo "[init] Replica set already initialized (no auth needed or localhost exception)"
+              else
+                # Try with authentication
+                RS_STATUS_AUTH=$(mongosh --host "$MONGO_HOST" -u "$MONGO_ROOT_USERNAME" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --quiet --eval 'try { rs.status().ok } catch(e) { 0 }' 2>/dev/null || echo "0")
+                if [ "$RS_STATUS_AUTH" = "1" ]; then
+                  echo "[init] Replica set already initialized (verified with auth)"
+                else
+                  echo "[init] Initializing replica set..."
+                  # MongoDB allows localhost exception for first user creation and rs.initiate
+                  mongosh --host "$MONGO_HOST" --quiet --eval '
+                    rs.initiate({
+                      _id: "{{ .Values.replicaSet.name }}",
+                      members: [
+                        { _id: 0, host: "{{ include "mongodb.fullname" . }}-0.{{ include "mongodb.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:27017" }
+                      ]
+                    });
+                  ' 2>/dev/null || echo "[init] rs.initiate might have already been done"
+                  echo "[init] Replica set initiation attempted"
+                fi
+              fi
+
+              echo "[init] Waiting for primary election..."
+              for i in $(seq 1 30); do
+                IS_PRIMARY=$(mongosh --host "$MONGO_HOST" --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null || echo "false")
+                if [ "$IS_PRIMARY" = "true" ]; then
+                  echo "[init] Primary is ready"
+                  break
+                fi
+                # Try with auth
+                IS_PRIMARY_AUTH=$(mongosh --host "$MONGO_HOST" -u "$MONGO_ROOT_USERNAME" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --quiet --eval 'db.hello().isWritablePrimary' 2>/dev/null || echo "false")
+                if [ "$IS_PRIMARY_AUTH" = "true" ]; then
+                  echo "[init] Primary is ready (verified with auth)"
+                  break
+                fi
+                echo "[init] Waiting for primary... ($i/30)"
+                sleep 2
+              done
+
+              echo "[init] Checking/creating admin user..."
+              # First try without auth (localhost exception)
+              mongosh --host "$MONGO_HOST" --quiet --eval '
+                db = db.getSiblingDB("admin");
+                try {
+                  const users = db.getUsers();
+                  const adminExists = users.users && users.users.some(u => u.user === "'"$MONGO_ROOT_USERNAME"'");
+                  if (adminExists) {
+                    print("Admin user already exists");
+                  } else {
+                    db.createUser({
+                      user: "'"$MONGO_ROOT_USERNAME"'",
+                      pwd: "'"$MONGO_ROOT_PASSWORD"'",
+                      roles: [{ role: "root", db: "admin" }]
+                    });
+                    print("Admin user created");
+                  }
+                } catch (e) {
+                  print("Auth required, checking with credentials...");
+                }
+              ' 2>/dev/null || true
+              
+              # Verify with auth
+              mongosh --host "$MONGO_HOST" -u "$MONGO_ROOT_USERNAME" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin --quiet --eval '
+                db = db.getSiblingDB("admin");
+                print("Successfully authenticated as admin user");
+              ' && echo "[init] MongoDB initialization complete!" || echo "[init] Warning: Could not verify admin authentication"
+              
+              echo "[init] MongoDB initialization complete!"
+          env:
+            - name: MONGO_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb.authSecretName" . }}
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mongodb.authSecretName" . }}
+                  key: MONGO_INITDB_ROOT_PASSWORD
+{{- end }}

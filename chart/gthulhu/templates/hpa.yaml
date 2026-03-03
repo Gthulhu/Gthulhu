@@ -1,0 +1,2 @@
+{{/* HPA is not supported for DaemonSets, so we remove it */}}
+{{/* Manager is a Deployment with replicas=1, HPA is also not applicable */}}

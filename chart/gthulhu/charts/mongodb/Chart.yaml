@@ -1,0 +1,16 @@
+apiVersion: v2
+name: mongodb
+description: A Helm chart for MongoDB with replica set support
+type: application
+version: 0.1.0
+appVersion: "8.2.2"
+
+maintainers:
+  - name: Gthulhu Team
+    email: maintainers@gthulhu.io
+
+keywords:
+  - mongodb
+  - database
+  - nosql
+  - replica-set

@@ -1,0 +1,278 @@
+# Production values for gthulhu.
+# This is a YAML-formatted file for production deployments.
+# Uses container images from GitHub Container Registry (ghcr.io/gthulhu)
+
+# Gthulhu Scheduler Configuration
+scheduler:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: ghcr.io/gthulhu/gthulhu
+    pullPolicy: Always
+    tag: "latest"
+  
+  # Scheduler requires privileged access for BPF operations
+  securityContext:
+    privileged: true
+    runAsUser: 0
+    capabilities:
+      add:
+        - SYS_ADMIN
+        - SYS_RESOURCE
+        - SYS_PTRACE
+  
+  # Host PID namespace is required for scheduler operations
+  hostPID: true
+  
+  # Node selector to ensure deployment on nodes with required kernel version
+  nodeSelector:
+    kubernetes.io/os: linux
+  
+  # Production resources for the scheduler
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  
+  # Tolerations to allow scheduling on any node
+  tolerations:
+    - operator: Exists
+  
+  # Sidecar container configuration (formerly Decision Maker)
+  # Shares PID namespace with the host
+  # Finds matching PIDs based on intent from manager
+  # Waits for Gthulhu scheduler to periodically fetch policies
+  sidecar:
+    enabled: true
+    
+    image:
+      repository: 127.0.0.1:32000/gthulhu-api
+      pullPolicy: Always
+      tag: "latest"
+    
+    # Sidecar port configuration
+    port: 8080
+    targetPort: 8080
+    
+    # Sidecar needs access to host proc and K8s API
+    securityContext:
+      privileged: true
+      allowPrivilegeEscalation: true
+      readOnlyRootFilesystem: false
+    
+    # Environment variables
+    env:
+      serverHost: ":8080"
+      loggingLevel: "info"
+    
+    # Service configuration (headless service for daemonset)
+    service:
+      port: 8080
+      targetPort: 8080
+    
+    # Health check configuration
+    healthCheck:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+    
+    # Resources for the sidecar
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+# Manager Configuration (k8s deployment with replica = 1)
+# Manager provides frontend and user-related APIs, accepts user intents
+# Manager is a Kubernetes client, knows which pods run on which nodes
+manager:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: 127.0.0.1:32000/gthulhu-api
+    pullPolicy: Always
+    tag: "latest"
+  
+  # Manager port configuration
+  port: 8080
+  targetPort: 8080
+  
+  # Environment variables
+  env:
+    serverHost: ":8080"
+    loggingLevel: "info"
+    inCluster: "true"
+  
+  # Node selector for manager
+  nodeSelector:
+    kubernetes.io/os: linux
+  
+  # Tolerations for manager
+  tolerations: []
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  
+  # Ingress configuration
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+      # kubernetes.io/tls-acme: "true"
+    hosts:
+      - host: gthulhu-manager.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: []
+    #  - secretName: gthulhu-manager-tls
+    #    hosts:
+    #      - gthulhu-manager.local
+  
+  # Health check configuration
+  healthCheck:
+    enabled: true
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  # Resources for the manager
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+# MongoDB Configuration
+mongodb:
+  enabled: true
+  
+  image:
+    repository: mongo
+    tag: "8.2.2"
+    pullPolicy: IfNotPresent
+  
+  # MongoDB replica set configuration
+  replicaSet:
+    name: rs0
+    replicas: 1
+  
+  # Authentication
+  auth:
+    # Existing secret name containing MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD
+    existingSecret: ""
+    # If existingSecret is not set, use these values
+    rootUsername: admin
+    rootPassword: changeme
+  
+  # Database name for manager
+  database: manager
+  
+  # Connection options
+  connectionOptions: "authSource=admin&tls=false&directConnection=true"
+  
+  # Persistence configuration
+  persistence:
+    enabled: true
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+  
+  # Resources for MongoDB
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  
+  # Security context
+  securityContext:
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+
+# mTLS Configuration — enable for production to secure Manager ↔ DM sidecar traffic
+mtls:
+  enabled: true
+  # Provide your own Secret with keys: ca.crt, dm.crt, dm.key, manager.crt, manager.key
+  # Generate certs with: ./gen-mtls-certs.sh certs
+  existingSecret: ""
+  ca:
+    cert: ""
+  dm:
+    cert: ""
+    key: ""
+  manager:
+    cert: ""
+    key: ""
+  serverName: "localhost"
+
+# Global configuration
+global:
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+  # Timezone
+  timezone: UTC
+
+# Service Account
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Additional labels for all resources
+additionalLabels: {}
+
+# Node selector for all components (can be overridden per component)
+nodeSelector: {}
+
+# Tolerations for all components (can be overridden per component)
+tolerations: []
+
+# Affinity for all components (can be overridden per component)  
+affinity: {}
+
+# Storage configuration for metrics (if needed in future)
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Monitoring and observability - enabled for production
+monitoring:
+  enabled: true
+  path: /metrics
+  serviceMonitor:
+    enabled: true
+    labels: {}
+    interval: 30s
