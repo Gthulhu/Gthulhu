@@ -11,9 +11,6 @@
 [submodule "qumun"]
 	path = qumun
 	url = https://github.com/Gthulhu/qumun.git
-[submodule "chart"]
-	path = chart
-	url = https://github.com/Gthulhu/chart.git
 [submodule "schtest"]
 	path = schtest
 	url = https://github.com/sched-ext/schtest.git
