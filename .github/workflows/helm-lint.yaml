@@ -4,12 +4,12 @@ on:
   push:
     branches: [ main, develop ]
     paths:
-      - 'gthulhu/**'
+      - 'chart/gthulhu/**'
       - '.github/workflows/helm-lint.yaml'
   pull_request:
     branches: [ main, develop ]
     paths:
-      - 'gthulhu/**'
+      - 'chart/gthulhu/**'
       - '.github/workflows/helm-lint.yaml'
 
 jobs:
@@ -27,16 +27,16 @@ jobs:
 
       - name: Lint Helm chart with default values
         run: |
-          helm lint gthulhu
+          helm lint chart/gthulhu
 
       - name: Lint Helm chart with production values
         run: |
-          helm lint gthulhu -f gthulhu/values-production.yaml
+          helm lint chart/gthulhu -f chart/gthulhu/values-production.yaml
 
       - name: Test Helm template rendering with default values
         run: |
-          helm template gthulhu gthulhu --debug
+          helm template gthulhu chart/gthulhu --debug
 
       - name: Test Helm template rendering with production values
         run: |
-          helm template gthulhu gthulhu -f gthulhu/values-production.yaml --debug
+          helm template gthulhu chart/gthulhu -f chart/gthulhu/values-production.yaml --debug
