@@ -1,0 +1,24 @@
+[
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$pull": {
+                        "policies": { "permissionKey": "schedule_strategy.update" }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "delete": "permissions",
+        "deletes": [
+            {
+                "q": { "key": "schedule_strategy.update" },
+                "limit": 1
+            }
+        ]
+    }
+]

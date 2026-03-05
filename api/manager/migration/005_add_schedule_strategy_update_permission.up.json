@@ -1,0 +1,26 @@
+[
+    {
+        "insert": "permissions",
+        "documents": [
+            {
+                "key": "schedule_strategy.update",
+                "resource": "schedule_strategy",
+                "action": "update",
+                "description": "Update schedule strategies"
+            }
+        ]
+    },
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$push": {
+                        "policies": { "permissionKey": "schedule_strategy.update", "self": false }
+                    }
+                }
+            }
+        ]
+    }
+]

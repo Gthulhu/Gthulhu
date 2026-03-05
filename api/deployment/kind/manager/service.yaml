@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: manager
+  namespace: gthulhu-api-local
+  labels:
+    app: manager
+spec:
+  selector:
+    app: manager
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

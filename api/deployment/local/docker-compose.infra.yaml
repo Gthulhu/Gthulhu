@@ -1,0 +1,56 @@
+services:
+  mongo:
+    container_name: mongo
+    image: mongo:8.2.2
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: test
+      MONGO_INITDB_ROOT_PASSWORD: test
+    volumes:
+      - ./mongo-keyfile:/etc/mongo-keyfile:ro
+    ports:
+      - 27017:27017
+    command: ["mongod", "--auth", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/etc/mongo-keyfile"]
+    networks:
+      - mongo_cluster
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo-setup:
+    image: mongo:8.2.2
+    network_mode: host
+    depends_on:
+      - mongo
+    volumes:
+      - ./mongo-keyfile:/etc/mongo-keyfile:ro
+    entrypoint: [
+      "/bin/sh",
+      "-c",
+      "
+        until mongosh --host localhost:27017 --quiet --eval 'db.adminCommand(\"ping\")' >/dev/null 2>&1; do
+          echo 'Waiting for mongod...';
+          sleep 2;
+        done;
+        mongosh --host localhost:27017 --authenticationDatabase admin --quiet --eval '
+          try {
+            rs.status();
+            print(\"Replica set already initialized\");
+          } catch (e) {
+            rs.initiate({
+              _id: \"rs0\",
+              members: [
+                { _id: 0, host: \"mongo:27017\" }
+              ]
+            });
+            print(\"Replica set initiated\");
+          }
+        ';
+
+        echo 'MongoDB initialization done';
+      "
+    ]
+networks:
+  mongo_cluster:
+    driver: bridge

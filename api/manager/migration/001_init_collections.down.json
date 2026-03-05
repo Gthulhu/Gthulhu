@@ -1,0 +1,7 @@
+[
+  { "drop": "users" },
+  { "drop": "roles" },
+  { "drop": "permissions" },
+  { "drop": "schedule_strategies" },
+  { "drop": "schedule_intents" }
+]

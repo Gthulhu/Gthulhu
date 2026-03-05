@@ -1,0 +1,17 @@
+all: false
+dir: "{{.InterfaceDirRelative}}"
+filename: "mock_{{.SrcPackageName}}.go"
+force-file-write: true
+formatter: goimports
+log-level: info
+structname: "{{.Mock}}{{.InterfaceName}}"
+pkgname: "{{.SrcPackageName}}"
+recursive: false
+require-template-schema-exists: true
+template: testify
+template-schema: "{{.Template}}.schema.json"
+
+packages:
+  github.com/Gthulhu/api/manager/domain:
+    config:
+      all: true

@@ -1,0 +1,24 @@
+[
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$pull": {
+                        "policies": { "permissionKey": "pod_pid_mapping.read" }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "delete": "permissions",
+        "deletes": [
+            {
+                "q": { "key": "pod_pid_mapping.read" },
+                "limit": 1
+            }
+        ]
+    }
+]

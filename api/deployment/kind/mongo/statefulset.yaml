@@ -1,0 +1,194 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: gthulhu-api-local
+  labels:
+    app: mongo
+spec:
+  serviceName: mongo
+  replicas: 1
+  podManagementPolicy: OrderedReady
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      initContainers:
+        - name: fix-keyfile-permissions
+          image: busybox:1.36
+          command: ["sh", "-c"]
+          args:
+            - |
+              cp /etc/mongo-keyfile-source/keyfile /etc/mongo-keyfile/keyfile
+              chmod 400 /etc/mongo-keyfile/keyfile
+              # 因為你的主容器是 runAsUser: 0 (root)，這裡 owner 設為 root
+              chown 999:999 /etc/mongo-keyfile/keyfile
+          volumeMounts:
+            - name: keyfile-source
+              mountPath: /etc/mongo-keyfile-source
+              readOnly: true
+            - name: mongo-keyfile-processed
+              mountPath: /etc/mongo-keyfile
+
+      containers:
+        - name: mongo
+          image: mongo:8.2.2
+          imagePullPolicy: IfNotPresent
+
+          # ----------------------
+          # mongod
+          # ----------------------
+          command:
+            - mongod
+          args:
+            - --bind_ip_all
+            - --replSet
+            - rs0
+            - --dbpath
+            - /data/db
+            - --auth
+            - --keyFile
+            - /etc/mongo-keyfile/keyfile
+
+          ports:
+            - name: mongo
+              containerPort: 27017
+
+          # ----------------------
+          # 初始化：rs + admin user
+          # ----------------------
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    set -e
+
+                    # 只在 mongo-0 初始化
+                    if [ "$(hostname)" != "mongo-0" ]; then
+                      echo "Not mongo-0, skip init"
+                      exit 0
+                    fi
+
+                    echo "[postStart] Waiting for mongod..."
+                    until mongosh --host localhost:27017 --quiet --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1; do
+                      sleep 2
+                    done
+
+                    echo "[postStart] Init replica set if needed..."
+                    mongosh --host localhost:27017 --quiet --eval '
+                      try {
+                        rs.status();
+                        print("Replica set already initialized");
+                      } catch (e) {
+                        rs.initiate({
+                          _id: "rs0",
+                          members: [
+                            { _id: 0, host: "mongo-0.mongo.gthulhu-api-local.svc.cluster.local:27017" }
+                          ]
+                        });
+                        print("Replica set initiated");
+                      }
+                      while (true) {
+                        const hello = db.hello();
+                        if (hello.isWritablePrimary) {
+                          break;
+                        }
+                        sleep(1000);
+                      }
+                      db = db.getSiblingDB("admin");
+                      try {
+                        db.getUser("'"$MONGO_ROOT_USERNAME"'");
+                        print("Admin user had been created");
+                      } catch (e) {
+                        db.createUser({
+                          user: "'"$MONGO_ROOT_USERNAME"'",
+                          pwd: "'"$MONGO_ROOT_PASSWORD"'",
+                          roles: [{ role: "root", db: "admin" }]
+                        });
+                        print("Admin user created");
+                      }
+                    '
+
+                    
+
+          # ----------------------
+          # Probes
+          # ----------------------
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          # ----------------------
+          # Volumes
+          # ----------------------
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+            - name: mongo-keyfile-processed
+              mountPath: /etc/mongo-keyfile
+              readOnly: true
+
+          # ----------------------
+          # Env (帳密來自 Secret)
+          # ----------------------
+          env:
+            - name: MONGO_ROOT_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-auth
+                  key: MONGO_INITDB_ROOT_USERNAME
+            - name: MONGO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-auth
+                  key: MONGO_INITDB_ROOT_PASSWORD
+
+
+      # ----------------------
+      # Security Context
+      # ----------------------
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+
+      # ----------------------
+      # Volumes
+      # ----------------------
+      volumes:
+        - name: keyfile-source
+          secret:
+            secretName: mongo-keyfile
+            defaultMode: 0400
+        - name: mongo-keyfile-processed
+          emptyDir: {}
+
+  # ----------------------
+  # PVC
+  # ----------------------
+  volumeClaimTemplates:
+    - metadata:
+        name: mongo-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+        storageClassName: standard

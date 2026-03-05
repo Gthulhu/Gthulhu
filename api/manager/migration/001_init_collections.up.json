@@ -1,0 +1,300 @@
+[
+    {
+        "create": "users",
+        "validator": {
+            "$jsonSchema": {
+                "bsonType": "object",
+                "required": [
+                    "username",
+                    "password",
+                    "status"
+                ],
+                "properties": {
+                    "_id": {
+                        "bsonType": "objectId"
+                    },
+                    "username": {
+                        "bsonType": "string"
+                    },
+                    "password": {
+                        "bsonType": "string"
+                    },
+                    "status": {
+                        "bsonType": "int"
+                    },
+                    "roleIds": {
+                        "bsonType": "array",
+                        "items": {
+                            "bsonType": "objectId"
+                        }
+                    },
+                    "permissionKeys": {
+                        "bsonType": "array",
+                        "items": {
+                            "bsonType": "string"
+                        }
+                    },
+                    "createdTime": {
+                        "bsonType": "long"
+                    },
+                    "updatedTime": {
+                        "bsonType": "long"
+                    },
+                    "deletedTime": {
+                        "bsonType": "long"
+                    },
+                    "creatorID": {
+                        "bsonType": "objectId"
+                    },
+                    "updaterID": {
+                        "bsonType": "objectId"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "createIndexes": "users",
+        "indexes": [
+            {
+                "key": {
+                    "username": 1
+                },
+                "name": "idx_users_username_unique",
+                "unique": true
+            }
+        ]
+    },
+    {
+        "create": "roles",
+        "validator": {
+            "$jsonSchema": {
+                "bsonType": "object",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "_id": {
+                        "bsonType": "objectId"
+                    },
+                    "name": {
+                        "bsonType": "string"
+                    },
+                    "description": {
+                        "bsonType": "string"
+                    },
+                    "policies": {
+                        "bsonType": "array",
+                        "items": {
+                            "bsonType": "object",
+                            "required": [
+                                "permissionKey"
+                            ],
+                            "properties": {
+                                "permissionKey": {
+                                    "bsonType": "string"
+                                },
+                                "self": {
+                                    "bsonType": "bool"
+                                },
+                                "k8sNamespace": {
+                                    "bsonType": "string"
+                                },
+                                "policyNamespace": {
+                                    "bsonType": "string"
+                                }
+                            }
+                        }
+                    },
+                    "createdTime": {
+                        "bsonType": "long"
+                    },
+                    "updatedTime": {
+                        "bsonType": "long"
+                    },
+                    "deletedTime": {
+                        "bsonType": "long"
+                    },
+                    "creatorID": {
+                        "bsonType": "objectId"
+                    },
+                    "updaterID": {
+                        "bsonType": "objectId"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "createIndexes": "roles",
+        "indexes": [
+            {
+                "key": {
+                    "name": 1
+                },
+                "unique": true,
+                "name": "idx_roles_name_unique"
+            }
+        ]
+    },
+    {
+        "create": "permissions",
+        "validator": {
+            "$jsonSchema": {
+                "bsonType": "object",
+                "required": [
+                    "key",
+                    "resource",
+                    "action"
+                ],
+                "properties": {
+                    "_id": {
+                        "bsonType": "objectId"
+                    },
+                    "key": {
+                        "bsonType": "string"
+                    },
+                    "description": {
+                        "bsonType": "string"
+                    },
+                    "resource": {
+                        "bsonType": "string"
+                    },
+                    "action": {
+                        "bsonType": "string"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "createIndexes": "permissions",
+        "indexes": [
+            {
+                "key": {
+                    "key": 1
+                },
+                "unique": true,
+                "name": "idx_permissions_key_unique"
+            }
+        ]
+    },
+    {
+        "create": "schedule_strategies",
+        "validator": {
+            "$jsonSchema": {
+                "bsonType": "object",
+                "properties": {
+                    "_id": {
+                        "bsonType": "objectId"
+                    },
+                    "createdTime": {
+                        "bsonType": "long"
+                    },
+                    "updatedTime": {
+                        "bsonType": "long"
+                    },
+                    "deletedTime": {
+                        "bsonType": "long"
+                    },
+                    "creatorID": {
+                        "bsonType": "objectId"
+                    },
+                    "updaterID": {
+                        "bsonType": "objectId"
+                    },
+                    "strategyNamespace": {
+                        "bsonType": "string"
+                    },
+                    "labelSelectors": {
+                        "bsonType": "array",
+                        "items": {
+                            "bsonType": "object",
+                            "properties": {
+                                "key": {
+                                    "bsonType": "string"
+                                },
+                                "value": {
+                                    "bsonType": "string"
+                                }
+                            }
+                        }
+                    },
+                    "k8sNamespace": {
+                        "bsonType": "array",
+                        "items": {
+                            "bsonType": "string"
+                        }
+                    },
+                    "commandRegex": {
+                        "bsonType": "string"
+                    },
+                    "priority": {
+                        "bsonType": "int"
+                    },
+                    "executionTime": {
+                        "bsonType": "long"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "create": "schedule_intents",
+        "validator": {
+            "$jsonSchema": {
+                "bsonType": "object",
+                "properties": {
+                    "_id": {
+                        "bsonType": "objectId"
+                    },
+                    "createdTime": {
+                        "bsonType": "long"
+                    },
+                    "updatedTime": {
+                        "bsonType": "long"
+                    },
+                    "deletedTime": {
+                        "bsonType": "long"
+                    },
+                    "creatorID": {
+                        "bsonType": "objectId"
+                    },
+                    "updaterID": {
+                        "bsonType": "objectId"
+                    },
+                    "strategyID": {
+                        "bsonType": "objectId"
+                    },
+                    "podID": {
+                        "bsonType": "string"
+                    },
+                    "nodeID": {
+                        "bsonType": "string"
+                    },
+                    "k8sNamespace": {
+                        "bsonType": "string"
+                    },
+                    "commandRegex": {
+                        "bsonType": "string"
+                    },
+                    "priority": {
+                        "bsonType": "int"
+                    },
+                    "executionTime": {
+                        "bsonType": "long"
+                    },
+                    "podLabels": {
+                        "bsonType": "object",
+                        "additionalProperties": {
+                            "bsonType": "string"
+                        }
+                    },
+                    "state": {
+                        "bsonType": "int"
+                    }
+                }
+            }
+        }
+    }
+]

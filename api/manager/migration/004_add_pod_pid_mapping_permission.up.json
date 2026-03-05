@@ -1,0 +1,26 @@
+[
+    {
+        "insert": "permissions",
+        "documents": [
+            {
+                "key": "pod_pid_mapping.read",
+                "resource": "pod_pid_mapping",
+                "action": "read",
+                "description": "Read pod-PID mappings from nodes"
+            }
+        ]
+    },
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$push": {
+                        "policies": { "permissionKey": "pod_pid_mapping.read", "self": false }
+                    }
+                }
+            }
+        ]
+    }
+]

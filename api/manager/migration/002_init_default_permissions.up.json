@@ -1,0 +1,91 @@
+[
+    {
+        "insert": "permissions",
+        "documents": [
+            {
+                "key": "user.create",
+                "resource": "user",
+                "action": "create",
+                "description": "Create a new user"
+            },
+            {
+                "key": "user.password.reset",
+                "resource": "user",
+                "action": "update",
+                "description": "Reset user password"
+            },
+            {
+                "key": "user.permission.update",
+                "resource": "user.permission",
+                "action": "update",
+                "description": "Update user permissions"
+            },
+            {
+                "key": "user.read",
+                "resource": "user",
+                "action": "read",
+                "description": "Read user information"
+            },
+            {
+                "key": "role.create",
+                "resource": "role",
+                "action": "create",
+                "description": "Create roles"
+            },
+            {
+                "key": "role.delete",
+                "resource": "role",
+                "action": "delete",
+                "description": "Delete roles"
+            },
+            {
+                "key": "role.update",
+                "resource": "role",
+                "action": "update",
+                "description": "Update roles"
+            },
+            {
+                "key": "role.read",
+                "resource": "role",
+                "action": "read",
+                "description": "Read roles"
+            },
+            {
+                "key": "permission.read",
+                "resource": "permission",
+                "action": "read",
+                "description": "Read permissions"
+            },
+            {
+                "key": "schedule_strategy.read",
+                "resource": "schedule_strategy",
+                "action": "read",
+                "description": "Read schedule strategies"
+            },
+            {
+                "key": "schedule_strategy.create",
+                "resource": "schedule_strategy",
+                "action": "create",
+                "description": "Create schedule strategies"
+            },
+            {
+                "key": "schedule_intent.read",
+                "resource": "schedule_intent",
+                "action": "read",
+                "description": "Read schedule intents"
+            },
+            {
+                "key": "schedule_strategy.delete",
+                "resource": "schedule_strategy",
+                "action": "delete",
+                "description": "Delete schedule strategies"
+            },
+            {
+                "key": "schedule_intent.delete",
+                "resource": "schedule_intent",
+                "action": "delete",
+                "description": "Delete schedule intents"
+            }
+        ]
+    }
+]

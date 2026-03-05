@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: decisionmaker
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: decisionmaker
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: decisionmaker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: decisionmaker
+subjects:
+  - kind: ServiceAccount
+    name: decisionmaker
+    namespace: kube-system
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: decisionmaker
+  namespace: kube-system
+  labels:
+    app: decisionmaker
+spec:
+  selector:
+    matchLabels:
+      app: decisionmaker
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: decisionmaker
+    spec:
+      serviceAccountName: decisionmaker
+      hostPID: true
+      hostNetwork: false
+      containers:
+        - name: api
+          image: gthulhu-api:local
+          imagePullPolicy: IfNotPresent
+          command:
+            - /app/main
+            - decisionmaker
+          env:
+            - name: DM_SERVER_HOST
+              value: ":8080"
+            - name: DM_LOGGING_LEVEL
+              value: "info"
+            - name: TZ
+              value: UTC
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          volumeMounts:
+            - name: proc-host
+              mountPath: /proc
+              readOnly: true
+            - name: var-run
+              mountPath: /var/run
+      volumes:
+        - name: proc-host
+          hostPath:
+            path: /proc
+            type: Directory
+        - name: var-run
+          hostPath:
+            path: /var/run
+            type: Directory

@@ -1,0 +1,29 @@
+[
+  {
+    "insert": "roles",
+    "documents": [
+      {
+        "name": "admin",
+        "description": "Administrator role with all permissions",
+        "policies": [
+          { "permissionKey": "user.create", "self": false },
+          { "permissionKey": "user.read", "self": false },
+          { "permissionKey": "user.permission.update", "self": false },
+          { "permissionKey": "user.password.reset", "self": false },
+          { "permissionKey": "role.create", "self": false },
+          { "permissionKey": "role.read", "self": false },
+          { "permissionKey": "role.update", "self": false },
+          { "permissionKey": "role.delete", "self": false },
+          { "permissionKey": "permission.read", "self": false },
+          { "permissionKey": "schedule_strategy.create", "self": false },
+          { "permissionKey": "schedule_strategy.read", "self": false },
+          { "permissionKey": "schedule_strategy.delete", "self": false },
+          { "permissionKey": "schedule_intent.read", "self": false },
+          { "permissionKey": "schedule_intent.delete", "self": false }
+        ],
+        "created_time": { "$numberLong": "0" },
+        "updated_time": { "$numberLong": "0" }
+      }
+    ]
+  }
+]
