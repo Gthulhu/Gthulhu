@@ -13,7 +13,7 @@ scheduler:
   image:
     repository: ghcr.io/gthulhu/gthulhu
     pullPolicy: Always
-    tag: "0.6.1"
+    tag: "1.0.0"
   
   # Scheduler requires privileged access for BPF operations
   securityContext:
@@ -53,9 +53,9 @@ scheduler:
     enabled: true
     
     image:
-      repository: ghcr.io/gthulhu/api
+      repository: ghcr.io/gthulhu/gthulhu-api
       pullPolicy: Always
-      tag: "1.3.0"
+      tag: "1.0.0"
     
     # Sidecar port configuration
     port: 8080
@@ -103,9 +103,9 @@ manager:
   replicaCount: 1
   
   image:
-    repository: ghcr.io/gthulhu/api
+    repository: ghcr.io/gthulhu/gthulhu-api
     pullPolicy: Always
-    tag: "1.3.0"
+    tag: "1.0.0"
   
   # Manager port configuration
   port: 8080
