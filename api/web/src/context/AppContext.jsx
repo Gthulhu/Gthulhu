@@ -70,18 +70,39 @@ export function AppProvider({ children }) {
       ...options.headers
     };
 
-    const response = await fetch(getApiUrl(endpoint), {
-      ...options,
-      headers
-    });
+    try {
+      const response = await fetch(getApiUrl(endpoint), {
+        ...options,
+        headers
+      });
 
-    if (response.status === 401) {
-      logout();
-      showToast('error', 'Session expired. Please login again.');
-      throw new Error('Session expired');
+      // Handle authentication and authorization errors
+      if (response.status === 401) {
+        // 401 = Token expired or invalid -> logout
+        console.warn('[Auth] 401 Unauthorized - Token expired or invalid, logging out...');
+        logout();
+        showToast('error', 'Session expired. Please login again.');
+        throw new Error('Session expired');
+      } else if (response.status === 403) {
+        // 403 = Forbidden - Valid token but insufficient permissions -> don't logout
+        console.warn('[Auth] 403 Forbidden - Insufficient permissions');
+        const errorData = await response.json().catch(() => ({ error: 'Permission denied' }));
+        const errorMsg = errorData.error || 'You do not have permission to perform this action';
+        showToast('error', errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      return response;
+    } catch (error) {
+      // If it's our custom error, just rethrow it
+      if (error.message === 'Session expired' || error.message.includes('permission')) {
+        throw error;
+      }
+      
+      // For other network errors, log and rethrow
+      console.error('[Auth] Request failed:', error);
+      throw error;
     }
-
-    return response;
   }, [isAuthenticated, jwtToken, getApiUrl, logout, showToast]);
 
   // Save API config
