@@ -16,9 +16,9 @@ func TestRegisterFrontend_WithIndex(t *testing.T) {
 
 	// Create a mock filesystem that simulates embedded dist contents.
 	mockFS := fstest.MapFS{
-		"index.html":           {Data: []byte("<html>app</html>")},
-		"assets/main.js":       {Data: []byte("console.log('ok')")},
-		"assets/style.css":     {Data: []byte("body{}")},
+		"index.html":       {Data: []byte("<html>app</html>")},
+		"assets/main.js":   {Data: []byte("console.log('ok')")},
+		"assets/style.css": {Data: []byte("body{}")},
 	}
 
 	registerFrontendFromFS(e, mockFS)
