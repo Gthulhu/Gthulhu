@@ -10,6 +10,10 @@ import (
 	"github.com/Gthulhu/api/manager/service"
 	"github.com/Gthulhu/api/pkg/container"
 	"go.uber.org/fx"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
 // ConfigModule creates an Fx module that provides configuration structs
@@ -44,6 +48,12 @@ func AdapterModule() (fx.Option, error) {
 	return fx.Options(
 		fx.Provide(func(k8sConfig config.K8SConfig) (domain.K8SAdapter, error) {
 			return k8sadapter.NewAdapter(k8sadapter.Options{
+				KubeConfigPath: k8sConfig.KubeConfigPath,
+				InCluster:      k8sConfig.IsInCluster,
+			})
+		}),
+		fx.Provide(func(k8sConfig config.K8SConfig) (dynamic.Interface, error) {
+			return k8sadapter.NewDynamicClient(k8sadapter.Options{
 				KubeConfigPath: k8sConfig.KubeConfigPath,
 				InCluster:      k8sConfig.IsInCluster,
 			})
@@ -100,6 +110,18 @@ func TestRepoModule(cfg config.ManageConfig, containerBuilder *container.Contain
 	}
 	return fx.Options(
 		configModule,
+		fx.Provide(NewFakeDynamicClient),
 		fx.Provide(repository.NewRepository),
 	), nil
+}
+
+// NewFakeDynamicClient returns a fake Kubernetes dynamic client for testing.
+func NewFakeDynamicClient() dynamic.Interface {
+	scheme := runtime.NewScheme()
+	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme,
+		map[schema.GroupVersionResource]string{
+			{Group: "gthulhu.io", Version: "v1alpha1", Resource: "schedulingstrategies"}: "SchedulingStrategyList",
+			{Group: "gthulhu.io", Version: "v1alpha1", Resource: "schedulingintents"}:    "SchedulingIntentList",
+		},
+	)
 }

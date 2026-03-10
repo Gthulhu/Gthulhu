@@ -67,7 +67,7 @@ type Repository interface {
 	BatchUpdateIntentsState(ctx context.Context, intentIDs []bson.ObjectID, newState IntentState) error
 	QueryStrategies(ctx context.Context, opt *QueryStrategyOptions) error
 	QueryIntents(ctx context.Context, opt *QueryIntentOptions) error
-	UpdateStrategy(ctx context.Context, strategyID bson.ObjectID, update bson.M) error
+	UpdateStrategy(ctx context.Context, strategy *ScheduleStrategy) error
 	DeleteStrategy(ctx context.Context, strategyID bson.ObjectID) error
 	DeleteIntents(ctx context.Context, intentIDs []bson.ObjectID) error
 	DeleteIntentsByStrategyID(ctx context.Context, strategyID bson.ObjectID) error

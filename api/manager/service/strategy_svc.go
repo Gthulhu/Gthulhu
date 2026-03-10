@@ -155,19 +155,13 @@ func (svc *Service) UpdateScheduleStrategy(ctx context.Context, operator *domain
 
 	// Update strategy document
 	now := time.Now().UnixMilli()
-	update := bson.M{
-		"$set": bson.M{
-			"strategyNamespace": strategy.StrategyNamespace,
-			"labelSelectors":    strategy.LabelSelectors,
-			"k8sNamespace":      strategy.K8sNamespace,
-			"commandRegex":      strategy.CommandRegex,
-			"priority":          strategy.Priority,
-			"executionTime":     strategy.ExecutionTime,
-			"updaterID":         operatorID,
-			"updatedTime":       now,
-		},
-	}
-	if err := svc.Repo.UpdateStrategy(ctx, strategyObjID, update); err != nil {
+	strategy.ID = strategyObjID
+	strategy.CreatedTime = currentStrategy.CreatedTime
+	strategy.CreatorID = currentStrategy.CreatorID
+	strategy.UpdaterID = operatorID
+	strategy.UpdatedTime = now
+
+	if err := svc.Repo.UpdateStrategy(ctx, strategy); err != nil {
 		return fmt.Errorf("update strategy: %w", err)
 	}
 
@@ -175,12 +169,6 @@ func (svc *Service) UpdateScheduleStrategy(ctx context.Context, operator *domain
 	if err := svc.Repo.DeleteIntentsByStrategyID(ctx, strategyObjID); err != nil {
 		return fmt.Errorf("delete intents by strategy ID: %w", err)
 	}
-
-	strategy.ID = strategyObjID
-	strategy.CreatedTime = currentStrategy.CreatedTime
-	strategy.CreatorID = currentStrategy.CreatorID
-	strategy.UpdaterID = operatorID
-	strategy.UpdatedTime = now
 
 	intents := make([]*domain.ScheduleIntent, 0, len(pods))
 	nodeIDsMap := make(map[string]struct{})

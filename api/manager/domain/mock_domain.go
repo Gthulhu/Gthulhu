@@ -443,69 +443,6 @@ func (_c *MockRepository_DeleteIntentsByStrategyID_Call) RunAndReturn(run func(c
 	return _c
 }
 
-// UpdateStrategy provides a mock function for the type MockRepository
-func (_mock *MockRepository) UpdateStrategy(ctx context.Context, strategyID bson.ObjectID, update bson.M) error {
-	ret := _mock.Called(ctx, strategyID, update)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateStrategy")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, bson.ObjectID, bson.M) error); ok {
-		r0 = returnFunc(ctx, strategyID, update)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockRepository_UpdateStrategy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStrategy'
-type MockRepository_UpdateStrategy_Call struct {
-	*mock.Call
-}
-
-// UpdateStrategy is a helper method to define mock.On call
-//   - ctx context.Context
-//   - strategyID bson.ObjectID
-//   - update bson.M
-func (_e *MockRepository_Expecter) UpdateStrategy(ctx interface{}, strategyID interface{}, update interface{}) *MockRepository_UpdateStrategy_Call {
-	return &MockRepository_UpdateStrategy_Call{Call: _e.mock.On("UpdateStrategy", ctx, strategyID, update)}
-}
-
-func (_c *MockRepository_UpdateStrategy_Call) Run(run func(ctx context.Context, strategyID bson.ObjectID, update bson.M)) *MockRepository_UpdateStrategy_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 bson.ObjectID
-		if args[1] != nil {
-			arg1 = args[1].(bson.ObjectID)
-		}
-		var arg2 bson.M
-		if args[2] != nil {
-			arg2 = args[2].(bson.M)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockRepository_UpdateStrategy_Call) Return(err error) *MockRepository_UpdateStrategy_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockRepository_UpdateStrategy_Call) RunAndReturn(run func(ctx context.Context, strategyID bson.ObjectID, update bson.M) error) *MockRepository_UpdateStrategy_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // DeleteStrategy provides a mock function for the type MockRepository
 func (_mock *MockRepository) DeleteStrategy(ctx context.Context, strategyID bson.ObjectID) error {
 	ret := _mock.Called(ctx, strategyID)
@@ -1139,6 +1076,63 @@ func (_c *MockRepository_UpdateRole_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// UpdateStrategy provides a mock function for the type MockRepository
+func (_mock *MockRepository) UpdateStrategy(ctx context.Context, strategy *ScheduleStrategy) error {
+	ret := _mock.Called(ctx, strategy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateStrategy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *ScheduleStrategy) error); ok {
+		r0 = returnFunc(ctx, strategy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_UpdateStrategy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateStrategy'
+type MockRepository_UpdateStrategy_Call struct {
+	*mock.Call
+}
+
+// UpdateStrategy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - strategy *ScheduleStrategy
+func (_e *MockRepository_Expecter) UpdateStrategy(ctx interface{}, strategy interface{}) *MockRepository_UpdateStrategy_Call {
+	return &MockRepository_UpdateStrategy_Call{Call: _e.mock.On("UpdateStrategy", ctx, strategy)}
+}
+
+func (_c *MockRepository_UpdateStrategy_Call) Run(run func(ctx context.Context, strategy *ScheduleStrategy)) *MockRepository_UpdateStrategy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *ScheduleStrategy
+		if args[1] != nil {
+			arg1 = args[1].(*ScheduleStrategy)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_UpdateStrategy_Call) Return(err error) *MockRepository_UpdateStrategy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_UpdateStrategy_Call) RunAndReturn(run func(ctx context.Context, strategy *ScheduleStrategy) error) *MockRepository_UpdateStrategy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateUser provides a mock function for the type MockRepository
 func (_mock *MockRepository) UpdateUser(ctx context.Context, user *User) error {
 	ret := _mock.Called(ctx, user)
@@ -1546,75 +1540,6 @@ func (_c *MockService_CreateScheduleStrategy_Call) Return(err error) *MockServic
 }
 
 func (_c *MockService_CreateScheduleStrategy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, strategy *ScheduleStrategy) error) *MockService_CreateScheduleStrategy_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateScheduleStrategy provides a mock function for the type MockService
-func (_mock *MockService) UpdateScheduleStrategy(ctx context.Context, operator *Claims, strategyID string, strategy *ScheduleStrategy) error {
-	ret := _mock.Called(ctx, operator, strategyID, strategy)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdateScheduleStrategy")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string, *ScheduleStrategy) error); ok {
-		r0 = returnFunc(ctx, operator, strategyID, strategy)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockService_UpdateScheduleStrategy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateScheduleStrategy'
-type MockService_UpdateScheduleStrategy_Call struct {
-	*mock.Call
-}
-
-// UpdateScheduleStrategy is a helper method to define mock.On call
-//   - ctx context.Context
-//   - operator *Claims
-//   - strategyID string
-//   - strategy *ScheduleStrategy
-func (_e *MockService_Expecter) UpdateScheduleStrategy(ctx interface{}, operator interface{}, strategyID interface{}, strategy interface{}) *MockService_UpdateScheduleStrategy_Call {
-	return &MockService_UpdateScheduleStrategy_Call{Call: _e.mock.On("UpdateScheduleStrategy", ctx, operator, strategyID, strategy)}
-}
-
-func (_c *MockService_UpdateScheduleStrategy_Call) Run(run func(ctx context.Context, operator *Claims, strategyID string, strategy *ScheduleStrategy)) *MockService_UpdateScheduleStrategy_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 *Claims
-		if args[1] != nil {
-			arg1 = args[1].(*Claims)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		var arg3 *ScheduleStrategy
-		if args[3] != nil {
-			arg3 = args[3].(*ScheduleStrategy)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-			arg3,
-		)
-	})
-	return _c
-}
-
-func (_c *MockService_UpdateScheduleStrategy_Call) Return(err error) *MockService_UpdateScheduleStrategy_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockService_UpdateScheduleStrategy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, strategyID string, strategy *ScheduleStrategy) error) *MockService_UpdateScheduleStrategy_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2480,6 +2405,75 @@ func (_c *MockService_UpdateRole_Call) Return(err error) *MockService_UpdateRole
 }
 
 func (_c *MockService_UpdateRole_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, roleID string, opt UpdateRoleOptions) error) *MockService_UpdateRole_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateScheduleStrategy provides a mock function for the type MockService
+func (_mock *MockService) UpdateScheduleStrategy(ctx context.Context, operator *Claims, strategyID string, strategy *ScheduleStrategy) error {
+	ret := _mock.Called(ctx, operator, strategyID, strategy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateScheduleStrategy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string, *ScheduleStrategy) error); ok {
+		r0 = returnFunc(ctx, operator, strategyID, strategy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_UpdateScheduleStrategy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateScheduleStrategy'
+type MockService_UpdateScheduleStrategy_Call struct {
+	*mock.Call
+}
+
+// UpdateScheduleStrategy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - strategyID string
+//   - strategy *ScheduleStrategy
+func (_e *MockService_Expecter) UpdateScheduleStrategy(ctx interface{}, operator interface{}, strategyID interface{}, strategy interface{}) *MockService_UpdateScheduleStrategy_Call {
+	return &MockService_UpdateScheduleStrategy_Call{Call: _e.mock.On("UpdateScheduleStrategy", ctx, operator, strategyID, strategy)}
+}
+
+func (_c *MockService_UpdateScheduleStrategy_Call) Run(run func(ctx context.Context, operator *Claims, strategyID string, strategy *ScheduleStrategy)) *MockService_UpdateScheduleStrategy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *ScheduleStrategy
+		if args[3] != nil {
+			arg3 = args[3].(*ScheduleStrategy)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_UpdateScheduleStrategy_Call) Return(err error) *MockService_UpdateScheduleStrategy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_UpdateScheduleStrategy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, strategyID string, strategy *ScheduleStrategy) error) *MockService_UpdateScheduleStrategy_Call {
 	_c.Call.Return(run)
 	return _c
 }

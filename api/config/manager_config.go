@@ -79,6 +79,7 @@ type AccountConfig struct {
 type K8SConfig struct {
 	KubeConfigPath string `mapstructure:"kube_config_path"`
 	IsInCluster    bool   `mapstructure:"in_cluster"`
+	CRDNamespace   string `mapstructure:"crd_namespace"`
 }
 
 var managerCfg *ManageConfig

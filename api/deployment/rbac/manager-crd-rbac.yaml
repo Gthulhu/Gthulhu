@@ -1,0 +1,35 @@
+# ClusterRole granting the API Server (manager mode) full access to
+# SchedulingStrategy and SchedulingIntent custom resources.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gthulhu-manager-crd
+rules:
+  - apiGroups: ["gthulhu.io"]
+    resources: ["schedulingstrategies", "schedulingintents"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+# Bind the ClusterRole to the manager ServiceAccount so that only the
+# manager pods can manipulate scheduling CRs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gthulhu-manager-crd-binding
+subjects:
+  - kind: ServiceAccount
+    name: manager
+    namespace: gthulhu-api-local
+roleRef:
+  kind: ClusterRole
+  name: gthulhu-manager-crd
+  apiGroup: rbac.authorization.k8s.io
+---
+# Read-only ClusterRole for monitoring / dashboards.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gthulhu-crd-viewer
+rules:
+  - apiGroups: ["gthulhu.io"]
+    resources: ["schedulingstrategies", "schedulingintents"]
+    verbs: ["get", "list", "watch"]
