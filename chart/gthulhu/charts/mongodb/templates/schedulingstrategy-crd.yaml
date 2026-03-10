@@ -1,0 +1,71 @@
+{{- $existingCrd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "schedulingstrategies.gthulhu.io" }}
+{{- if not $existingCrd }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: schedulingstrategies.gthulhu.io
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: gthulhu.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                strategyNamespace:
+                  type: string
+                labelSelectors:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key:
+                        type: string
+                      value:
+                        type: string
+                k8sNamespaces:
+                  type: array
+                  items:
+                    type: string
+                commandRegex:
+                  type: string
+                priority:
+                  type: integer
+                executionTime:
+                  type: integer
+                  format: int64
+                creatorID:
+                  type: string
+                updaterID:
+                  type: string
+                createdTime:
+                  type: integer
+                  format: int64
+                updatedTime:
+                  type: integer
+                  format: int64
+      additionalPrinterColumns:
+        - name: Priority
+          type: integer
+          jsonPath: .spec.priority
+        - name: Creator
+          type: string
+          jsonPath: .spec.creatorID
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: schedulingstrategies
+    singular: schedulingstrategy
+    kind: SchedulingStrategy
+    shortNames:
+      - ss
+{{- end }}

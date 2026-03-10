@@ -1,0 +1,14 @@
+{{- if .Values.crdNamespace.create }}
+{{- $existingNs := lookup "v1" "Namespace" "" .Values.crdNamespace.name }}
+{{- if not $existingNs }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.crdNamespace.name }}
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-namespace
+  annotations:
+    helm.sh/resource-policy: keep
+{{- end }}
+{{- end }}

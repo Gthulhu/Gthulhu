@@ -2,6 +2,12 @@
 # This is a YAML-formatted file for production deployments.
 # Uses container images from GitHub Container Registry (ghcr.io/gthulhu)
 
+# CRD Namespace Configuration
+# This namespace is used to store SchedulingIntent and SchedulingStrategy CRs
+crdNamespace:
+  create: true
+  name: gthulhu-system
+
 # Gthulhu Scheduler Configuration
 scheduler:
   enabled: true

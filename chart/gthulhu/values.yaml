@@ -2,6 +2,12 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# CRD Namespace Configuration
+# This namespace is used to store SchedulingIntent and SchedulingStrategy CRs
+crdNamespace:
+  create: true
+  name: gthulhu-system
+
 mongodb:
   enabled: true
 

@@ -63,6 +63,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["gthulhu.io"]
+    resources: ["schedulingstrategies", "schedulingintents"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

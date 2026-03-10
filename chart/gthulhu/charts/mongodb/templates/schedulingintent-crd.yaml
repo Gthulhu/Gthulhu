@@ -1,0 +1,78 @@
+{{- $existingCrd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "schedulingintents.gthulhu.io" }}
+{{- if not $existingCrd }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: schedulingintents.gthulhu.io
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: gthulhu.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                strategyID:
+                  type: string
+                podID:
+                  type: string
+                podName:
+                  type: string
+                nodeID:
+                  type: string
+                k8sNamespace:
+                  type: string
+                commandRegex:
+                  type: string
+                priority:
+                  type: integer
+                executionTime:
+                  type: integer
+                  format: int64
+                podLabels:
+                  type: object
+                  additionalProperties:
+                    type: string
+                state:
+                  type: integer
+                creatorID:
+                  type: string
+                updaterID:
+                  type: string
+                createdTime:
+                  type: integer
+                  format: int64
+                updatedTime:
+                  type: integer
+                  format: int64
+      additionalPrinterColumns:
+        - name: Strategy
+          type: string
+          jsonPath: .spec.strategyID
+        - name: Pod
+          type: string
+          jsonPath: .spec.podName
+        - name: Node
+          type: string
+          jsonPath: .spec.nodeID
+        - name: State
+          type: integer
+          jsonPath: .spec.state
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: schedulingintents
+    singular: schedulingintent
+    kind: SchedulingIntent
+    shortNames:
+      - si
+{{- end }}
