@@ -1,0 +1,30 @@
+# Gthulhu test configuration
+# Used by scripts/test_scheduler.sh inside vng VM
+
+monitor:
+  enabled: true
+  bpf_object_path: sched_monitor.bpf.o
+  collection_interval_sec: 10
+  monitor_all: false
+  stream_events: false
+  prometheus_port: 9090
+  enable_crd_watcher: false
+  kubeconfig_path: ""
+
+scheduler:
+  slice_ns_default: 20000000
+  slice_ns_min: 1000000
+  mode: gthulhu
+  kernel_mode: false
+  max_time_watchdog: true
+
+api:
+  url: http://127.0.0.1:8080
+  interval: 5
+  public_key_path: ""
+  enabled: false
+  auth_enabled: false
+
+debug: false
+early_processing: false
+builtin_idle: false
