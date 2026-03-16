@@ -4,13 +4,16 @@ on:
   push:
     branches:
       - main
-      - develop
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
       - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -48,7 +51,7 @@ jobs:
     name: Build and Push Container Image
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' || github.base_ref == 'develop'
     permissions:
       contents: read
       packages: write

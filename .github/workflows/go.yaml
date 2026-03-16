@@ -1,7 +1,7 @@
 name: Go
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
     tags:
       - 'v*'
   pull_request:
@@ -10,6 +10,9 @@ on:
       - develop
   workflow_dispatch: # Allow manual trigger
   workflow_call:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   analyze-code:
     name: Analyze Code
