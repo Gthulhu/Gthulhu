@@ -38,9 +38,9 @@ type Collector struct {
 	logger *slog.Logger
 
 	// BPF maps
-	taskMetricsMap  *bpf.BPFMap
-	monitoredPIDs   *bpf.BPFMap
-	monitoredTGIDs  *bpf.BPFMap
+	taskMetricsMap *bpf.BPFMap
+	monitoredPIDs  *bpf.BPFMap
+	monitoredTGIDs *bpf.BPFMap
 
 	// Pod mapper
 	podMapper *PodMapper

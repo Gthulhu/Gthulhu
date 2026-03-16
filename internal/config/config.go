@@ -82,7 +82,7 @@ func DefaultConfig() *Config {
 			MaxTimeWatchdog: true,
 		},
 		Monitor: MonitorConfig{
-			Enabled:               true,  // monitor is the base feature, enabled by default
+			Enabled:               true, // monitor is the base feature, enabled by default
 			BPFObjectPath:         "sched_monitor.bpf.o",
 			CollectionIntervalSec: 10,
 			MonitorAll:            false,
