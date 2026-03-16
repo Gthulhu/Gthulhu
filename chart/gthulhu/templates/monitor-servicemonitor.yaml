@@ -1,0 +1,26 @@
+{{/*
+ServiceMonitor for the Gthulhu scheduling event monitor.
+Scrapes pod-level scheduling metrics exposed by the monitor's /metrics endpoint.
+These metrics are the data source for the Prometheus adapter and KEDA triggers.
+*/}}
+{{- if and .Values.scheduler.enabled .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-monitor
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitor
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "gthulhu.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  endpoints:
+    - port: monitor-metrics
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval | default "15s" }}
+{{- end }}

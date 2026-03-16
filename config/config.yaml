@@ -1,6 +1,22 @@
-# Gthulhu Scheduler Configuration
-# This configuration file allows you to adjust scheduler parameters before eBPF program loading
+# Gthulhu Configuration
+# The monitor is the BASE feature (pod-level scheduling metrics via eBPF).
+# The scheduler is an ADVANCED feature (sched_ext based, requires Linux 6.12+).
 
+# ── Monitor (base feature) ──────────────────────────────────────────
+# Collects per-pod scheduling metrics using eBPF fentry/fexit hooks.
+# Works on Linux 5.2+ (BTF-enabled kernels). Does NOT require sched_ext.
+monitor:
+  enabled: true
+  bpf_object_path: sched_monitor.bpf.o
+  collection_interval_sec: 10
+  monitor_all: false         # true = track all processes; false = only CRD-selected pods
+  stream_events: false       # true = push real-time events via BPF ring buffer
+  prometheus_port: 9090      # port for /metrics endpoint
+  enable_crd_watcher: false  # true = watch PodSchedulingMetrics CRDs to filter monitored pods
+  kubeconfig_path: ""        # empty = use in-cluster config; set path for out-of-cluster dev
+
+# ── Scheduler (advanced feature) ────────────────────────────────────
+# Requires sched_ext (Linux 6.12+ with CONFIG_SCHED_CLASS_EXT)
 scheduler:
   # Default time slice in nanoseconds (default: 5000000 = 5ms)
   slice_ns_default: 20000000

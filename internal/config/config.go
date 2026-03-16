@@ -27,6 +27,19 @@ type SimpleSchedulerConfig struct {
 	EnableFifo bool `yaml:"enable_fifo,omitempty" description:"Enable FIFO scheduling in simple scheduler mode"`
 }
 
+// MonitorConfig represents the pod-level scheduling metrics monitor configuration.
+// The monitor is the base (default) functionality; the scheduler is advanced.
+type MonitorConfig struct {
+	Enabled               bool   `yaml:"enabled" description:"Enable eBPF scheduling event monitor (base feature)"`
+	BPFObjectPath         string `yaml:"bpf_object_path,omitempty" description:"Path to compiled sched_monitor.bpf.o"`
+	CollectionIntervalSec int    `yaml:"collection_interval_sec,omitempty" description:"Interval in seconds for reading BPF maps and aggregating metrics"`
+	MonitorAll            bool   `yaml:"monitor_all,omitempty" description:"Monitor all processes (if false, only CRD-selected pods are tracked)"`
+	StreamEvents          bool   `yaml:"stream_events,omitempty" description:"Enable real-time event streaming via BPF ring buffer"`
+	PrometheusPort        int    `yaml:"prometheus_port,omitempty" description:"Port to expose Prometheus /metrics endpoint for pod scheduling metrics"`
+	EnableCRDWatcher      bool   `yaml:"enable_crd_watcher,omitempty" description:"Enable Kubernetes CRD watcher for PodSchedulingMetrics resources"`
+	KubeConfigPath        string `yaml:"kubeconfig_path,omitempty" description:"Path to kubeconfig file (uses in-cluster config if empty)"`
+}
+
 // MTLSConfig holds the mutual TLS configuration used for scheduler → API server communication.
 // CertPem and KeyPem are the scheduler's own certificate/key pair signed by the private CA.
 // CAPem is the private CA certificate used to verify the API server's certificate.
@@ -49,8 +62,9 @@ type ApiConfig struct {
 
 // Config represents the application configuration
 type Config struct {
-	Scheduler       SchedulerConfig       `yaml:"scheduler" description:"Scheduler-specific configuration"`
+	Scheduler       SchedulerConfig       `yaml:"scheduler" description:"Scheduler-specific configuration (advanced feature)"`
 	SimpleScheduler SimpleSchedulerConfig `yaml:"simple_scheduler,omitempty" description:"Simple scheduler mode configuration"`
+	Monitor         MonitorConfig         `yaml:"monitor" description:"Pod-level scheduling metrics monitor (base feature)"`
 	Debug           bool                  `yaml:"debug,omitempty" description:"Enable debug mode (pprof server on :6060)"`
 	EarlyProcessing bool                  `yaml:"early_processing,omitempty" description:"Enable early processing of tasks in BPF before user-space dispatch"`
 	BuiltinIdle     bool                  `yaml:"builtin_idle,omitempty" description:"Enable built-in idle CPU selection in BPF"`
@@ -66,6 +80,14 @@ func DefaultConfig() *Config {
 			SliceNsDefault:  20000 * 1000, // 20ms
 			SliceNsMin:      1000 * 1000,  // 1ms
 			MaxTimeWatchdog: true,
+		},
+		Monitor: MonitorConfig{
+			Enabled:               true,  // monitor is the base feature, enabled by default
+			BPFObjectPath:         "sched_monitor.bpf.o",
+			CollectionIntervalSec: 10,
+			MonitorAll:            false,
+			StreamEvents:          false,
+			PrometheusPort:        9090,
 		},
 		Api: ApiConfig{},
 	}
@@ -115,6 +137,22 @@ func (c *Config) IsBuiltinIdleEnabled() bool {
 // GetApiConfig returns the API configuration
 func (c *Config) GetApiConfig() ApiConfig {
 	return c.Api
+}
+
+// GetMonitorConfig returns the monitor configuration
+func (c *Config) GetMonitorConfig() MonitorConfig {
+	return c.Monitor
+}
+
+// IsMonitorEnabled returns whether the scheduling event monitor is enabled
+func (c *Config) IsMonitorEnabled() bool {
+	return c.Monitor.Enabled
+}
+
+// IsSchedulerEnabled returns whether the advanced scheduler is enabled.
+// The scheduler is considered enabled when a scheduler mode is explicitly set.
+func (c *Config) IsSchedulerEnabled() bool {
+	return c.Scheduler.Mode != ""
 }
 
 // ExplainConfig prints all configuration keys with their descriptions.
