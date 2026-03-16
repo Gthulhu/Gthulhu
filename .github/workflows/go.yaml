@@ -114,7 +114,6 @@ jobs:
     name: Build and Push Container Image
     runs-on: ubuntu-24.04
     needs: [analyze-code, self-tests, schtest-tests]
-    if: github.event_name != 'pull_request'
     permissions:
       contents: read
       packages: write
