@@ -8,6 +8,7 @@ import StrategiesCard from './cards/StrategiesCard';
 import UsersCard from './cards/UsersCard';
 import RolesCard from './cards/RolesCard';
 import PodsCard from './cards/PodsCard';
+import PodSchedulingMetricsCard from './cards/PodSchedulingMetricsCard';
 
 export default function Dashboard() {
   const { isAuthenticated, showToast, getApiUrl } = useApp();
@@ -38,6 +39,7 @@ export default function Dashboard() {
       window.dispatchEvent(new CustomEvent('refreshStrategies'));
       window.dispatchEvent(new CustomEvent('refreshIntents'));
       window.dispatchEvent(new CustomEvent('refreshPodPids'));
+      window.dispatchEvent(new CustomEvent('refreshPSM'));
     }
     setTimeout(() => showToast('success', 'Data refreshed'), 500);
   };
@@ -73,6 +75,7 @@ export default function Dashboard() {
         <UsersCard />
         <RolesCard />
         <PodsCard />
+        <PodSchedulingMetricsCard />
       </div>
     </main>
   );

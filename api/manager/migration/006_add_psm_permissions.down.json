@@ -1,0 +1,33 @@
+[
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$pull": {
+                        "policies": {
+                            "permissionKey": {
+                                "$in": [
+                                    "pod_scheduling_metrics.create",
+                                    "pod_scheduling_metrics.read",
+                                    "pod_scheduling_metrics.update",
+                                    "pod_scheduling_metrics.delete"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "delete": "permissions",
+        "deletes": [
+            { "q": { "key": "pod_scheduling_metrics.create" }, "limit": 1 },
+            { "q": { "key": "pod_scheduling_metrics.read" }, "limit": 1 },
+            { "q": { "key": "pod_scheduling_metrics.update" }, "limit": 1 },
+            { "q": { "key": "pod_scheduling_metrics.delete" }, "limit": 1 }
+        ]
+    }
+]

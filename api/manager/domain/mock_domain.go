@@ -158,6 +158,63 @@ func (_c *MockRepository_CreateAuditLog_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// CreatePSM provides a mock function for the type MockRepository
+func (_mock *MockRepository) CreatePSM(ctx context.Context, psm *PodSchedulingMetrics) error {
+	ret := _mock.Called(ctx, psm)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePSM")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *PodSchedulingMetrics) error); ok {
+		r0 = returnFunc(ctx, psm)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_CreatePSM_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreatePSM'
+type MockRepository_CreatePSM_Call struct {
+	*mock.Call
+}
+
+// CreatePSM is a helper method to define mock.On call
+//   - ctx context.Context
+//   - psm *PodSchedulingMetrics
+func (_e *MockRepository_Expecter) CreatePSM(ctx interface{}, psm interface{}) *MockRepository_CreatePSM_Call {
+	return &MockRepository_CreatePSM_Call{Call: _e.mock.On("CreatePSM", ctx, psm)}
+}
+
+func (_c *MockRepository_CreatePSM_Call) Run(run func(ctx context.Context, psm *PodSchedulingMetrics)) *MockRepository_CreatePSM_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *PodSchedulingMetrics
+		if args[1] != nil {
+			arg1 = args[1].(*PodSchedulingMetrics)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CreatePSM_Call) Return(err error) *MockRepository_CreatePSM_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_CreatePSM_Call) RunAndReturn(run func(ctx context.Context, psm *PodSchedulingMetrics) error) *MockRepository_CreatePSM_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreatePermission provides a mock function for the type MockRepository
 func (_mock *MockRepository) CreatePermission(ctx context.Context, permission *Permission) error {
 	ret := _mock.Called(ctx, permission)
@@ -439,6 +496,63 @@ func (_c *MockRepository_DeleteIntentsByStrategyID_Call) Return(err error) *Mock
 }
 
 func (_c *MockRepository_DeleteIntentsByStrategyID_Call) RunAndReturn(run func(ctx context.Context, strategyID bson.ObjectID) error) *MockRepository_DeleteIntentsByStrategyID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeletePSM provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeletePSM(ctx context.Context, name string) error {
+	ret := _mock.Called(ctx, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePSM")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeletePSM_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePSM'
+type MockRepository_DeletePSM_Call struct {
+	*mock.Call
+}
+
+// DeletePSM is a helper method to define mock.On call
+//   - ctx context.Context
+//   - name string
+func (_e *MockRepository_Expecter) DeletePSM(ctx interface{}, name interface{}) *MockRepository_DeletePSM_Call {
+	return &MockRepository_DeletePSM_Call{Call: _e.mock.On("DeletePSM", ctx, name)}
+}
+
+func (_c *MockRepository_DeletePSM_Call) Run(run func(ctx context.Context, name string)) *MockRepository_DeletePSM_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeletePSM_Call) Return(err error) *MockRepository_DeletePSM_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeletePSM_Call) RunAndReturn(run func(ctx context.Context, name string) error) *MockRepository_DeletePSM_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -734,6 +848,63 @@ func (_c *MockRepository_QueryIntents_Call) RunAndReturn(run func(ctx context.Co
 	return _c
 }
 
+// QueryPSMs provides a mock function for the type MockRepository
+func (_mock *MockRepository) QueryPSMs(ctx context.Context, opt *QueryPSMOptions) error {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryPSMs")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryPSMOptions) error); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_QueryPSMs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryPSMs'
+type MockRepository_QueryPSMs_Call struct {
+	*mock.Call
+}
+
+// QueryPSMs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt *QueryPSMOptions
+func (_e *MockRepository_Expecter) QueryPSMs(ctx interface{}, opt interface{}) *MockRepository_QueryPSMs_Call {
+	return &MockRepository_QueryPSMs_Call{Call: _e.mock.On("QueryPSMs", ctx, opt)}
+}
+
+func (_c *MockRepository_QueryPSMs_Call) Run(run func(ctx context.Context, opt *QueryPSMOptions)) *MockRepository_QueryPSMs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryPSMOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryPSMOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_QueryPSMs_Call) Return(err error) *MockRepository_QueryPSMs_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_QueryPSMs_Call) RunAndReturn(run func(ctx context.Context, opt *QueryPSMOptions) error) *MockRepository_QueryPSMs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryPermissions provides a mock function for the type MockRepository
 func (_mock *MockRepository) QueryPermissions(ctx context.Context, opt *QueryPermissionOptions) error {
 	ret := _mock.Called(ctx, opt)
@@ -958,6 +1129,63 @@ func (_c *MockRepository_QueryUsers_Call) Return(err error) *MockRepository_Quer
 }
 
 func (_c *MockRepository_QueryUsers_Call) RunAndReturn(run func(ctx context.Context, opt *QueryUserOptions) error) *MockRepository_QueryUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePSM provides a mock function for the type MockRepository
+func (_mock *MockRepository) UpdatePSM(ctx context.Context, psm *PodSchedulingMetrics) error {
+	ret := _mock.Called(ctx, psm)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePSM")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *PodSchedulingMetrics) error); ok {
+		r0 = returnFunc(ctx, psm)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_UpdatePSM_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePSM'
+type MockRepository_UpdatePSM_Call struct {
+	*mock.Call
+}
+
+// UpdatePSM is a helper method to define mock.On call
+//   - ctx context.Context
+//   - psm *PodSchedulingMetrics
+func (_e *MockRepository_Expecter) UpdatePSM(ctx interface{}, psm interface{}) *MockRepository_UpdatePSM_Call {
+	return &MockRepository_UpdatePSM_Call{Call: _e.mock.On("UpdatePSM", ctx, psm)}
+}
+
+func (_c *MockRepository_UpdatePSM_Call) Run(run func(ctx context.Context, psm *PodSchedulingMetrics)) *MockRepository_UpdatePSM_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *PodSchedulingMetrics
+		if args[1] != nil {
+			arg1 = args[1].(*PodSchedulingMetrics)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_UpdatePSM_Call) Return(err error) *MockRepository_UpdatePSM_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_UpdatePSM_Call) RunAndReturn(run func(ctx context.Context, psm *PodSchedulingMetrics) error) *MockRepository_UpdatePSM_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1418,6 +1646,69 @@ func (_c *MockService_CreateNewUser_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// CreatePodSchedulingMetrics provides a mock function for the type MockService
+func (_mock *MockService) CreatePodSchedulingMetrics(ctx context.Context, operator *Claims, psm *PodSchedulingMetrics) error {
+	ret := _mock.Called(ctx, operator, psm)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreatePodSchedulingMetrics")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, *PodSchedulingMetrics) error); ok {
+		r0 = returnFunc(ctx, operator, psm)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_CreatePodSchedulingMetrics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreatePodSchedulingMetrics'
+type MockService_CreatePodSchedulingMetrics_Call struct {
+	*mock.Call
+}
+
+// CreatePodSchedulingMetrics is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - psm *PodSchedulingMetrics
+func (_e *MockService_Expecter) CreatePodSchedulingMetrics(ctx interface{}, operator interface{}, psm interface{}) *MockService_CreatePodSchedulingMetrics_Call {
+	return &MockService_CreatePodSchedulingMetrics_Call{Call: _e.mock.On("CreatePodSchedulingMetrics", ctx, operator, psm)}
+}
+
+func (_c *MockService_CreatePodSchedulingMetrics_Call) Run(run func(ctx context.Context, operator *Claims, psm *PodSchedulingMetrics)) *MockService_CreatePodSchedulingMetrics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 *PodSchedulingMetrics
+		if args[2] != nil {
+			arg2 = args[2].(*PodSchedulingMetrics)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_CreatePodSchedulingMetrics_Call) Return(err error) *MockService_CreatePodSchedulingMetrics_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_CreatePodSchedulingMetrics_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, psm *PodSchedulingMetrics) error) *MockService_CreatePodSchedulingMetrics_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateRole provides a mock function for the type MockService
 func (_mock *MockService) CreateRole(ctx context.Context, operator *Claims, role *Role) error {
 	ret := _mock.Called(ctx, operator, role)
@@ -1540,6 +1831,69 @@ func (_c *MockService_CreateScheduleStrategy_Call) Return(err error) *MockServic
 }
 
 func (_c *MockService_CreateScheduleStrategy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, strategy *ScheduleStrategy) error) *MockService_CreateScheduleStrategy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeletePodSchedulingMetrics provides a mock function for the type MockService
+func (_mock *MockService) DeletePodSchedulingMetrics(ctx context.Context, operator *Claims, name string) error {
+	ret := _mock.Called(ctx, operator, name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeletePodSchedulingMetrics")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string) error); ok {
+		r0 = returnFunc(ctx, operator, name)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_DeletePodSchedulingMetrics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeletePodSchedulingMetrics'
+type MockService_DeletePodSchedulingMetrics_Call struct {
+	*mock.Call
+}
+
+// DeletePodSchedulingMetrics is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - name string
+func (_e *MockService_Expecter) DeletePodSchedulingMetrics(ctx interface{}, operator interface{}, name interface{}) *MockService_DeletePodSchedulingMetrics_Call {
+	return &MockService_DeletePodSchedulingMetrics_Call{Call: _e.mock.On("DeletePodSchedulingMetrics", ctx, operator, name)}
+}
+
+func (_c *MockService_DeletePodSchedulingMetrics_Call) Run(run func(ctx context.Context, operator *Claims, name string)) *MockService_DeletePodSchedulingMetrics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_DeletePodSchedulingMetrics_Call) Return(err error) *MockService_DeletePodSchedulingMetrics_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_DeletePodSchedulingMetrics_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, name string) error) *MockService_DeletePodSchedulingMetrics_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1859,6 +2213,63 @@ func (_c *MockService_ListNodes_Call) Return(nodes []*Node, err error) *MockServ
 }
 
 func (_c *MockService_ListNodes_Call) RunAndReturn(run func(ctx context.Context) ([]*Node, error)) *MockService_ListNodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPodSchedulingMetrics provides a mock function for the type MockService
+func (_mock *MockService) ListPodSchedulingMetrics(ctx context.Context, opt *QueryPSMOptions) error {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPodSchedulingMetrics")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryPSMOptions) error); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_ListPodSchedulingMetrics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPodSchedulingMetrics'
+type MockService_ListPodSchedulingMetrics_Call struct {
+	*mock.Call
+}
+
+// ListPodSchedulingMetrics is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt *QueryPSMOptions
+func (_e *MockService_Expecter) ListPodSchedulingMetrics(ctx interface{}, opt interface{}) *MockService_ListPodSchedulingMetrics_Call {
+	return &MockService_ListPodSchedulingMetrics_Call{Call: _e.mock.On("ListPodSchedulingMetrics", ctx, opt)}
+}
+
+func (_c *MockService_ListPodSchedulingMetrics_Call) Run(run func(ctx context.Context, opt *QueryPSMOptions)) *MockService_ListPodSchedulingMetrics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryPSMOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryPSMOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_ListPodSchedulingMetrics_Call) Return(err error) *MockService_ListPodSchedulingMetrics_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_ListPodSchedulingMetrics_Call) RunAndReturn(run func(ctx context.Context, opt *QueryPSMOptions) error) *MockService_ListPodSchedulingMetrics_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2336,6 +2747,75 @@ func (_c *MockService_ResetPassword_Call) Return(err error) *MockService_ResetPa
 }
 
 func (_c *MockService_ResetPassword_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, id string, newPassword string) error) *MockService_ResetPassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdatePodSchedulingMetrics provides a mock function for the type MockService
+func (_mock *MockService) UpdatePodSchedulingMetrics(ctx context.Context, operator *Claims, name string, psm *PodSchedulingMetrics) error {
+	ret := _mock.Called(ctx, operator, name, psm)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdatePodSchedulingMetrics")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string, *PodSchedulingMetrics) error); ok {
+		r0 = returnFunc(ctx, operator, name, psm)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_UpdatePodSchedulingMetrics_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePodSchedulingMetrics'
+type MockService_UpdatePodSchedulingMetrics_Call struct {
+	*mock.Call
+}
+
+// UpdatePodSchedulingMetrics is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - name string
+//   - psm *PodSchedulingMetrics
+func (_e *MockService_Expecter) UpdatePodSchedulingMetrics(ctx interface{}, operator interface{}, name interface{}, psm interface{}) *MockService_UpdatePodSchedulingMetrics_Call {
+	return &MockService_UpdatePodSchedulingMetrics_Call{Call: _e.mock.On("UpdatePodSchedulingMetrics", ctx, operator, name, psm)}
+}
+
+func (_c *MockService_UpdatePodSchedulingMetrics_Call) Run(run func(ctx context.Context, operator *Claims, name string, psm *PodSchedulingMetrics)) *MockService_UpdatePodSchedulingMetrics_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *PodSchedulingMetrics
+		if args[3] != nil {
+			arg3 = args[3].(*PodSchedulingMetrics)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_UpdatePodSchedulingMetrics_Call) Return(err error) *MockService_UpdatePodSchedulingMetrics_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_UpdatePodSchedulingMetrics_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, name string, psm *PodSchedulingMetrics) error) *MockService_UpdatePodSchedulingMetrics_Call {
 	_c.Call.Return(run)
 	return _c
 }

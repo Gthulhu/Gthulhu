@@ -1,0 +1,51 @@
+[
+    {
+        "insert": "permissions",
+        "documents": [
+            {
+                "key": "pod_scheduling_metrics.create",
+                "resource": "pod_scheduling_metrics",
+                "action": "create",
+                "description": "Create pod scheduling metrics resources"
+            },
+            {
+                "key": "pod_scheduling_metrics.read",
+                "resource": "pod_scheduling_metrics",
+                "action": "read",
+                "description": "Read pod scheduling metrics resources"
+            },
+            {
+                "key": "pod_scheduling_metrics.update",
+                "resource": "pod_scheduling_metrics",
+                "action": "update",
+                "description": "Update pod scheduling metrics resources"
+            },
+            {
+                "key": "pod_scheduling_metrics.delete",
+                "resource": "pod_scheduling_metrics",
+                "action": "delete",
+                "description": "Delete pod scheduling metrics resources"
+            }
+        ]
+    },
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$push": {
+                        "policies": {
+                            "$each": [
+                                { "permissionKey": "pod_scheduling_metrics.create", "self": false },
+                                { "permissionKey": "pod_scheduling_metrics.read", "self": false },
+                                { "permissionKey": "pod_scheduling_metrics.update", "self": false },
+                                { "permissionKey": "pod_scheduling_metrics.delete", "self": false }
+                            ]
+                        }
+                    }
+                }
+            }
+        ]
+    }
+]

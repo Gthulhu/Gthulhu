@@ -56,7 +56,7 @@ scheduler:
     enabled: true
     
     image:
-      repository: 127.0.0.1:32000/gthulhu-api
+      repository: ghcr.io/gthulhu/gthulhu-api
       pullPolicy: Always
       tag: "latest"
     
@@ -106,7 +106,7 @@ manager:
   replicaCount: 1
   
   image:
-    repository: 127.0.0.1:32000/gthulhu-api
+    repository: ghcr.io/gthulhu/gthulhu-api
     pullPolicy: Always
     tag: "latest"
   
