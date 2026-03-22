@@ -2,6 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { BarChart3, Download, Trash2, Save, Loader2, XCircle, Inbox, ChevronDown, ChevronRight, HelpCircle, Pencil, Plus } from 'lucide-react';
 
+function formatMetricValue(value) {
+  return new Intl.NumberFormat().format(value || 0);
+}
+
 export default function PodSchedulingMetricsCard() {
   const { isAuthenticated, makeAuthenticatedRequest, showToast } = useApp();
   const [items, setItems] = useState([]);
@@ -10,6 +14,10 @@ export default function PodSchedulingMetricsCard() {
   const [editForm, setEditForm] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [runtimeItems, setRuntimeItems] = useState([]);
+  const [runtimeWarnings, setRuntimeWarnings] = useState([]);
+  const [loadingRuntime, setLoadingRuntime] = useState(false);
+  const [runtimeError, setRuntimeError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createForm, setCreateForm] = useState(newCreateForm());
 
@@ -66,15 +74,46 @@ export default function PodSchedulingMetricsCard() {
     }
   }, [isAuthenticated, makeAuthenticatedRequest, showToast]);
 
-  useEffect(() => {
-    const handler = () => loadItems();
-    window.addEventListener('refreshPSM', handler);
-    return () => window.removeEventListener('refreshPSM', handler);
-  }, [loadItems]);
+  const loadRuntimeMetrics = useCallback(async () => {
+    if (!isAuthenticated) return;
+    setLoadingRuntime(true);
+    setRuntimeError('');
+    try {
+      const response = await makeAuthenticatedRequest('/api/v1/pod-scheduling-metrics/runtime');
+      const data = await response.json();
+      if (data.success) {
+        setRuntimeItems(data.data && data.data.items ? data.data.items : []);
+        setRuntimeWarnings(data.data && data.data.warnings ? data.data.warnings : []);
+      } else {
+        setRuntimeError(data.error || 'Failed to load runtime metrics');
+        setRuntimeItems([]);
+        setRuntimeWarnings([]);
+      }
+    } catch (err) {
+      setRuntimeError(err.message);
+      setRuntimeItems([]);
+      setRuntimeWarnings([]);
+    } finally {
+      setLoadingRuntime(false);
+    }
+  }, [isAuthenticated, makeAuthenticatedRequest]);
+
+  const refreshAllMetricsData = useCallback(() => {
+    loadItems();
+    loadRuntimeMetrics();
+  }, [loadItems, loadRuntimeMetrics]);
 
   useEffect(() => {
-    if (isAuthenticated) loadItems();
-  }, [isAuthenticated]);
+    const handler = () => refreshAllMetricsData();
+    window.addEventListener('refreshPSM', handler);
+    return () => window.removeEventListener('refreshPSM', handler);
+  }, [refreshAllMetricsData]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshAllMetricsData();
+    }
+  }, [isAuthenticated, refreshAllMetricsData]);
 
   const toggleExpand = (id) => setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -364,7 +403,7 @@ export default function PodSchedulingMetricsCard() {
           </div>
         </div>
         <div className="card-actions">
-          <button className="icon-btn auth-required" onClick={loadItems} title="Refresh" disabled={!isAuthenticated}>
+          <button className="icon-btn auth-required" onClick={refreshAllMetricsData} title="Refresh" disabled={!isAuthenticated}>
             <Download size={16} />
           </button>
           <button className="primary-btn auth-required" onClick={() => setShowCreateForm(prev => !prev)} disabled={!isAuthenticated}>
@@ -417,6 +456,85 @@ export default function PodSchedulingMetricsCard() {
             </div>
           </div>
         )}
+
+        <div className="loaded-strategies-section">
+          <h3 className="section-title"><BarChart3 size={16} /> Latest Collected Pod Metrics</h3>
+
+          {loadingRuntime && (
+            <div className="empty-state">
+              <span className="empty-icon"><Loader2 size={24} className="spin" /></span>
+              <p>Loading runtime metrics...</p>
+            </div>
+          )}
+
+          {!loadingRuntime && runtimeError && (
+            <div className="empty-state error">
+              <span className="empty-icon"><XCircle size={24} /></span>
+              <p>Error: {runtimeError}</p>
+            </div>
+          )}
+
+          {!loadingRuntime && !runtimeError && runtimeWarnings.length > 0 && (
+            <div className="labels-section">
+              <span className="labels-title">Collection Warnings</span>
+              <div className="labels-grid">
+                {runtimeWarnings.map((warning, index) => (
+                  <span key={index} className="strategy-namespace-badge disabled">{warning}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!loadingRuntime && !runtimeError && runtimeItems.length === 0 && (
+            <div className="empty-state">
+              <span className="empty-icon"><Inbox size={24} /></span>
+              <p>No runtime pod scheduling metrics collected yet.</p>
+            </div>
+          )}
+
+          {!loadingRuntime && !runtimeError && runtimeItems.length > 0 && (
+            <div className="users-list">
+              {runtimeItems.map((item) => (
+                <div key={`${item.namespace}-${item.podName}-${item.nodeID || 'unknown'}`} className="strategy-loaded-item">
+                  <div className="strategy-loaded-header">
+                    <div className="strategy-loaded-title">
+                      <span className="strategy-id">{item.namespace}/{item.podName}</span>
+                      {item.nodeID && <span className="strategy-namespace-badge">Node: {item.nodeID}</span>}
+                    </div>
+                  </div>
+                  <div className="strategy-loaded-details">
+                    <div className="detail-grid">
+                      <div className="detail-item">
+                        <span className="detail-label">Voluntary Ctx Switches</span>
+                        <span className="detail-value">{formatMetricValue(item.voluntaryCtxSwitches)}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Involuntary Ctx Switches</span>
+                        <span className="detail-value">{formatMetricValue(item.involuntaryCtxSwitches)}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">CPU Time (ns)</span>
+                        <span className="detail-value">{formatMetricValue(item.cpuTimeNs)}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Wait Time (ns)</span>
+                        <span className="detail-value">{formatMetricValue(item.waitTimeNs)}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Run Count</span>
+                        <span className="detail-value">{formatMetricValue(item.runCount)}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">CPU Migrations</span>
+                        <span className="detail-value">{formatMetricValue(item.cpuMigrations)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Loaded Items */}
         <div className="loaded-strategies-section">

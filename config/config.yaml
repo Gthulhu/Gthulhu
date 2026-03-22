@@ -12,7 +12,7 @@ monitor:
   monitor_all: false         # true = track all processes; false = only CRD-selected pods
   stream_events: false       # true = push real-time events via BPF ring buffer
   prometheus_port: 9090      # port for /metrics endpoint
-  enable_crd_watcher: false  # true = watch PodSchedulingMetrics CRDs to filter monitored pods
+  enable_crd_watcher: true  # true = watch PodSchedulingMetrics CRDs to filter monitored pods
   kubeconfig_path: ""        # empty = use in-cluster config; set path for out-of-cluster dev
 
 # ── Scheduler (advanced feature) ────────────────────────────────────

@@ -2155,6 +2155,34 @@ func (_c *MockService_GetPodPIDMapping_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// ListPodSchedulingMetricValues provides a mock function for the type MockService
+func (_mock *MockService) ListPodSchedulingMetricValues(ctx context.Context) (*PodSchedulingMetricValuesResult, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPodSchedulingMetricValues")
+	}
+
+	var r0 *PodSchedulingMetricValuesResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (*PodSchedulingMetricValuesResult, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) *PodSchedulingMetricValuesResult); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*PodSchedulingMetricValuesResult)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
 // ListNodes provides a mock function for the type MockService
 func (_mock *MockService) ListNodes(ctx context.Context) ([]*Node, error) {
 	ret := _mock.Called(ctx)
@@ -3552,6 +3580,34 @@ func (_c *MockDecisionMakerAdapter_GetPodPIDMapping_Call) Return(podPIDMappingRe
 func (_c *MockDecisionMakerAdapter_GetPodPIDMapping_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod) (*PodPIDMappingResponse, error)) *MockDecisionMakerAdapter_GetPodPIDMapping_Call {
 	_c.Call.Return(run)
 	return _c
+}
+
+// GetPodSchedulingMetricValues provides a mock function for the type MockDecisionMakerAdapter
+func (_mock *MockDecisionMakerAdapter) GetPodSchedulingMetricValues(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error) {
+	ret := _mock.Called(ctx, decisionMaker)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPodSchedulingMetricValues")
+	}
+
+	var r0 []*PodSchedulingMetricValue
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)); ok {
+		return returnFunc(ctx, decisionMaker)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod) []*PodSchedulingMetricValue); ok {
+		r0 = returnFunc(ctx, decisionMaker)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*PodSchedulingMetricValue)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *DecisionMakerPod) error); ok {
+		r1 = returnFunc(ctx, decisionMaker)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // SendSchedulingIntent provides a mock function for the type MockDecisionMakerAdapter

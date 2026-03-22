@@ -106,6 +106,7 @@ type Service interface {
 
 	CreatePodSchedulingMetrics(ctx context.Context, operator *Claims, psm *PodSchedulingMetrics) error
 	ListPodSchedulingMetrics(ctx context.Context, opt *QueryPSMOptions) error
+	ListPodSchedulingMetricValues(ctx context.Context) (*PodSchedulingMetricValuesResult, error)
 	UpdatePodSchedulingMetrics(ctx context.Context, operator *Claims, name string, psm *PodSchedulingMetrics) error
 	DeletePodSchedulingMetrics(ctx context.Context, operator *Claims, name string) error
 }
@@ -138,4 +139,5 @@ type DecisionMakerAdapter interface {
 	GetIntentMerkleRoot(ctx context.Context, decisionMaker *DecisionMakerPod) (string, error)
 	DeleteSchedulingIntents(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteIntentsRequest) error
 	GetPodPIDMapping(ctx context.Context, decisionMaker *DecisionMakerPod) (*PodPIDMappingResponse, error)
+	GetPodSchedulingMetricValues(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)
 }

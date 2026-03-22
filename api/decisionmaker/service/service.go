@@ -30,9 +30,11 @@ func NewService(params Params) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize JWT private key: %v", err)
 	}
+	machineID := util.GetMachineID()
 	svc := &Service{
 		schedulingIntentsMap: util.NewGenericMap[string, []*domain.SchedulingIntents](),
-		metricCollector:      NewMetricCollector(util.GetMachineID()),
+		metricCollector:      NewMetricCollector(machineID),
+		podSchedCollector:    NewPodSchedMetricCollector(machineID),
 		jwtPrivateKey:        privateKey,
 	}
 
@@ -40,12 +42,17 @@ func NewService(params Params) (*Service, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to register metric collector: %v", err)
 	}
+	err = prometheus.Register(svc.podSchedCollector)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register pod sched metric collector: %v", err)
+	}
 	return svc, nil
 }
 
 type Service struct {
 	schedulingIntentsMap *util.GenericMap[string, []*domain.SchedulingIntents]
 	metricCollector      *MetricCollector
+	podSchedCollector    *PodSchedMetricCollector
 	jwtPrivateKey        *rsa.PrivateKey
 	tokenConfig          config.TokenConfig
 	intentCacheMu        sync.RWMutex
@@ -75,6 +82,7 @@ func (svc *Service) ListAllSchedulingIntents(ctx context.Context) ([]*domain.Sch
 		return nil, err
 	}
 
+	svc.podSchedCollector.UpdatePodTargets(cachedIntents, podInfos)
 	return svc.resolveSchedulingIntents(ctx, cachedIntents, podInfos), nil
 }
 
@@ -103,6 +111,7 @@ func (svc *Service) ProcessIntents(ctx context.Context, intents []*domain.Intent
 	}
 	svc.intentCacheMu.Unlock()
 	svc.resolveSchedulingIntents(ctx, normalizedIntents, podInfos)
+	svc.podSchedCollector.UpdatePodTargets(normalizedIntents, podInfos)
 	logger.Logger(ctx).Info().Msgf("Discovered pods: %+v", podInfos)
 	return nil
 }
