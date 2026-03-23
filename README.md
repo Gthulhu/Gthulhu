@@ -1,4 +1,4 @@
-# Gthulhu Project
+# Gthulhu: Cloud-Native Workload Orchestration with eBPF and Custom Scheduling
 
 <a href="https://landscape.cncf.io/?item=provisioning--automation-configuration--gthulhu" target="_blank"><img src="https://img.shields.io/badge/CNCF%20Landscape-5699C6?style=for-the-badge&logo=cncf&label=cncf" alt="cncf landscape" /></a>
 
@@ -9,7 +9,7 @@
 [![Portability](https://github.com/Gthulhu/Gthulhu/actions/workflows/portability.yaml/badge.svg)](https://github.com/Gthulhu/Gthulhu/actions/workflows/portability.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Gthulhu/Gthulhu)](https://goreportcard.com/report/github.com/Gthulhu/Gthulhu)
 
-<img src="./assets/logo.png" alt="logo" width="300"/>
+<img src="./assets/logo.svg" alt="logo" width="300"/>
 
 ## Overview
 
