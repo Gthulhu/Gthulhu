@@ -17,6 +17,8 @@ Gthulhu is a cloud-native workload orchestration platform that provides granular
 
 ![](https://private-user-images.githubusercontent.com/264927932/567637553-6d15bd51-fb69-4f6b-99e6-88ef1ebd0d44.gif?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzQyNTk0MzgsIm5iZiI6MTc3NDI1OTEzOCwicGF0aCI6Ii8yNjQ5Mjc5MzIvNTY3NjM3NTUzLTZkMTViZDUxLWZiNjktNGY2Yi05OWU2LTg4ZWYxZWJkMGQ0NC5naWY_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwMzIzJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDMyM1QwOTQ1MzhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT04NWE4MzYzZmZiNGI3ZjExMzEwMWUyZDFlOGI2ZmQ1MDU4MzhlMzhmNzIwN2Q1MWJlNjA2ZjVkMWMxYzFiZjk2JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.UHX8hLMZ5jL6xRwL3sxOuKVub_RlLRVt0pOfbCutc-A)
 
+> Please visit https://youtu.be/Cyjrh9cW1a8 for a demo video showcasing Gthulhu's capabilities.
+
 ### Key Capabilities
 
 - **Pod-Level Scheduling Metrics** — Gthulhu uses eBPF to hook into kernel scheduling events (`fentry`/`fexit`), collecting per-process metrics such as voluntary/involuntary context switches, CPU time, wait time, run count, and CPU migrations. These metrics are aggregated at the pod level and exposed via REST APIs.
