@@ -5,7 +5,6 @@ import {
   Server,
   BarChart3,
   Target,
-  ClipboardList,
   Users,
   Shield,
   LogOut,
@@ -18,13 +17,7 @@ const navSections = [
     items: [
       { to: '/nodes', icon: Server, label: 'Nodes & Health' },
       { to: '/pod-metrics', icon: BarChart3, label: 'Pod Metrics' },
-    ],
-  },
-  {
-    label: 'MANAGEMENT',
-    items: [
-      { to: '/strategies', icon: Target, label: 'Strategies' },
-      { to: '/intents', icon: ClipboardList, label: 'Intents' },
+      { to: '/strategies', icon: Target, label: 'Strategies', badge: 'Advanced' },
     ],
   },
   {
@@ -55,7 +48,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">G</div>
+        <img src="/logo.svg" alt="Gthulhu" className="sidebar-logo-icon" />
         <span className="sidebar-logo-text">Gthulhu</span>
       </div>
 
@@ -77,6 +70,7 @@ export default function Sidebar() {
                 >
                   <Icon size={18} />
                   <span>{item.label}</span>
+                  {item.badge && <span className="sidebar-nav-badge">{item.badge}</span>}
                 </NavLink>
               );
             })}

@@ -145,9 +145,34 @@ export default function NodesPage() {
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-card-label">Uptime (last 10)</div>
-          <div className="stat-card-value">
-            {totalChecks === 0 ? '--' : `${healthyCount}/${totalChecks}`}
+          <div className="stat-card-label">Uptime</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {Array.from({ length: 10 }).map((_, i) => {
+                const entry = healthHistory[i];
+                const color = !entry
+                  ? 'var(--color-border)'
+                  : entry.healthy
+                    ? 'var(--color-success, #22c55e)'
+                    : 'var(--color-danger, #ef4444)';
+                return (
+                  <div
+                    key={i}
+                    title={entry ? `${new Date(entry.timestamp).toLocaleTimeString()} — ${entry.healthy ? 'Healthy' : 'Failed'}` : 'No data'}
+                    style={{
+                      width: 6,
+                      height: 20,
+                      borderRadius: 2,
+                      background: color,
+                      transition: 'background 0.3s',
+                    }}
+                  />
+                );
+              })}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+              {totalChecks === 0 ? '--' : `${Math.round((healthyCount / totalChecks) * 100)}%`}
+            </span>
           </div>
         </div>
       </div>

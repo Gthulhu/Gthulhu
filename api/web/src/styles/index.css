@@ -110,10 +110,8 @@ input, button, textarea, select { font-family: inherit; font-size: inherit; }
 
 .sidebar-logo-icon {
   width: 32px; height: 32px;
-  background: var(--color-primary);
   border-radius: var(--radius-md);
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: var(--font-size-lg); color: white;
+  object-fit: contain;
 }
 
 .sidebar-logo-text {
@@ -169,6 +167,18 @@ input, button, textarea, select { font-family: inherit; font-size: inherit; }
 
 .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.8; }
 .sidebar-nav-item.active svg { opacity: 1; }
+
+.sidebar-nav-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60A5FA;
+  line-height: 1.6;
+}
 
 .sidebar-footer {
   border-top: 1px solid rgba(255,255,255,0.08);
