@@ -1,63 +1,88 @@
-# Gthulhu Project
+# Gthulhu: Cloud-Native Workload Orchestration with eBPF and Custom Scheduling
 
 <a href="https://landscape.cncf.io/?item=provisioning--automation-configuration--gthulhu" target="_blank"><img src="https://img.shields.io/badge/CNCF%20Landscape-5699C6?style=for-the-badge&logo=cncf&label=cncf" alt="cncf landscape" /></a>
+
+<a href="https://ebpf.io/applications/" target="_blank"><img src="https://img.shields.io/badge/eBPF%20Application%20Landscape-5699C6?style=for-the-badge&logo=ebpf&label=ebpf" alt="ebpf landscape" /></a>
+
 [![LFX Contributors](https://insights.linuxfoundation.org/api/badge/contributors?project=gthulhu)](https://insights.linuxfoundation.org/project/gthulhu)
 [![Go](https://github.com/Gthulhu/Gthulhu/actions/workflows/go.yaml/badge.svg)](https://github.com/Gthulhu/Gthulhu/actions/workflows/go.yaml)
 [![Portability](https://github.com/Gthulhu/Gthulhu/actions/workflows/portability.yaml/badge.svg)](https://github.com/Gthulhu/Gthulhu/actions/workflows/portability.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Gthulhu/Gthulhu)](https://goreportcard.com/report/github.com/Gthulhu/Gthulhu)
 
-<img src="./assets/logo.png" alt="logo" width="300"/>
+<img src="./assets/logo.svg" alt="logo" width="300"/>
 
 ## Overview
 
-Gthulhu aims to provide an orchestrable, distributed scheduler solution for the cloud-native ecosystem to meet the dynamic and diverse needs of cloud-native applications, such as:
-- Trading systems requiring low-latency processing capabilities
-- Big data analytics requiring high-throughput computing resources
-- Machine learning tasks requiring flexible resource allocation
+Gthulhu is a cloud-native workload orchestration platform that provides granular, pod-level scheduling observability and automated scaling for Kubernetes workloads. Through an intuitive web GUI, users can select workloads running on Kubernetes, monitor fine-grained scheduling metrics collected via eBPF, and configure automatic scaling policies powered by KEDA — all without modifying the kernel or application code. For clusters running Linux 6.12+ with `sched_ext`, Gthulhu further supports defining scheduling strategies and distributing scheduling intents to each node, enabling kernel-level custom CPU scheduling across the cluster.
 
-The default Linux Kernel scheduler emphasizes fairness and cannot be optimized for the specific needs of different applications.
-Moreover, when these applications run in a distributed architecture, traditional schedulers often fail to effectively coordinate and allocate resources, leading to performance bottlenecks and resource waste.
+![](https://private-user-images.githubusercontent.com/264927932/567637553-6d15bd51-fb69-4f6b-99e6-88ef1ebd0d44.gif?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzQyNTk0MzgsIm5iZiI6MTc3NDI1OTEzOCwicGF0aCI6Ii8yNjQ5Mjc5MzIvNTY3NjM3NTUzLTZkMTViZDUxLWZiNjktNGY2Yi05OWU2LTg4ZWYxZWJkMGQ0NC5naWY_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjYwMzIzJTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI2MDMyM1QwOTQ1MzhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT04NWE4MzYzZmZiNGI3ZjExMzEwMWUyZDFlOGI2ZmQ1MDU4MzhlMzhmNzIwN2Q1MWJlNjA2ZjVkMWMxYzFiZjk2JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.UHX8hLMZ5jL6xRwL3sxOuKVub_RlLRVt0pOfbCutc-A)
+
+> Please visit https://youtu.be/Cyjrh9cW1a8 for a demo video showcasing Gthulhu's capabilities.
+
+### Key Capabilities
+
+- **Pod-Level Scheduling Metrics** — Gthulhu uses eBPF to hook into kernel scheduling events (`fentry`/`fexit`), collecting per-process metrics such as voluntary/involuntary context switches, CPU time, wait time, run count, and CPU migrations. These metrics are aggregated at the pod level and exposed via REST APIs.
+- **Declarative Configuration** — Users define which workloads to monitor using Kubernetes label selectors and namespaces, either through the web GUI or the `PodSchedulingMetrics` CRD.
+- **KEDA Auto-Scaling Integration** — Gthulhu provides out-of-the-box integration with [KEDA](https://keda.sh/), enabling auto-scaling decisions driven by real scheduling behavior rather than generic resource utilization.
+- **Advanced: Scheduling Strategies & Intents** *(requires Linux 6.12+ with `sched_ext`)* — Users can define scheduling strategies (priority, time-slice, CPU affinity) for specific workloads via the web GUI or REST API. The Manager converts strategies into scheduling intents and distributes them to Decision Makers on each node, enabling cross-node coordinated scheduling policy enforcement.
+- **Advanced: Custom CPU Scheduling** *(requires Linux 6.12+ with `sched_ext`)* — On nodes running a supported kernel, Gthulhu attaches a custom eBPF-based CPU scheduler through the `sched_ext` mechanism, applying the scheduling intents at the kernel level — including priority-based dispatching, dynamic time-slice tuning, and preemption control — without modifying the kernel itself.
+
+### Why Gthulhu?
+
+The default Linux kernel scheduler emphasizes fairness and cannot be optimized for the specific needs of individual applications. Cloud-native workloads — trading systems, big data analytics, ML training — all have different scheduling requirements. Gthulhu bridges this gap by:
+
+1. **Making scheduling visible** — exposing kernel-level scheduling behavior as actionable metrics
+2. **Making scaling smarter** — driving auto-scaling from actual scheduling pressure, not just CPU/memory averages
+3. **Making scheduling tunable** (advanced) — allowing per-workload CPU scheduling policies on supported kernels
+
+### Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                              Gthulhu Architecture                               │
-├─────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                 │
-│   ┌─────────────┐         ┌─────────────────────┐         ┌─────────────────┐   │
-│   │    User     │ ──────▶ │      Manager        │ ──────▶ │    MongoDB      │   │
-│   │  (Web UI)   │         │ (Central Management)│         │  (Persistence)  │   │
-│   └─────────────┘         └──────────┬──────────┘         └─────────────────┘   │
-│                                      │                                          │
-│                                      │ Query Pods via K8s API                   │
-│                                      ▼                                          │
-│                           ┌─────────────────────┐                               │
-│                           │   Kubernetes API    │                               │
-│                           │   (Pod Informer)    │                               │
-│                           └─────────────────────┘                               │
-│                                      │                                          │
-│              ┌───────────────────────┼───────────────────────┐                  │
-│              │                       │                       │                  │
-│              ▼                       ▼                       ▼                  │
-│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐           │
-│   │ Decision Maker  │     │ Decision Maker  │     │ Decision Maker  │           │
-│   │   (Node 1)      │     │   (Node 2)      │     │   (Node N)      │           │
-│   └────────┬────────┘     └────────┬────────┘     └────────┬────────┘           │
-│            │                       │                       │                    │
-│            ▼                       ▼                       ▼                    │
-│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐           │
-│   │  sched_ext      │     │  sched_ext      │     │  sched_ext      │           │
-│   │ (eBPF Scheduler)│     │ (eBPF Scheduler)│     │ (eBPF Scheduler)│           │
-│   └─────────────────┘     └─────────────────┘     └─────────────────┘           │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                             Gthulhu Architecture                                 │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                  │
+│   ┌──────────────┐        ┌──────────────────────┐        ┌─────────────────┐    │
+│   │    User      │──────▶ │      Manager         │──────▶ │    MongoDB      │    │
+│   │  (Web GUI)   │        │ (Central Management) │        │  (Persistence)  │    │
+│   └──────────────┘        └──────────┬───────────┘        └─────────────────┘    │
+│                                      │                                           │
+│                      ┌───────────────┼───────────────┐                           │
+│                      │               │               │                           │
+│                      ▼               ▼               ▼                           │
+│           ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                     │
+│           │Decision Maker│ │Decision Maker│ │Decision Maker│  (DaemonSet)        │
+│           │   (Node 1)   │ │   (Node 2)   │ │   (Node N)   │                     │
+│           └──────┬───────┘ └──────┬───────┘ └──────┬───────┘                     │
+│                  │                │                │                              │
+│          ┌───────┴───────┐ ┌──────┴───────┐ ┌─────┴────────┐                     │
+│          ▼               ▼ ▼              ▼ ▼              ▼                      │
+│   ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐                    │
+│   │eBPF Metrics│ │ sched_ext  │ │eBPF Metrics│ │ sched_ext  │                    │
+│   │ Collector  │ │ Scheduler* │ │ Collector  │ │ Scheduler* │                    │
+│   └──────┬─────┘ └────────────┘ └──────┬─────┘ └────────────┘                    │
+│          │                              │                                        │
+│          ▼                              ▼               ┌─────────────────┐       │
+│   ┌────────────────────────────────────────────┐        │      KEDA       │       │
+│   │       Prometheus / Grafana Dashboards      │───────▶│  (Auto-Scaler)  │       │
+│   └────────────────────────────────────────────┘        └─────────────────┘       │
+│                                                                                  │
+│   * sched_ext scheduler requires Linux 6.12+ (advanced feature)                  │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Gthulhu allows users to configure scheduling strategies via REST APIs. The Gthulhu Control Plane (https://github.com/Gthulhu/api) then distributes these strategies to the Gthulhu Scheduler on each node, enabling cross-node coordinated scheduling and resource management.
+**How it works:**
 
-Here is important information about Gthulhu:
-- Gthulhu is a scheduler developed using eBPF and Golang, with core components defined in the [qumun framework](https://github.com/Gthulhu/qumun), which allows you to develop custom Linux schedulers in Go without modifying the kernel directly—leveraging the eBPF/sched_ext mechanism to implement customized scheduling policies. This is also the technical foundation that enables Gthulhu to provide an orchestrable, distributed scheduler.
-- Gthulhu provides a [helm chart](https://github.com/Gthulhu/chart/tree/main/gthulhu) for easy deployment on Kubernetes clusters, which includes the tech stack that Gthulhu depends on.
-- For real-world use cases of Gthulhu, please refer to [Improving Network Performance with Custom eBPF-based Schedulers](https://free5gc.org/blog/20250726/index.en/).
+1. Users select Kubernetes workloads through the **Web GUI** (or `PodSchedulingMetrics` CRD) and define monitoring/scheduling policies.
+2. The **Manager** persists configurations, queries pods via the Kubernetes API (Informer), and distributes intents to Decision Makers.
+3. Each **Decision Maker** (deployed as a DaemonSet) runs on every node and attaches eBPF programs to kernel scheduling hooks to collect per-process metrics in real time.
+4. Metrics are aggregated at the pod level and exported to **Prometheus**, enabling Grafana dashboards and **KEDA**-driven auto-scaling.
+5. On nodes with Linux 6.12+ and `sched_ext` support, the advanced **custom scheduler** can be activated for priority-based dispatching and time-slice tuning.
+
+**Key links:**
+- Core scheduling framework: [qumun](https://github.com/Gthulhu/qumun) — build custom Linux schedulers in Go using eBPF/sched_ext, without modifying the kernel
+- Deployment: [Helm chart](https://github.com/Gthulhu/chart/tree/main/gthulhu) for Kubernetes clusters
+- Real-world use case: [Improving Network Performance with Custom eBPF-based Schedulers](https://free5gc.org/blog/20250726/index.en/)
 
 
 ### Meaning of the Name
@@ -68,20 +93,20 @@ The prefix “G” comes from Golang, the language at the core of this project, 
 
 Underneath, Gthulhu runs on the qumun framework (qumun means “heart” in the Bunun language, an Indigenous people of Taiwan), reflecting the role of a scheduler as the beating heart of the operating system. This not only emphasizes its central importance in orchestrating workloads but also shares a piece of Taiwan’s Indigenous culture with the global open-source community.
 
-## DEMO
-
-Click the image below to see our DEMO on YouTube!
-<a href="https://www.youtube.com/watch?v=MfU64idQcHg" target="_blank">
-<img src="./assets/preview.png" alt="preview" width="300"/>
-</a>
-
 ## Prerequisites
 
-To build and run Gthulhu, ensure you have the following prerequisites installed on your system
+To build and run Gthulhu, ensure you have the following prerequisites installed on your system:
+
+**Core (Metrics Collection & Monitoring):**
 - Go 1.22+
 - LLVM/Clang 17+
 - libbpf
-- Linux kernel 6.12+ with sched_ext support
+- Linux kernel with eBPF support (5.x+)
+
+**Advanced (Custom CPU Scheduling):**
+- Linux kernel 6.12+ with `sched_ext` support (`CONFIG_SCHED_CLASS_EXT`)
+
+> **Note:** The eBPF metrics collection feature works on a wide range of kernels and does not require `sched_ext`. The custom CPU scheduling feature requires Linux 6.12+ which may not be available on all managed Kubernetes platforms (e.g., GKE currently does not support it).
 
 See [Installation guide](https://gthulhu.org/installation/) for detailed installation instructions.
 

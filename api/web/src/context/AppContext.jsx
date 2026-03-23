@@ -112,6 +112,34 @@ export function AppProvider({ children }) {
     showToast('success', 'Configuration saved successfully');
   }, [showToast]);
 
+  // Fetch current user profile
+  const fetchCurrentUser = useCallback(async () => {
+    if (!jwtToken) return;
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + jwtToken,
+      };
+      const base = apiBaseUrl ? apiBaseUrl.replace(/\/$/, '') : '';
+      const response = await fetch(base + '/api/v1/users/self', { headers });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data) {
+          setCurrentUser(data.data);
+        }
+      }
+    } catch {
+      /* silent – user info is non-critical */
+    }
+  }, [jwtToken, apiBaseUrl]);
+
+  // Auto-fetch user profile when authenticated
+  useEffect(() => {
+    if (isAuthenticated && jwtToken) {
+      fetchCurrentUser();
+    }
+  }, [isAuthenticated, jwtToken, fetchCurrentUser]);
+
   // Handle token from URL (OAuth flows)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
