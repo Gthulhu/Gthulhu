@@ -15,6 +15,8 @@
 
 Gthulhu is a cloud-native workload orchestration platform that provides granular, pod-level scheduling observability and automated scaling for Kubernetes workloads. Through an intuitive web GUI, users can select workloads running on Kubernetes, monitor fine-grained scheduling metrics collected via eBPF, and configure automatic scaling policies powered by KEDA — all without modifying the kernel or application code. For clusters running Linux 6.12+ with `sched_ext`, Gthulhu further supports defining scheduling strategies and distributing scheduling intents to each node, enabling kernel-level custom CPU scheduling across the cluster.
 
+![](https://gist.github.com/ianchen0119/62c65aa4d72c13fd165de0952dba771d/raw/bccd17feabdd59574400ccb220955a4aea21a82b/Gthulhu.gif)
+
 ### Key Capabilities
 
 - **Pod-Level Scheduling Metrics** — Gthulhu uses eBPF to hook into kernel scheduling events (`fentry`/`fexit`), collecting per-process metrics such as voluntary/involuntary context switches, CPU time, wait time, run count, and CPU migrations. These metrics are aggregated at the pod level and exposed via REST APIs.
@@ -88,13 +90,6 @@ The name Gthulhu is inspired by Cthulhu, a mythical creature known for its many 
 The prefix “G” comes from Golang, the language at the core of this project, highlighting both its technical foundation and its developer-friendly design.
 
 Underneath, Gthulhu runs on the qumun framework (qumun means “heart” in the Bunun language, an Indigenous people of Taiwan), reflecting the role of a scheduler as the beating heart of the operating system. This not only emphasizes its central importance in orchestrating workloads but also shares a piece of Taiwan’s Indigenous culture with the global open-source community.
-
-## DEMO
-
-Click the image below to see our DEMO on YouTube!
-<a href="https://www.youtube.com/watch?v=MfU64idQcHg" target="_blank">
-<img src="./assets/preview.png" alt="preview" width="300"/>
-</a>
 
 ## Prerequisites
 
