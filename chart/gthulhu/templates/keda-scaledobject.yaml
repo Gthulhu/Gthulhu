@@ -1,0 +1,38 @@
+{{/*
+KEDA ScaledObject template.
+Generated for every PodSchedulingMetrics CR that has .spec.scaling.enabled=true.
+Requires KEDA to be installed in the cluster and the Prometheus trigger to be available.
+
+Usage: enable via values.yaml → keda.enabled = true
+The actual ScaledObject CRs are created by the Manager when it processes
+PodSchedulingMetrics CRDs with scaling hints.
+
+This template provides a default/example ScaledObject for reference.
+*/}}
+{{- if and .Values.keda.enabled .Values.keda.example.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-example-scaler
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keda-scaler
+spec:
+  scaleTargetRef:
+    apiVersion: {{ .Values.keda.example.scaleTargetRef.apiVersion | default "apps/v1" }}
+    kind: {{ .Values.keda.example.scaleTargetRef.kind | default "Deployment" }}
+    name: {{ .Values.keda.example.scaleTargetRef.name }}
+  pollingInterval: {{ .Values.keda.example.pollingInterval | default 30 }}
+  cooldownPeriod: {{ .Values.keda.example.cooldownPeriod | default 300 }}
+  minReplicaCount: {{ .Values.keda.example.minReplicaCount | default 1 }}
+  maxReplicaCount: {{ .Values.keda.example.maxReplicaCount | default 10 }}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheusAddress }}
+        metricName: {{ .Values.keda.example.metricName | default "gthulhu_pod_voluntary_ctx_switches_total" }}
+        query: >-
+          sum(rate({{ .Values.keda.example.metricName | default "gthulhu_pod_voluntary_ctx_switches_total" }}
+          {namespace="{{ .Values.keda.example.targetNamespace | default "default" }}"}[5m]))
+        threshold: {{ .Values.keda.example.threshold | quote }}
+{{- end }}

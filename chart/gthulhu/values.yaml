@@ -19,7 +19,7 @@ scheduler:
   image:
     repository: ghcr.io/gthulhu/gthulhu
     pullPolicy: Always
-    tag: "1.0.0"
+    tag: "develop"
   
   # Scheduler requires privileged access for BPF operations
   securityContext:
@@ -61,7 +61,7 @@ scheduler:
     image:
       repository: ghcr.io/gthulhu/gthulhu-api
       pullPolicy: Always
-      tag: "1.0.0"
+      tag: "develop"
     
     # Sidecar port configuration
     port: 8080
@@ -111,7 +111,7 @@ manager:
   image:
     repository: ghcr.io/gthulhu/gthulhu-api
     pullPolicy: Always
-    tag: "1.0.0"
+    tag: "develop"
   
   # Manager port configuration
   port: 8080
@@ -290,9 +290,63 @@ persistence:
 
 # Monitoring and observability
 monitoring:
-  enabled: false
+  enabled: true
   path: /metrics
   serviceMonitor:
-    enabled: false
+    enabled: true
     labels: {}
     interval: 30s
+
+# ── KEDA Auto-Scaling Integration ──
+# Requires: KEDA operator installed in the cluster
+# Metrics flow: Monitor eBPF → Prometheus → KEDA Prometheus trigger → HPA
+keda:
+  enabled: false
+  # Prometheus server address used by KEDA's prometheus trigger
+  prometheusAddress: http://prometheus-kube-prometheus-prometheus.monitoring:9090
+  # Example ScaledObject (set enabled=true and configure to deploy)
+  example:
+    enabled: false
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: my-workload
+    targetNamespace: default
+    metricName: gthulhu_pod_voluntary_ctx_switches_total
+    threshold: "100"
+    pollingInterval: 30
+    cooldownPeriod: 300
+    minReplicaCount: 1
+    maxReplicaCount: 10
+
+# ── Prometheus Adapter Configuration ──
+# Maps Gthulhu pod scheduling metrics to Kubernetes custom metrics API
+# so HPA / KEDA can query them via the metrics.k8s.io aggregation layer.
+prometheusAdapter:
+  enabled: false
+  # Rules to register custom metrics from Gthulhu's Prometheus metrics
+  rules:
+    - seriesQuery: 'gthulhu_pod_voluntary_ctx_switches_total{namespace!="",pod_name!=""}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod_name: {resource: "pod"}
+      name:
+        as: "gthulhu_voluntary_ctx_switches_rate"
+      metricsQuery: 'sum(rate(<<.Series>>{<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>)'
+    - seriesQuery: 'gthulhu_pod_cpu_time_nanoseconds_total{namespace!="",pod_name!=""}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod_name: {resource: "pod"}
+      name:
+        as: "gthulhu_cpu_time_rate"
+      metricsQuery: 'sum(rate(<<.Series>>{<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>)'
+    - seriesQuery: 'gthulhu_pod_involuntary_ctx_switches_total{namespace!="",pod_name!=""}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod_name: {resource: "pod"}
+      name:
+        as: "gthulhu_involuntary_ctx_switches_rate"
+      metricsQuery: 'sum(rate(<<.Series>>{<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>)'

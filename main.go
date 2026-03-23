@@ -21,6 +21,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/Gthulhu/Gthulhu/internal/config"
+	"github.com/Gthulhu/Gthulhu/monitor"
 	"github.com/Gthulhu/plugin/models"
 	"github.com/Gthulhu/plugin/plugin"
 	"github.com/Gthulhu/plugin/plugin/gthulhu"
@@ -60,6 +61,47 @@ func main() {
 		panic(err)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// ── Monitor (base feature, works on Linux 5.2+ BTF kernels) ──
+	if cfg.IsMonitorEnabled() {
+		monCfg := monitor.Config{
+			BPFObjectPath:         cfg.Monitor.BPFObjectPath,
+			CollectionIntervalSec: cfg.Monitor.CollectionIntervalSec,
+			MonitorAll:            cfg.Monitor.MonitorAll,
+			StreamEvents:          cfg.Monitor.StreamEvents,
+			PrometheusPort:        cfg.Monitor.PrometheusPort,
+			NodeName:              os.Getenv("NODE_NAME"),
+			EnableCRDWatcher:      cfg.Monitor.EnableCRDWatcher,
+			KubeConfigPath:        cfg.Monitor.KubeConfigPath,
+		}
+		go func() {
+			slog.Info("starting scheduling monitor",
+				"bpfObject", monCfg.BPFObjectPath,
+				"prometheusPort", monCfg.PrometheusPort,
+				"monitorAll", monCfg.MonitorAll,
+			)
+			if err := monitor.StartMonitor(ctx, monCfg, slog.Default()); err != nil {
+				slog.Error("monitor goroutine error", "error", err)
+			}
+		}()
+	}
+
+	// ── Scheduler (advanced feature, requires sched_ext / Linux 6.12+) ──
+	if !cfg.IsSchedulerEnabled() {
+		slog.Info("running in monitor-only mode (no scheduler mode configured)")
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		select {
+		case sig := <-sigCh:
+			slog.Info("received signal, shutting down", "signal", sig)
+		case <-ctx.Done():
+		}
+		slog.Info("Gthulhu exit")
+		return
+	}
+
 	// Apply scheduler configuration before loading eBPF program
 	schedConfig := cfg.GetSchedulerConfig()
 
@@ -68,8 +110,6 @@ func main() {
 	SLICE_NS_DEFAULT = cfg.Scheduler.SliceNsDefault
 	SLICE_NS_MIN = cfg.Scheduler.SliceNsMin
 	slog.Info("Scheduler configuration", "SliceNsDefault", SLICE_NS_DEFAULT, "SliceNsMin", SLICE_NS_MIN)
-
-	ctx, cancel := context.WithCancel(context.Background())
 	config := &plugin.SchedConfig{
 		Mode: schedConfig.Mode,
 		Scheduler: plugin.Scheduler{

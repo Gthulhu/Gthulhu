@@ -2,7 +2,7 @@ name: Helm Lint
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
     paths:
       - 'chart/gthulhu/**'
       - '.github/workflows/helm-lint.yaml'

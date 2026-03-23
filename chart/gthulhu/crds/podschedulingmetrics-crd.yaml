@@ -1,0 +1,206 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: podschedulingmetrics.gthulhu.io
+  annotations:
+    gthulhu.io/description: "Defines which pods to monitor for scheduling metrics"
+spec:
+  group: gthulhu.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required:
+            - spec
+          properties:
+            spec:
+              type: object
+              required:
+                - labelSelectors
+              properties:
+                # --- Selector ---
+                labelSelectors:
+                  type: array
+                  description: "Label selectors to match target pods"
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - key
+                      - value
+                    properties:
+                      key:
+                        type: string
+                      value:
+                        type: string
+                k8sNamespaces:
+                  type: array
+                  description: "Kubernetes namespaces to scope the selector (empty = all namespaces)"
+                  items:
+                    type: string
+                commandRegex:
+                  type: string
+                  description: "Regex filter for process command within matched pods"
+
+                # --- Collection control ---
+                collectionIntervalSeconds:
+                  type: integer
+                  format: int32
+                  default: 10
+                  minimum: 1
+                  maximum: 3600
+                  description: "How often to aggregate and export metrics (seconds)"
+                enabled:
+                  type: boolean
+                  default: true
+                  description: "Enable or disable collection for this resource"
+
+                # --- Metrics to collect (explicit flags) ---
+                metrics:
+                  type: object
+                  description: "Which scheduling metrics to collect"
+                  properties:
+                    voluntaryCtxSwitches:
+                      type: boolean
+                      default: true
+                      description: "Collect voluntary context switch count"
+                    involuntaryCtxSwitches:
+                      type: boolean
+                      default: true
+                      description: "Collect involuntary context switch count"
+                    cpuTimeNs:
+                      type: boolean
+                      default: true
+                      description: "Collect total CPU time in nanoseconds"
+                    waitTimeNs:
+                      type: boolean
+                      default: false
+                      description: "Collect total run-queue wait time in nanoseconds"
+                    runCount:
+                      type: boolean
+                      default: false
+                      description: "Collect number of times tasks were scheduled"
+                    cpuMigrations:
+                      type: boolean
+                      default: false
+                      description: "Collect CPU migration count"
+
+                # --- KEDA auto-scaling hints ---
+                scaling:
+                  type: object
+                  description: "Optional KEDA auto-scaling hints attached to this metric source"
+                  properties:
+                    enabled:
+                      type: boolean
+                      default: false
+                      description: "Enable KEDA ScaledObject generation for this resource"
+                    metricName:
+                      type: string
+                      description: "Prometheus metric name to use as KEDA trigger (e.g. gthulhu_pod_voluntary_ctx_switches_total)"
+                    targetValue:
+                      type: string
+                      description: "Target metric threshold for scaling (e.g. '100')"
+                    scaleTargetRef:
+                      type: object
+                      description: "Kubernetes workload to scale"
+                      properties:
+                        apiVersion:
+                          type: string
+                          default: "apps/v1"
+                        kind:
+                          type: string
+                          default: "Deployment"
+                        name:
+                          type: string
+                    minReplicaCount:
+                      type: integer
+                      format: int32
+                      default: 1
+                    maxReplicaCount:
+                      type: integer
+                      format: int32
+                      default: 10
+                    cooldownPeriod:
+                      type: integer
+                      format: int32
+                      default: 300
+                      description: "Cooldown period in seconds before scaling down"
+
+                # --- Metadata ---
+                creatorID:
+                  type: string
+                updaterID:
+                  type: string
+                createdTime:
+                  type: integer
+                  format: int64
+                updatedTime:
+                  type: integer
+                  format: int64
+
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum:
+                    - Pending
+                    - Active
+                    - Error
+                  description: "Current phase of the metric collection"
+                matchedPodCount:
+                  type: integer
+                  format: int32
+                  description: "Number of pods currently matched by selectors"
+                lastCollectionTime:
+                  type: string
+                  format: date-time
+                  description: "Timestamp of last successful metric collection"
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+                      reason:
+                        type: string
+                      message:
+                        type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Enabled
+          type: boolean
+          jsonPath: .spec.enabled
+        - name: Interval
+          type: integer
+          jsonPath: .spec.collectionIntervalSeconds
+        - name: Matched Pods
+          type: integer
+          jsonPath: .status.matchedPodCount
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Last Collection
+          type: date
+          jsonPath: .status.lastCollectionTime
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: podschedulingmetrics
+    singular: podschedulingmetrics
+    kind: PodSchedulingMetrics
+    shortNames:
+      - psm

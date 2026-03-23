@@ -10,8 +10,8 @@ WARMUP_TIME=15
 
 echo "Starting scheduler test..."
 
-# Run scheduler in background
-timeout ${TIMEOUT_DURATION} ./main > "${LOGFILE}" 2>&1 &
+# Run scheduler in background with test config
+timeout ${TIMEOUT_DURATION} ./main -config testcase/test_config.yaml > "${LOGFILE}" 2>&1 &
 SCHED_PID=$!
 
 echo "Scheduler PID: ${SCHED_PID}"

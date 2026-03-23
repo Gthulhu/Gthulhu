@@ -49,6 +49,13 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		// pod-pid mapping routes
 		apiV1.GET("/nodes", h.echoHandler(h.ListNodes), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PodPIDMappingRead)))
 		apiV1.GET("/nodes/:nodeID/pods/pids", h.echoHandlerWithParams(h.GetNodePodPIDMapping), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PodPIDMappingRead)))
+
+		// pod scheduling metrics routes
+		apiV1.POST("/pod-scheduling-metrics", h.echoHandler(h.CreatePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMCreate)))
+		apiV1.GET("/pod-scheduling-metrics", h.echoHandler(h.ListPodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMRead)))
+		apiV1.GET("/pod-scheduling-metrics/runtime", h.echoHandler(h.ListPodSchedulingMetricValues), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMRead)))
+		apiV1.PUT("/pod-scheduling-metrics", h.echoHandler(h.UpdatePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMUpdate)))
+		apiV1.DELETE("/pod-scheduling-metrics", h.echoHandler(h.DeletePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMDelete)))
 	}
 
 }

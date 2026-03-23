@@ -19,6 +19,10 @@ const (
 	ScheduleIntentRead     PermissionKey = "schedule_intent.read"
 	ScheduleIntentDelete   PermissionKey = "schedule_intent.delete"
 	PodPIDMappingRead      PermissionKey = "pod_pid_mapping.read"
+	PSMCreate              PermissionKey = "pod_scheduling_metrics.create"
+	PSMRead                PermissionKey = "pod_scheduling_metrics.read"
+	PSMUpdate              PermissionKey = "pod_scheduling_metrics.update"
+	PSMDelete              PermissionKey = "pod_scheduling_metrics.delete"
 )
 
 const (

@@ -71,6 +71,11 @@ type Repository interface {
 	DeleteStrategy(ctx context.Context, strategyID bson.ObjectID) error
 	DeleteIntents(ctx context.Context, intentIDs []bson.ObjectID) error
 	DeleteIntentsByStrategyID(ctx context.Context, strategyID bson.ObjectID) error
+
+	CreatePSM(ctx context.Context, psm *PodSchedulingMetrics) error
+	QueryPSMs(ctx context.Context, opt *QueryPSMOptions) error
+	UpdatePSM(ctx context.Context, psm *PodSchedulingMetrics) error
+	DeletePSM(ctx context.Context, name string) error
 }
 
 type Service interface {
@@ -98,6 +103,12 @@ type Service interface {
 	GetPodPIDMapping(ctx context.Context, nodeID string) (*PodPIDMappingResponse, error)
 	ListNodes(ctx context.Context) ([]*Node, error)
 	ReconcileIntents(ctx context.Context) error
+
+	CreatePodSchedulingMetrics(ctx context.Context, operator *Claims, psm *PodSchedulingMetrics) error
+	ListPodSchedulingMetrics(ctx context.Context, opt *QueryPSMOptions) error
+	ListPodSchedulingMetricValues(ctx context.Context) (*PodSchedulingMetricValuesResult, error)
+	UpdatePodSchedulingMetrics(ctx context.Context, operator *Claims, name string, psm *PodSchedulingMetrics) error
+	DeletePodSchedulingMetrics(ctx context.Context, operator *Claims, name string) error
 }
 
 type QueryPodsOptions struct {
@@ -128,4 +139,5 @@ type DecisionMakerAdapter interface {
 	GetIntentMerkleRoot(ctx context.Context, decisionMaker *DecisionMakerPod) (string, error)
 	DeleteSchedulingIntents(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteIntentsRequest) error
 	GetPodPIDMapping(ctx context.Context, decisionMaker *DecisionMakerPod) (*PodPIDMappingResponse, error)
+	GetPodSchedulingMetricValues(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)
 }

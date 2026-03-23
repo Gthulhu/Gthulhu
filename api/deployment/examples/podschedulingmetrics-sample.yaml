@@ -1,0 +1,33 @@
+# Example: Monitor all pods with label app=production-server in default namespace
+# and enable KEDA auto-scaling based on voluntary context switch rate.
+apiVersion: gthulhu.io/v1alpha1
+kind: PodSchedulingMetrics
+metadata:
+  name: production-server-metrics
+  namespace: default
+spec:
+  labelSelectors:
+    - key: app
+      value: production-server
+  k8sNamespaces:
+    - default
+  collectionIntervalSeconds: 10
+  enabled: true
+  metrics:
+    voluntaryCtxSwitches: true
+    involuntaryCtxSwitches: true
+    cpuTimeNs: true
+    waitTimeNs: true
+    runCount: false
+    cpuMigrations: false
+  scaling:
+    enabled: true
+    metricName: gthulhu_pod_voluntary_ctx_switches_total
+    targetValue: "100"
+    scaleTargetRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: production-server
+    minReplicaCount: 1
+    maxReplicaCount: 10
+    cooldownPeriod: 300

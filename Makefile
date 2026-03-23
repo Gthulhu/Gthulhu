@@ -79,6 +79,11 @@ BPF_TARGET = ${TARGET:=.bpf}
 BPF_C = ${BPF_TARGET:=.c}
 BPF_OBJ = ${BPF_C:.c=.o}
 
+# Monitor BPF target
+MONITOR_BPF_SRC = monitor/bpf/sched_monitor.bpf.c
+MONITOR_BPF_OBJ = sched_monitor.bpf.o
+MONITOR_BPF_DIR = monitor/bpf
+
 BASEDIR = $(abspath .)
 LIBBPF_INCLUDE_UAPI = $(abspath ./libbpf/include/uapi)
 CLANG_BPF_SYS_INCLUDES := `shell $(CLANG) -v -E - </dev/null 2>&1 | sed -n '/<...> search starts here:/,/End of search list./{ s| \(/.*\)|-idirafter \1|p }'`
@@ -86,8 +91,21 @@ CGOFLAG = $(GOARCH_ENV) CC=$(CGO_CC) CGO_CFLAGS="-I$(BASEDIR) -I$(BASEDIR)/qumun
 STATIC=
 
 .PHONY: build
-build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper
+build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper monitor-bpf
 	$(CGOFLAG) go build -ldflags "-w -s" main.go
+
+# Build monitor eBPF object (sched_monitor.bpf.o)
+.PHONY: monitor-bpf
+monitor-bpf: $(MONITOR_BPF_OBJ)
+
+$(MONITOR_BPF_OBJ): $(MONITOR_BPF_SRC) $(MONITOR_BPF_DIR)/sched_monitor.h
+	@echo "==> Generating vmlinux.h for monitor BPF"
+	bpftool/src/bpftool btf dump file /sys/kernel/btf/vmlinux format c > $(MONITOR_BPF_DIR)/vmlinux.h
+	@echo "==> Compiling monitor BPF: $@"
+	$(CLANG) -g -O2 -target bpf \
+		$(ARCH_DEFINE) \
+		-I $(MONITOR_BPF_DIR) \
+		-c $(MONITOR_BPF_SRC) -o $@
 
 # Build for ARM64 architecture
 .PHONY: build-arm64
@@ -104,6 +122,11 @@ lint: build
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" main.go
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./internal/...
 	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./util/...
+	$(CGOFLAG) go vet -ldflags "-w -s $(STATIC)" ./monitor/...
+
+.PHONY: test-monitor
+test-monitor:
+	$(CGOFLAG) go test -v -count=1 ./monitor/...
 
 # Build the gthulhu-cli tool (pure Go, no BPF dependencies)
 .PHONY: cli
@@ -228,3 +251,5 @@ clean:
 	rm *.skeleton.h || true
 	rm *.ll *.o || true
 	rm main || true
+	rm -f $(MONITOR_BPF_OBJ) || true
+	rm -f $(MONITOR_BPF_DIR)/vmlinux.h || true
