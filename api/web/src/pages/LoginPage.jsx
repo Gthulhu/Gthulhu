@@ -29,7 +29,10 @@ export default function LoginPage() {
       });
       const data = await response.json();
       if (response.ok && data.success) {
-        login(data.data.token);
+        login({
+          accessToken: data.data.accessToken || data.data.token,
+          refreshToken: data.data.refreshToken || ''
+        });
         showToast('success', 'Logged in successfully');
       } else {
         showToast('error', data.message || 'Login failed');

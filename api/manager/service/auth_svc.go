@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	goerrors "errors"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"time"
@@ -10,6 +13,7 @@ import (
 	"github.com/Gthulhu/api/manager/errs"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	"github.com/rs/xid"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -31,28 +35,248 @@ func (svc *Service) CreateNewUser(ctx context.Context, operator *domain.Claims, 
 	return nil
 }
 
-func (svc *Service) Login(ctx context.Context, username, password string) (string, error) {
+func (svc *Service) Login(ctx context.Context, username, password string) (domain.TokenPair, error) {
 	user, err := svc.getUserByUserName(ctx, username)
 	if err != nil {
-		return "", err
+		return domain.TokenPair{}, err
 	}
 	if user.Status == domain.UserStatusInactive {
-		return "", errs.NewHTTPStatusError(http.StatusUnauthorized, "user is inactive", fmt.Errorf("username %s is inactive", username))
+		return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "user is inactive", fmt.Errorf("username %s is inactive", username))
 	}
 
 	ok, err := user.Password.Cmp(password)
 	if err != nil {
-		return "", errors.WithMessagef(err, "compare password for username %s failed", username)
+		return domain.TokenPair{}, errors.WithMessagef(err, "compare password for username %s failed", username)
 	}
 	if !ok {
-		return "", errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid password", fmt.Errorf("compare password for username %s not match", username))
+		return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid password", fmt.Errorf("compare password for username %s not match", username))
 	}
-	token, err := svc.genJWTToken(ctx, user)
-	if err != nil {
-		return "", errors.WithMessage(err, "generate JWT token failed")
-	}
-	return token, nil
+	return svc.issueTokenPair(ctx, user)
 }
+
+func (svc *Service) RefreshToken(ctx context.Context, refreshToken string) (domain.TokenPair, error) {
+	claims, err := svc.parseAndValidateToken(refreshToken)
+	if err != nil {
+		return domain.TokenPair{}, err
+	}
+	if claims.TokenType != "refresh" {
+		return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid refresh token", errors.New("token type is not refresh"))
+	}
+	if claims.ID == "" {
+		return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid refresh token", errors.New("missing jti"))
+	}
+
+	uid, err := claims.GetBsonObjectUID()
+	if err != nil {
+		return domain.TokenPair{}, errors.WithMessagef(err, "invalid user ID %s", claims.UID)
+	}
+	user, err := svc.getUserByID(ctx, uid)
+	if err != nil {
+		return domain.TokenPair{}, err
+	}
+	if user.TokenVersion != claims.TokenVersion {
+		return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "refresh token revoked", errors.New("token version mismatch"))
+	}
+
+	refreshTokenHash := hashToken(refreshToken)
+	matched := false
+	now := time.Now()
+	for index := range user.RefreshTokens {
+		session := &user.RefreshTokens[index]
+		if session.JTI != claims.ID {
+			continue
+		}
+		if session.Revoked || session.IsExpired(now) {
+			return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "refresh token revoked", errors.New("session revoked or expired"))
+		}
+		if session.TokenHash != refreshTokenHash {
+			return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "refresh token revoked", errors.New("token hash mismatch"))
+		}
+		session.Revoked = true
+		matched = true
+		break
+	}
+	if !matched {
+		return domain.TokenPair{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "refresh token not found", errors.New("refresh session not found"))
+	}
+
+	user.UpdatedTime = time.Now().UnixMilli()
+	err = svc.Repo.UpdateUser(ctx, user)
+	if err != nil {
+		return domain.TokenPair{}, errors.WithMessage(err, "revoke old refresh session failed")
+	}
+
+	return svc.issueTokenPair(ctx, user)
+}
+
+func (svc *Service) Logout(ctx context.Context, refreshToken string) error {
+	claims, err := svc.parseAndValidateToken(refreshToken)
+	if err != nil {
+		return err
+	}
+	if claims.TokenType != "refresh" || claims.ID == "" {
+		return errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid refresh token", errors.New("invalid token type or missing jti"))
+	}
+
+	uid, err := claims.GetBsonObjectUID()
+	if err != nil {
+		return errors.WithMessagef(err, "invalid user ID %s", claims.UID)
+	}
+	user, err := svc.getUserByID(ctx, uid)
+	if err != nil {
+		return err
+	}
+
+	refreshTokenHash := hashToken(refreshToken)
+	updated := false
+	for index := range user.RefreshTokens {
+		session := &user.RefreshTokens[index]
+		if session.JTI == claims.ID && session.TokenHash == refreshTokenHash {
+			session.Revoked = true
+			updated = true
+			break
+		}
+	}
+	if !updated {
+		return errs.NewHTTPStatusError(http.StatusUnauthorized, "refresh token not found", errors.New("refresh session not found"))
+	}
+
+	user.UpdatedTime = time.Now().UnixMilli()
+	return svc.Repo.UpdateUser(ctx, user)
+}
+
+func (svc *Service) LogoutAll(ctx context.Context, userClaims *domain.Claims) error {
+	uid, err := userClaims.GetBsonObjectUID()
+	if err != nil {
+		return errors.WithMessagef(err, "invalid user ID %s", userClaims.UID)
+	}
+	user, err := svc.getUserByID(ctx, uid)
+	if err != nil {
+		return err
+	}
+
+	user.TokenVersion++
+	user.RefreshTokens = nil
+	user.UpdatedTime = time.Now().UnixMilli()
+	return svc.Repo.UpdateUser(ctx, user)
+}
+
+func (svc *Service) issueTokenPair(ctx context.Context, user *domain.User) (domain.TokenPair, error) {
+	accessToken, err := svc.genAccessToken(ctx, user)
+	if err != nil {
+		return domain.TokenPair{}, errors.WithMessage(err, "generate access token failed")
+	}
+	refreshToken, claims, err := svc.genRefreshToken(ctx, user)
+	if err != nil {
+		return domain.TokenPair{}, errors.WithMessage(err, "generate refresh token failed")
+	}
+
+	now := time.Now()
+	user.RefreshTokens = pruneRefreshSessions(user.RefreshTokens, now)
+	user.RefreshTokens = append(user.RefreshTokens, domain.RefreshSession{
+		JTI:       claims.ID,
+		TokenHash: hashToken(refreshToken),
+		ExpiresAt: claims.ExpiresAt.Time.Unix(),
+		Revoked:   false,
+	})
+	user.UpdatedTime = now.UnixMilli()
+	err = svc.Repo.UpdateUser(ctx, user)
+	if err != nil {
+		return domain.TokenPair{}, errors.WithMessage(err, "persist refresh session failed")
+	}
+
+	return domain.TokenPair{AccessToken: accessToken, RefreshToken: refreshToken}, nil
+}
+
+func pruneRefreshSessions(sessions []domain.RefreshSession, now time.Time) []domain.RefreshSession {
+	result := make([]domain.RefreshSession, 0, len(sessions))
+	for _, session := range sessions {
+		if session.Revoked || session.IsExpired(now) {
+			continue
+		}
+		result = append(result, session)
+	}
+	return result
+}
+
+func hashToken(token string) string {
+	hashValue := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hashValue[:])
+}
+
+func (svc *Service) parseAndValidateToken(tokenString string) (*domain.Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &domain.Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return svc.jwtPrivateKey.Public(), nil
+	})
+	if err != nil {
+		if goerrors.Is(err, jwt.ErrTokenExpired) ||
+			goerrors.Is(err, jwt.ErrTokenNotValidYet) ||
+			goerrors.Is(err, jwt.ErrTokenMalformed) ||
+			goerrors.Is(err, jwt.ErrTokenSignatureInvalid) ||
+			goerrors.Is(err, jwt.ErrTokenUnverifiable) ||
+			goerrors.Is(err, jwt.ErrTokenInvalidClaims) {
+			return nil, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid or expired token", err)
+		}
+		return nil, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid token", err)
+	}
+	claims, ok := token.Claims.(*domain.Claims)
+	if !ok || !token.Valid {
+		return nil, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid token claims", errors.New("invalid JWT token claims"))
+	}
+	return claims, nil
+}
+
+func (svc *Service) genAccessToken(ctx context.Context, user *domain.User) (string, error) {
+	tokenTTL := time.Duration(1) * time.Minute
+	uid := user.ID.Hex()
+
+	claims := domain.Claims{
+		UID:                uid,
+		NeedChangePassword: user.Status == domain.UserStatusWaitChangePassword,
+		TokenVersion:       user.TokenVersion,
+		TokenType:          "access",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "bss-api-server",
+			Subject:   uid,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	return token.SignedString(svc.jwtPrivateKey)
+}
+
+func (svc *Service) genRefreshToken(ctx context.Context, user *domain.User) (string, *domain.Claims, error) {
+	tokenTTL := time.Duration(24) * time.Hour
+	uid := user.ID.Hex()
+
+	claims := &domain.Claims{
+		UID:                uid,
+		NeedChangePassword: user.Status == domain.UserStatusWaitChangePassword,
+		TokenVersion:       user.TokenVersion,
+		TokenType:          "refresh",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "bss-api-server",
+			Subject:   uid,
+			ID:        xid.New().String(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	tokenString, err := token.SignedString(svc.jwtPrivateKey)
+	if err != nil {
+		return "", nil, err
+	}
+	return tokenString, claims, nil
+	}
 
 func (svc *Service) ChangePassword(ctx context.Context, userClaims *domain.Claims, oldPassword, newPassword string) error {
 	uid, err := userClaims.GetBsonObjectUID()
@@ -186,46 +410,13 @@ func (svc *Service) getUserByID(ctx context.Context, id bson.ObjectID) (*domain.
 	return users[0], nil
 }
 
-func (svc *Service) genJWTToken(ctx context.Context, user *domain.User) (string, error) {
-	tokenTTL := time.Duration(3) * time.Hour
-	uid := user.ID.Hex()
-
-	roles := []string{}
-	for _, role := range user.Roles {
-		roles = append(roles, role)
-	}
-	claims := domain.Claims{
-		UID:                uid,
-		NeedChangePassword: user.Status == domain.UserStatusWaitChangePassword,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenTTL)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "bss-api-server",
-			Subject:   uid,
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	return token.SignedString(svc.jwtPrivateKey)
-}
-
 func (svc *Service) VerifyJWTToken(ctx context.Context, tokenString string, permissionKey domain.PermissionKey) (domain.Claims, domain.RolePolicy, error) {
-	token, err := jwt.ParseWithClaims(tokenString, &domain.Claims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return svc.jwtPrivateKey.Public(), nil
-	})
+	claims, err := svc.parseAndValidateToken(tokenString)
 	if err != nil {
-		return domain.Claims{}, domain.RolePolicy{}, errors.WithMessage(err, "parse JWT token failed")
+		return domain.Claims{}, domain.RolePolicy{}, err
 	}
-	claims, ok := token.Claims.(*domain.Claims)
-	if !ok || !token.Valid {
-		return domain.Claims{}, domain.RolePolicy{}, errors.New("invalid JWT token claims")
-	}
-	if permissionKey == "" {
-		return *claims, domain.RolePolicy{}, nil
+	if claims.TokenType != "access" {
+		return domain.Claims{}, domain.RolePolicy{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid token type", errors.New("access token required"))
 	}
 	if permissionKey != domain.ChangeUserPermission && claims.NeedChangePassword {
 		return domain.Claims{}, domain.RolePolicy{}, errs.NewHTTPStatusError(http.StatusForbidden, "password change required", fmt.Errorf("user %s need to change password", claims.UID))
@@ -238,6 +429,12 @@ func (svc *Service) VerifyJWTToken(ctx context.Context, tokenString string, perm
 	user, err := svc.getUserByID(ctx, uid)
 	if err != nil {
 		return domain.Claims{}, domain.RolePolicy{}, errors.WithMessagef(err, "get user by ID %s failed", uid.Hex())
+	}
+	if user.TokenVersion != claims.TokenVersion {
+		return domain.Claims{}, domain.RolePolicy{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "token revoked", errors.New("token version mismatch"))
+	}
+	if permissionKey == "" {
+		return *claims, domain.RolePolicy{}, nil
 	}
 
 	roles, err := svc.getRolesByNames(ctx, user.Roles)

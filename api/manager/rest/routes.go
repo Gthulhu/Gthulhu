@@ -22,6 +22,10 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		apiV1 := api.Group("/v1")
 		// auth routes
 		apiV1.POST("/auth/login", h.echoHandler(h.Login))
+		apiV1.POST("/auth/refresh", h.echoHandler(h.RefreshToken))
+		apiV1.POST("/auth/logout", h.echoHandler(h.Logout))
+		apiV1.POST("/auth/logout-all", h.echoHandler(h.LogoutAll), echo.WrapMiddleware(h.GetAuthMiddleware("")))
+		apiV1.GET("/auth/validate", h.echoHandler(h.ValidateToken), echo.WrapMiddleware(h.GetAuthMiddleware("")))
 
 		// users  routes
 		apiV1.POST("/users", h.echoHandler(h.CreateUser), echo.WrapMiddleware(h.GetAuthMiddleware(domain.CreateUser)))
