@@ -113,6 +113,7 @@ jobs:
   build-and-push-image:
     name: Build and Push Container Image
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
     needs: [analyze-code, self-tests, schtest-tests]
     permissions:
       contents: read
@@ -139,7 +140,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
