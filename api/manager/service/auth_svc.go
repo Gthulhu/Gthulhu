@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"crypto/sha256"
-	goerrors "errors"
 	"encoding/hex"
+	goerrors "errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -276,7 +276,7 @@ func (svc *Service) genRefreshToken(ctx context.Context, user *domain.User) (str
 		return "", nil, err
 	}
 	return tokenString, claims, nil
-	}
+}
 
 func (svc *Service) ChangePassword(ctx context.Context, userClaims *domain.Claims, oldPassword, newPassword string) error {
 	uid, err := userClaims.GetBsonObjectUID()
