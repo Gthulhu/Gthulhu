@@ -1,0 +1,37 @@
+[
+    {
+        "insert": "permissions",
+        "documents": [
+            {
+                "key": "scheduler_config.read",
+                "resource": "scheduler_config",
+                "action": "read",
+                "description": "Read scheduler runtime config status"
+            },
+            {
+                "key": "scheduler_config.update",
+                "resource": "scheduler_config",
+                "action": "update",
+                "description": "Apply scheduler runtime config"
+            }
+        ]
+    },
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$push": {
+                        "policies": {
+                            "$each": [
+                                { "permissionKey": "scheduler_config.read", "self": false },
+                                { "permissionKey": "scheduler_config.update", "self": false }
+                            ]
+                        }
+                    }
+                }
+            }
+        ]
+    }
+]

@@ -2,15 +2,20 @@ package service
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Gthulhu/api/config"
 	"github.com/Gthulhu/api/decisionmaker/domain"
@@ -22,7 +27,8 @@ import (
 
 type Params struct {
 	fx.In
-	TokenConfig config.TokenConfig
+	TokenConfig  config.TokenConfig
+	DaemonConfig config.DaemonConfig
 }
 
 func NewService(params Params) (*Service, error) {
@@ -36,6 +42,13 @@ func NewService(params Params) (*Service, error) {
 		metricCollector:      NewMetricCollector(machineID),
 		podSchedCollector:    NewPodSchedMetricCollector(machineID),
 		jwtPrivateKey:        privateKey,
+		daemonEndpoint:       strings.TrimRight(params.DaemonConfig.Endpoint, "/"),
+		daemonHTTPClient: &http.Client{
+			Timeout: time.Duration(max(params.DaemonConfig.TimeoutSec, 5)) * time.Second,
+		},
+	}
+	if svc.daemonEndpoint == "" {
+		svc.daemonEndpoint = "http://127.0.0.1:18080"
 	}
 
 	err = prometheus.Register(svc.metricCollector)
@@ -59,6 +72,10 @@ type Service struct {
 	intentCache          []*domain.Intent
 	intentMerkleRoot     *util.MerkleNode
 	intentMerkleRootHash string
+	runtimeConfigMu      sync.RWMutex
+	runtimeConfig        *domain.RuntimeSchedulerConfig
+	daemonEndpoint       string
+	daemonHTTPClient     *http.Client
 }
 
 const (
@@ -425,4 +442,93 @@ func (svc *Service) DeleteAllIntents(ctx context.Context) error {
 
 	logger.Logger(ctx).Info().Msgf("Deleted all %d scheduling intents", len(keysToDelete))
 	return nil
+}
+
+func (svc *Service) ApplyRuntimeConfig(ctx context.Context, config domain.RuntimeSchedulerConfig) error {
+	if config.ConfigVersion == "" {
+		return fmt.Errorf("configVersion is required")
+	}
+
+	endpoint := svc.daemonEndpoint + "/api/v1/runtime-config"
+	body, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("marshal runtime config: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return fmt.Errorf("create daemon runtime config request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := svc.daemonHTTPClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("call daemon runtime config endpoint: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("daemon runtime config endpoint returned status %s: %s", resp.Status, string(respBody))
+	}
+
+	svc.runtimeConfigMu.Lock()
+	defer svc.runtimeConfigMu.Unlock()
+
+	if svc.runtimeConfig != nil && svc.runtimeConfig.ConfigVersion == config.ConfigVersion {
+		return nil
+	}
+
+	copyConfig := config
+	svc.runtimeConfig = &copyConfig
+	logger.Logger(ctx).Info().Msgf("runtime config applied: version=%s", config.ConfigVersion)
+	return nil
+}
+
+func (svc *Service) GetRuntimeConfigStatus(ctx context.Context) domain.RuntimeConfigStatus {
+	// Try to fetch detailed status from daemon's status endpoint
+	endpoint := svc.daemonEndpoint + "/api/v1/status"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err == nil {
+		resp, httpErr := svc.daemonHTTPClient.Do(req)
+		if httpErr == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var payload struct {
+					Success bool `json:"success"`
+					Data    *struct {
+						ConfigVersion string `json:"configVersion,omitempty"`
+						Applied       bool   `json:"applied"`
+						AppliedAt     string `json:"appliedAt,omitempty"`
+						RestartCount  int64  `json:"restartCount,omitempty"`
+						LastError     string `json:"lastError,omitempty"`
+					} `json:"data,omitempty"`
+				}
+				if decodeErr := json.NewDecoder(resp.Body).Decode(&payload); decodeErr == nil && payload.Success && payload.Data != nil {
+					return domain.RuntimeConfigStatus{
+						ConfigVersion: payload.Data.ConfigVersion,
+						Applied:       payload.Data.Applied,
+						AppliedAt:     payload.Data.AppliedAt,
+						RestartCount:  payload.Data.RestartCount,
+						LastError:     payload.Data.LastError,
+					}
+				}
+			}
+		}
+	}
+
+	svc.runtimeConfigMu.RLock()
+	defer svc.runtimeConfigMu.RUnlock()
+	if svc.runtimeConfig == nil {
+		return domain.RuntimeConfigStatus{Applied: false}
+	}
+	return domain.RuntimeConfigStatus{
+		ConfigVersion: svc.runtimeConfig.ConfigVersion,
+		Applied:       true,
+	}
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -316,3 +316,122 @@ func (dm *DecisionMakerClient) GetPodPIDMapping(ctx context.Context, decisionMak
 
 	return result, nil
 }
+
+func (dm *DecisionMakerClient) ApplyRuntimeConfig(ctx context.Context, decisionMaker *domain.DecisionMakerPod, config domain.RuntimeSchedulerConfig) error {
+	token, err := dm.GetToken(ctx, decisionMaker)
+	if err != nil {
+		return err
+	}
+
+	type applyRuntimeConfigRequest struct {
+		ConfigVersion     string `json:"configVersion,omitempty"`
+		Mode              string `json:"mode,omitempty"`
+		SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
+		SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
+		KernelMode        bool   `json:"kernelMode,omitempty"`
+		MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
+		EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
+		BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
+		SchedulerEnabled  bool   `json:"schedulerEnabled"`
+		MonitoringEnabled bool   `json:"monitoringEnabled"`
+	}
+
+	reqPayload := applyRuntimeConfigRequest{
+		ConfigVersion:     config.ConfigVersion,
+		Mode:              config.Mode,
+		SliceNsDefault:    config.SliceNsDefault,
+		SliceNsMin:        config.SliceNsMin,
+		KernelMode:        config.KernelMode,
+		MaxTimeWatchdog:   config.MaxTimeWatchdog,
+		EarlyProcessing:   config.EarlyProcessing,
+		BuiltinIdle:       config.BuiltinIdle,
+		SchedulerEnabled:  config.SchedulerEnabled,
+		MonitoringEnabled: config.MonitoringEnabled,
+	}
+
+	jsonBody, err := json.Marshal(reqPayload)
+	if err != nil {
+		return err
+	}
+
+	endpoint := dm.scheme() + "://" + decisionMaker.Host + ":" + strconv.Itoa(decisionMaker.Port) + "/api/v1/runtime-config"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := dm.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
+	}
+
+	return nil
+}
+
+func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decisionMaker *domain.DecisionMakerPod) (domain.RuntimeConfigApplyResult, error) {
+	token, err := dm.GetToken(ctx, decisionMaker)
+	if err != nil {
+		return domain.RuntimeConfigApplyResult{}, err
+	}
+
+	endpoint := dm.scheme() + "://" + decisionMaker.Host + ":" + strconv.Itoa(decisionMaker.Port) + "/api/v1/runtime-config"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return domain.RuntimeConfigApplyResult{}, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := dm.Client.Do(req)
+	if err != nil {
+		return domain.RuntimeConfigApplyResult{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return domain.RuntimeConfigApplyResult{}, fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
+	}
+
+	type runtimeConfigStatusResponse struct {
+		Success bool `json:"success"`
+		Data    *struct {
+			ConfigVersion string `json:"configVersion,omitempty"`
+			Applied       bool   `json:"applied"`
+			AppliedAt     string `json:"appliedAt,omitempty"`
+			RestartCount  int64  `json:"restartCount,omitempty"`
+			LastError     string `json:"lastError,omitempty"`
+		} `json:"data,omitempty"`
+	}
+
+	var statusResp runtimeConfigStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&statusResp); err != nil {
+		return domain.RuntimeConfigApplyResult{}, err
+	}
+
+	if !statusResp.Success {
+		return domain.RuntimeConfigApplyResult{}, fmt.Errorf("decision maker %s returned unsuccessful status response", decisionMaker)
+	}
+
+	result := domain.RuntimeConfigApplyResult{
+		NodeID:  decisionMaker.NodeID,
+		Host:    decisionMaker.Host,
+		Success: true,
+	}
+	if statusResp.Data != nil {
+		result.ConfigVersion = statusResp.Data.ConfigVersion
+		result.AppliedAt = statusResp.Data.AppliedAt
+		result.RestartCount = statusResp.Data.RestartCount
+		result.LastError = statusResp.Data.LastError
+		if statusResp.Data.ConfigVersion == "" {
+			result.Error = "runtime config not applied yet"
+		}
+	}
+
+	return result, nil
+}

@@ -23,6 +23,8 @@ const (
 	PSMRead                PermissionKey = "pod_scheduling_metrics.read"
 	PSMUpdate              PermissionKey = "pod_scheduling_metrics.update"
 	PSMDelete              PermissionKey = "pod_scheduling_metrics.delete"
+	SchedulerConfigRead    PermissionKey = "scheduler_config.read"
+	SchedulerConfigUpdate  PermissionKey = "scheduler_config.update"
 )
 
 const (

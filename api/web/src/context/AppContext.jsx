@@ -182,6 +182,25 @@ export function AppProvider({ children }) {
     }
   }, [isAuthenticated, jwtToken, getApiUrl, refreshAccessToken, clearLocalAuth, showToast]);
 
+  // Runtime config API
+  const getRuntimeConfigStatus = useCallback(async (nodeIds = []) => {
+    const qs = nodeIds.length ? '?nodeIds=' + nodeIds.join(',') : '';
+    const res = await makeAuthenticatedRequest('/api/v1/scheduler/runtime-config/status' + qs);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to get runtime config status');
+    return data.data?.results || [];
+  }, [makeAuthenticatedRequest]);
+
+  const applyRuntimeConfig = useCallback(async (nodeIds, config) => {
+    const res = await makeAuthenticatedRequest('/api/v1/scheduler/runtime-config/apply', {
+      method: 'POST',
+      body: JSON.stringify({ nodeIds, config }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to apply runtime config');
+    return data.data?.results || [];
+  }, [makeAuthenticatedRequest]);
+
   // Save API config
   const saveApiConfig = useCallback((url) => {
     setApiBaseUrl(url);
@@ -245,7 +264,9 @@ export function AppProvider({ children }) {
     logout,
     getApiUrl,
     makeAuthenticatedRequest,
-    saveApiConfig
+    saveApiConfig,
+    getRuntimeConfigStatus,
+    applyRuntimeConfig
   };
 
   return (

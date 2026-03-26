@@ -75,6 +75,56 @@ func TestGetIntentMerkleRootEmptyData(t *testing.T) {
 	assert.Contains(t, err.Error(), "returned empty merkle root")
 }
 
+func TestApplyRuntimeConfigSuccess(t *testing.T) {
+	const cachedToken = "cached-token"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/api/v1/runtime-config", r.URL.Path)
+		assert.Equal(t, "Bearer "+cachedToken, r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"success":true}`))
+	}))
+	defer server.Close()
+
+	dm := newDecisionMakerPodFromServerURL(t, server.URL)
+	client := newDecisionMakerClientWithCachedToken(dm.NodeID, cachedToken, server.Client())
+
+	err := client.ApplyRuntimeConfig(context.Background(), dm, domain.RuntimeSchedulerConfig{
+		ConfigVersion:     "v1",
+		Mode:              "gthulhu",
+		SliceNsDefault:    20000000,
+		SliceNsMin:        1000000,
+		KernelMode:        true,
+		MaxTimeWatchdog:   true,
+		SchedulerEnabled:  true,
+		MonitoringEnabled: true,
+	})
+	require.NoError(t, err)
+}
+
+func TestGetRuntimeConfigStatusSuccess(t *testing.T) {
+	const cachedToken = "cached-token"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/api/v1/runtime-config", r.URL.Path)
+		assert.Equal(t, "Bearer "+cachedToken, r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"success":true,"data":{"configVersion":"v2","applied":true}}`))
+	}))
+	defer server.Close()
+
+	dm := newDecisionMakerPodFromServerURL(t, server.URL)
+	client := newDecisionMakerClientWithCachedToken(dm.NodeID, cachedToken, server.Client())
+
+	result, err := client.GetRuntimeConfigStatus(context.Background(), dm)
+	require.NoError(t, err)
+	assert.Equal(t, dm.NodeID, result.NodeID)
+	assert.Equal(t, dm.Host, result.Host)
+	assert.True(t, result.Success)
+}
+
 func newDecisionMakerClientWithCachedToken(nodeID, token string, httpClient *http.Client) *DecisionMakerClient {
 	tokenCache := cache.New[string, string]()
 	tokenCache.Set(nodeID, token)

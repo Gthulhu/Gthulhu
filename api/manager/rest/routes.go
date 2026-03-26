@@ -60,6 +60,10 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		apiV1.GET("/pod-scheduling-metrics/runtime", h.echoHandler(h.ListPodSchedulingMetricValues), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMRead)))
 		apiV1.PUT("/pod-scheduling-metrics", h.echoHandler(h.UpdatePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMUpdate)))
 		apiV1.DELETE("/pod-scheduling-metrics", h.echoHandler(h.DeletePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMDelete)))
+
+		// scheduler runtime config routes
+		apiV1.POST("/scheduler/runtime-config/apply", h.echoHandler(h.ApplyRuntimeConfig), echo.WrapMiddleware(h.GetAuthMiddleware(domain.SchedulerConfigUpdate)))
+		apiV1.GET("/scheduler/runtime-config/status", h.echoHandler(h.GetRuntimeConfigStatus), echo.WrapMiddleware(h.GetAuthMiddleware(domain.SchedulerConfigRead)))
 	}
 
 }
