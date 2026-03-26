@@ -7,6 +7,7 @@ const (
 	UserRead               PermissionKey = "user.read"
 	ChangeUserPermission   PermissionKey = "user.permission.update"
 	ResetUserPassword      PermissionKey = "user.password.reset"
+	ChangeOwnPassword      PermissionKey = "user.password.change"
 	RoleCrete              PermissionKey = "role.create"
 	RoleRead               PermissionKey = "role.read"
 	RoleUpdate             PermissionKey = "role.update"

@@ -32,7 +32,7 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		apiV1.PUT("/users/password", h.echoHandler(h.ResetPassword), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ResetUserPassword)))
 		apiV1.PUT("/users/permissions", h.echoHandler(h.UpdateUserPermissions), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ChangeUserPermission)))
 		apiV1.GET("/users", h.echoHandler(h.ListUsers), echo.WrapMiddleware(h.GetAuthMiddleware(domain.UserRead)))
-		apiV1.PUT("/users/self/password", h.echoHandler(h.ChangePassword), echo.WrapMiddleware(h.GetAuthMiddleware("")))
+		apiV1.PUT("/users/self/password", h.echoHandler(h.ChangePassword), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ChangeOwnPassword)))
 		apiV1.GET("/users/self", h.echoHandler(h.GetSelfUser), echo.WrapMiddleware(h.GetAuthMiddleware("")))
 
 		// role routes

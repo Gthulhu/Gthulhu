@@ -19,6 +19,7 @@ export function AppProvider({ children }) {
   const [strategyCounter, setStrategyCounter] = useState(0);
   const [currentUser, setCurrentUser] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const refreshRequestRef = React.useRef(null);
 
   // API URL helper
   const getApiUrl = useCallback((endpoint) => {
@@ -95,24 +96,38 @@ export function AppProvider({ children }) {
   }, []);
 
   const refreshAccessToken = useCallback(async () => {
-    if (!refreshToken) {
-      return null;
+    if (refreshRequestRef.current) {
+      return refreshRequestRef.current;
     }
-    const response = await fetch(getApiUrl('/api/v1/auth/refresh'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken })
-    });
 
-    if (!response.ok) {
+    const currentRefreshToken = localStorage.getItem('refreshToken') || refreshToken;
+    if (!currentRefreshToken) {
       return null;
     }
-    const data = await response.json();
-    if (!data?.success || !data?.data?.accessToken) {
-      return null;
+
+    refreshRequestRef.current = (async () => {
+      const response = await fetch(getApiUrl('/api/v1/auth/refresh'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: currentRefreshToken })
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      if (!data?.success || !data?.data?.accessToken) {
+        return null;
+      }
+      login({ accessToken: data.data.accessToken, refreshToken: data.data.refreshToken || '' });
+      return data.data.accessToken;
+    })();
+
+    try {
+      return await refreshRequestRef.current;
+    } finally {
+      refreshRequestRef.current = null;
     }
-    login({ accessToken: data.data.accessToken, refreshToken: data.data.refreshToken || '' });
-    return data.data.accessToken;
   }, [refreshToken, getApiUrl, login]);
 
   // Authenticated request helper

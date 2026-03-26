@@ -418,7 +418,7 @@ func (svc *Service) VerifyJWTToken(ctx context.Context, tokenString string, perm
 	if claims.TokenType != "access" {
 		return domain.Claims{}, domain.RolePolicy{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "invalid token type", errors.New("access token required"))
 	}
-	if permissionKey != domain.ChangeUserPermission && claims.NeedChangePassword {
+	if permissionKey != domain.ChangeOwnPassword && claims.NeedChangePassword {
 		return domain.Claims{}, domain.RolePolicy{}, errs.NewHTTPStatusError(http.StatusForbidden, "password change required", fmt.Errorf("user %s need to change password", claims.UID))
 	}
 
@@ -433,7 +433,8 @@ func (svc *Service) VerifyJWTToken(ctx context.Context, tokenString string, perm
 	if user.TokenVersion != claims.TokenVersion {
 		return domain.Claims{}, domain.RolePolicy{}, errs.NewHTTPStatusError(http.StatusUnauthorized, "token revoked", errors.New("token version mismatch"))
 	}
-	if permissionKey == "" {
+	// ChangeOwnPassword is allowed for any authenticated user without a role check
+	if permissionKey == "" || permissionKey == domain.ChangeOwnPassword {
 		return *claims, domain.RolePolicy{}, nil
 	}
 
