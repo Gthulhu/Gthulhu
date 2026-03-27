@@ -193,7 +193,6 @@ func (dm *DecisionMakerClient) GetToken(ctx context.Context, decisionMaker *doma
 
 	dm.tokenCache.Set(decisionMaker.NodeID, tokenResp.Data.Token, cache.WithExpiration(time.Duration(ttl)*time.Second))
 	return tokenResp.Data.Token, nil
-
 }
 
 func (dm *DecisionMakerClient) DeleteSchedulingIntents(ctx context.Context, decisionMaker *domain.DecisionMakerPod, req *domain.DeleteIntentsRequest) error {
@@ -419,18 +418,24 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 	}
 
 	result := domain.RuntimeConfigApplyResult{
-		NodeID:  decisionMaker.NodeID,
-		Host:    decisionMaker.Host,
-		Success: true,
+		NodeID: decisionMaker.NodeID,
+		Host:   decisionMaker.Host,
 	}
 	if statusResp.Data != nil {
 		result.ConfigVersion = statusResp.Data.ConfigVersion
 		result.AppliedAt = statusResp.Data.AppliedAt
 		result.RestartCount = statusResp.Data.RestartCount
 		result.LastError = statusResp.Data.LastError
-		if statusResp.Data.ConfigVersion == "" {
-			result.Error = "runtime config not applied yet"
+		result.Success = statusResp.Data.Applied
+		if !statusResp.Data.Applied {
+			if statusResp.Data.LastError != "" {
+				result.Error = statusResp.Data.LastError
+			} else {
+				result.Error = "runtime config not applied yet"
+			}
 		}
+	} else {
+		result.Error = "runtime config not applied yet"
 	}
 
 	return result, nil
