@@ -49,7 +49,7 @@ jobs:
   self-tests:
     name: Selftests
     runs-on: ubuntu-24.04
-    if: github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')
+    if: (github.event_name == 'pull_request' || github.event_name == 'push') && (github.base_ref == 'develop' || github.base_ref == 'main')
     strategy:
       matrix:
         go-version: [ 'stable' ]
@@ -78,7 +78,7 @@ jobs:
   schtest-tests:
     name: Schtest Integration Tests
     runs-on: ubuntu-24.04
-    if: github.event_name == 'pull_request' && (github.base_ref == 'develop' || github.base_ref == 'main')
+    if: (github.event_name == 'pull_request' || github.event_name == 'push') && (github.base_ref == 'develop' || github.base_ref == 'main')
     strategy:
       matrix:
         go-version: [ 'stable' ]
