@@ -20,11 +20,20 @@ type ApplyRuntimeConfigRequest struct {
 }
 
 type RuntimeConfigStatusResponse struct {
-	ConfigVersion string `json:"configVersion,omitempty"`
-	Applied       bool   `json:"applied"`
-	AppliedAt     string `json:"appliedAt,omitempty"`
-	RestartCount  int64  `json:"restartCount,omitempty"`
-	LastError     string `json:"lastError,omitempty"`
+	ConfigVersion     string `json:"configVersion,omitempty"`
+	Applied           bool   `json:"applied"`
+	AppliedAt         string `json:"appliedAt,omitempty"`
+	RestartCount      int64  `json:"restartCount,omitempty"`
+	LastError         string `json:"lastError,omitempty"`
+	Mode              string `json:"mode,omitempty"`
+	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
+	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
+	KernelMode        bool   `json:"kernelMode,omitempty"`
+	MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
+	EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
+	BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
+	SchedulerEnabled  bool   `json:"schedulerEnabled"`
+	MonitoringEnabled bool   `json:"monitoringEnabled"`
 }
 
 func (h *Handler) ApplyRuntimeConfig(w http.ResponseWriter, r *http.Request) {
@@ -58,11 +67,23 @@ func (h *Handler) ApplyRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	status := h.Service.GetRuntimeConfigStatus(ctx)
-	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(&RuntimeConfigStatusResponse{
+	resp := &RuntimeConfigStatusResponse{
 		ConfigVersion: status.ConfigVersion,
 		Applied:       status.Applied,
 		AppliedAt:     status.AppliedAt,
 		RestartCount:  status.RestartCount,
 		LastError:     status.LastError,
-	}))
+	}
+	if status.Config != nil {
+		resp.Mode = status.Config.Mode
+		resp.SliceNsDefault = status.Config.SliceNsDefault
+		resp.SliceNsMin = status.Config.SliceNsMin
+		resp.KernelMode = status.Config.KernelMode
+		resp.MaxTimeWatchdog = status.Config.MaxTimeWatchdog
+		resp.EarlyProcessing = status.Config.EarlyProcessing
+		resp.BuiltinIdle = status.Config.BuiltinIdle
+		resp.SchedulerEnabled = status.Config.SchedulerEnabled
+		resp.MonitoringEnabled = status.Config.MonitoringEnabled
+	}
+	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(resp))
 }

@@ -485,6 +485,7 @@ func (svc *Service) ApplyRuntimeConfig(ctx context.Context, config domain.Runtim
 
 func (svc *Service) GetRuntimeConfigStatus(ctx context.Context) domain.RuntimeConfigStatus {
 	// Try to fetch detailed status from daemon's status endpoint
+	// The daemon now returns actual config values from its runtime YAML
 	endpoint := svc.daemonEndpoint + "/api/v1/status"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err == nil {
@@ -495,34 +496,61 @@ func (svc *Service) GetRuntimeConfigStatus(ctx context.Context) domain.RuntimeCo
 				var payload struct {
 					Success bool `json:"success"`
 					Data    *struct {
-						ConfigVersion string `json:"configVersion,omitempty"`
-						Applied       bool   `json:"applied"`
-						AppliedAt     string `json:"appliedAt,omitempty"`
-						RestartCount  int64  `json:"restartCount,omitempty"`
-						LastError     string `json:"lastError,omitempty"`
+						ConfigVersion     string `json:"configVersion,omitempty"`
+						Applied           bool   `json:"applied"`
+						AppliedAt         string `json:"appliedAt,omitempty"`
+						RestartCount      int64  `json:"restartCount,omitempty"`
+						LastError         string `json:"lastError,omitempty"`
+						Mode              string `json:"mode,omitempty"`
+						SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
+						SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
+						KernelMode        bool   `json:"kernelMode,omitempty"`
+						MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
+						EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
+						BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
+						SchedulerEnabled  bool   `json:"schedulerEnabled"`
+						MonitoringEnabled bool   `json:"monitoringEnabled"`
 					} `json:"data,omitempty"`
 				}
 				if decodeErr := json.NewDecoder(resp.Body).Decode(&payload); decodeErr == nil && payload.Success && payload.Data != nil {
+					// Build config from daemon's actual running values
+					daemonConfig := &domain.RuntimeSchedulerConfig{
+						ConfigVersion:     payload.Data.ConfigVersion,
+						Mode:              payload.Data.Mode,
+						SliceNsDefault:    payload.Data.SliceNsDefault,
+						SliceNsMin:        payload.Data.SliceNsMin,
+						KernelMode:        payload.Data.KernelMode,
+						MaxTimeWatchdog:   payload.Data.MaxTimeWatchdog,
+						EarlyProcessing:   payload.Data.EarlyProcessing,
+						BuiltinIdle:       payload.Data.BuiltinIdle,
+						SchedulerEnabled:  payload.Data.SchedulerEnabled,
+						MonitoringEnabled: payload.Data.MonitoringEnabled,
+					}
 					return domain.RuntimeConfigStatus{
 						ConfigVersion: payload.Data.ConfigVersion,
 						Applied:       payload.Data.Applied,
 						AppliedAt:     payload.Data.AppliedAt,
 						RestartCount:  payload.Data.RestartCount,
 						LastError:     payload.Data.LastError,
+						Config:        daemonConfig,
 					}
 				}
 			}
 		}
 	}
 
+	// Fallback to locally cached config if daemon is unreachable
 	svc.runtimeConfigMu.RLock()
-	defer svc.runtimeConfigMu.RUnlock()
-	if svc.runtimeConfig == nil {
+	currentConfig := svc.runtimeConfig
+	svc.runtimeConfigMu.RUnlock()
+
+	if currentConfig == nil {
 		return domain.RuntimeConfigStatus{Applied: false}
 	}
 	return domain.RuntimeConfigStatus{
-		ConfigVersion: svc.runtimeConfig.ConfigVersion,
+		ConfigVersion: currentConfig.ConfigVersion,
 		Applied:       true,
+		Config:        currentConfig,
 	}
 }
 

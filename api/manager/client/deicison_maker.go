@@ -400,11 +400,20 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 	type runtimeConfigStatusResponse struct {
 		Success bool `json:"success"`
 		Data    *struct {
-			ConfigVersion string `json:"configVersion,omitempty"`
-			Applied       bool   `json:"applied"`
-			AppliedAt     string `json:"appliedAt,omitempty"`
-			RestartCount  int64  `json:"restartCount,omitempty"`
-			LastError     string `json:"lastError,omitempty"`
+			ConfigVersion     string `json:"configVersion,omitempty"`
+			Applied           bool   `json:"applied"`
+			AppliedAt         string `json:"appliedAt,omitempty"`
+			RestartCount      int64  `json:"restartCount,omitempty"`
+			LastError         string `json:"lastError,omitempty"`
+			Mode              string `json:"mode,omitempty"`
+			SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
+			SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
+			KernelMode        bool   `json:"kernelMode,omitempty"`
+			MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
+			EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
+			BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
+			SchedulerEnabled  bool   `json:"schedulerEnabled"`
+			MonitoringEnabled bool   `json:"monitoringEnabled"`
 		} `json:"data,omitempty"`
 	}
 
@@ -432,6 +441,22 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 				result.Error = statusResp.Data.LastError
 			} else {
 				result.Error = "runtime config not applied yet"
+			}
+		}
+		// Include the current config values from the daemon
+		// Config is always available when the daemon reports applied status
+		if statusResp.Data.Applied || statusResp.Data.Mode != "" || statusResp.Data.SliceNsDefault != 0 {
+			result.Config = &domain.RuntimeSchedulerConfig{
+				ConfigVersion:     statusResp.Data.ConfigVersion,
+				Mode:              statusResp.Data.Mode,
+				SliceNsDefault:    statusResp.Data.SliceNsDefault,
+				SliceNsMin:        statusResp.Data.SliceNsMin,
+				KernelMode:        statusResp.Data.KernelMode,
+				MaxTimeWatchdog:   statusResp.Data.MaxTimeWatchdog,
+				EarlyProcessing:   statusResp.Data.EarlyProcessing,
+				BuiltinIdle:       statusResp.Data.BuiltinIdle,
+				SchedulerEnabled:  statusResp.Data.SchedulerEnabled,
+				MonitoringEnabled: statusResp.Data.MonitoringEnabled,
 			}
 		}
 	} else {

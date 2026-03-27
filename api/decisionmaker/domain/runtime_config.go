@@ -14,9 +14,10 @@ type RuntimeSchedulerConfig struct {
 }
 
 type RuntimeConfigStatus struct {
-	ConfigVersion string `json:"configVersion,omitempty"`
-	Applied       bool   `json:"applied"`
-	AppliedAt     string `json:"appliedAt,omitempty"`
-	RestartCount  int64  `json:"restartCount,omitempty"`
-	LastError     string `json:"lastError,omitempty"`
+	ConfigVersion string                  `json:"configVersion,omitempty"`
+	Applied       bool                    `json:"applied"`
+	AppliedAt     string                  `json:"appliedAt,omitempty"`
+	RestartCount  int64                   `json:"restartCount,omitempty"`
+	LastError     string                  `json:"lastError,omitempty"`
+	Config        *RuntimeSchedulerConfig `json:"config,omitempty"`
 }
