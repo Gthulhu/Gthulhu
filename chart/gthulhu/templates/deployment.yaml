@@ -40,8 +40,17 @@ spec:
           securityContext:
             {{- toYaml .Values.scheduler.securityContext | nindent 12 }}
           command:
-            - /gthulhu/main 
-          args: ["-config", "/etc/gthulhu/config.yaml"]
+            - /gthulhu/main
+            - daemon
+          args:
+            - -config
+            - /etc/gthulhu/config.yaml
+            - -control-addr
+            - {{ .Values.scheduler.daemon.controlAddr | quote }}
+            - -runtime-config-path
+            - {{ .Values.scheduler.daemon.runtimeConfigPath | quote }}
+            - -restart-delay
+            - {{ .Values.scheduler.daemon.restartDelay | quote }}
           volumeMounts:
             - name: sys-kernel-debug
               mountPath: /sys/kernel/debug
@@ -52,6 +61,8 @@ spec:
             - name: config-volume
               mountPath: /etc/gthulhu
               readOnly: true
+            - name: runtime-config-dir
+              mountPath: /tmp/gthulhu
           resources:
             {{- toYaml .Values.scheduler.resources | nindent 12 }}
         {{- if .Values.scheduler.sidecar.enabled }}
@@ -66,6 +77,8 @@ spec:
               value: {{ .Values.scheduler.sidecar.env.serverHost | quote }}
             - name: DM_LOGGING_LEVEL
               value: {{ .Values.scheduler.sidecar.env.loggingLevel | quote }}
+            - name: DM_DAEMON_ENDPOINT
+              value: {{ .Values.scheduler.sidecar.env.daemonEndpoint | quote }}
             - name: TZ
               value: {{ .Values.global.timezone | quote }}
             {{- if .Values.mtls.enabled }}
@@ -167,6 +180,8 @@ spec:
           hostPath:
             path: /var/run
             type: Directory
+        - name: runtime-config-dir
+          emptyDir: {}
       {{- with .Values.scheduler.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

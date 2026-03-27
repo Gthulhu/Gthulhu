@@ -11,6 +11,12 @@ type DecisionMakerConfig struct {
 	Logging LoggingConfig `mapstructure:"logging"`
 	Token   TokenConfig   `mapstructure:"token"`
 	MTLS    MTLSConfig    `mapstructure:"mtls"`
+	Daemon  DaemonConfig  `mapstructure:"daemon"`
+}
+
+type DaemonConfig struct {
+	Endpoint   string `mapstructure:"endpoint"`
+	TimeoutSec int    `mapstructure:"timeout_sec"`
 }
 
 var (

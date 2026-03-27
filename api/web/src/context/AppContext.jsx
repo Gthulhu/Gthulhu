@@ -12,12 +12,14 @@ export function useApp() {
 
 export function AppProvider({ children }) {
   const [jwtToken, setJwtToken] = useState(() => localStorage.getItem('jwtToken'));
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem('refreshToken'));
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('jwtToken'));
   const [apiBaseUrl, setApiBaseUrl] = useState(() => localStorage.getItem('apiBaseUrl') || '');
   const [healthHistory, setHealthHistory] = useState([]);
   const [strategyCounter, setStrategyCounter] = useState(0);
   const [currentUser, setCurrentUser] = useState(null);
   const [toasts, setToasts] = useState([]);
+  const refreshRequestRef = React.useRef(null);
 
   // API URL helper
   const getApiUrl = useCallback((endpoint) => {
@@ -44,19 +46,89 @@ export function AppProvider({ children }) {
   }, []);
 
   // Authentication
-  const login = useCallback((token) => {
+  const login = useCallback((tokenOrPayload) => {
+    const token = typeof tokenOrPayload === 'string' ? tokenOrPayload : tokenOrPayload?.accessToken;
+    const refresh = typeof tokenOrPayload === 'string' ? '' : (tokenOrPayload?.refreshToken || '');
+    if (!token) {
+      return;
+    }
     setJwtToken(token);
+    setRefreshToken(refresh || null);
     setIsAuthenticated(true);
     localStorage.setItem('jwtToken', token);
+    if (refresh) {
+      localStorage.setItem('refreshToken', refresh);
+    } else {
+      localStorage.removeItem('refreshToken');
+    }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const currentRefreshToken = localStorage.getItem('refreshToken');
+    const base = apiBaseUrl ? apiBaseUrl.replace(/\/$/, '') : '';
+    if (currentRefreshToken) {
+      try {
+        await fetch(base + '/api/v1/auth/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: currentRefreshToken })
+        });
+      } catch {
+        // best effort revoke
+      }
+    }
     setJwtToken(null);
+    setRefreshToken(null);
     setIsAuthenticated(false);
     setCurrentUser(null);
     localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
     showToast('info', 'You have been logged out');
-  }, [showToast]);
+  }, [apiBaseUrl, showToast]);
+
+  const clearLocalAuth = useCallback(() => {
+    setJwtToken(null);
+    setRefreshToken(null);
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    localStorage.removeItem('jwtToken');
+    localStorage.removeItem('refreshToken');
+  }, []);
+
+  const refreshAccessToken = useCallback(async () => {
+    if (refreshRequestRef.current) {
+      return refreshRequestRef.current;
+    }
+
+    const currentRefreshToken = localStorage.getItem('refreshToken') || refreshToken;
+    if (!currentRefreshToken) {
+      return null;
+    }
+
+    refreshRequestRef.current = (async () => {
+      const response = await fetch(getApiUrl('/api/v1/auth/refresh'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: currentRefreshToken })
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+      const data = await response.json();
+      if (!data?.success || !data?.data?.accessToken) {
+        return null;
+      }
+      login({ accessToken: data.data.accessToken, refreshToken: data.data.refreshToken || '' });
+      return data.data.accessToken;
+    })();
+
+    try {
+      return await refreshRequestRef.current;
+    } finally {
+      refreshRequestRef.current = null;
+    }
+  }, [refreshToken, getApiUrl, login]);
 
   // Authenticated request helper
   const makeAuthenticatedRequest = useCallback(async (endpoint, options = {}) => {
@@ -78,9 +150,29 @@ export function AppProvider({ children }) {
 
       // Handle authentication and authorization errors
       if (response.status === 401) {
-        // 401 = Token expired or invalid -> logout
-        console.warn('[Auth] 401 Unauthorized - Token expired or invalid, logging out...');
-        logout();
+        const newAccessToken = await refreshAccessToken();
+        if (newAccessToken) {
+          const retryResponse = await fetch(getApiUrl(endpoint), {
+            ...options,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + newAccessToken,
+              ...options.headers
+            }
+          });
+          if (retryResponse.status !== 401) {
+            if (retryResponse.status === 403) {
+              const retryErrorData = await retryResponse.json().catch(() => ({ error: 'Permission denied' }));
+              const retryErrorMsg = retryErrorData.error || 'You do not have permission to perform this action';
+              showToast('error', retryErrorMsg);
+              throw new Error(retryErrorMsg);
+            }
+            return retryResponse;
+          }
+        }
+
+        console.warn('[Auth] 401 Unauthorized - Token expired or revoked, logging out...');
+        clearLocalAuth();
         showToast('error', 'Session expired. Please login again.');
         throw new Error('Session expired');
       } else if (response.status === 403) {
@@ -103,7 +195,26 @@ export function AppProvider({ children }) {
       console.error('[Auth] Request failed:', error);
       throw error;
     }
-  }, [isAuthenticated, jwtToken, getApiUrl, logout, showToast]);
+  }, [isAuthenticated, jwtToken, getApiUrl, refreshAccessToken, clearLocalAuth, showToast]);
+
+  // Runtime config API
+  const getRuntimeConfigStatus = useCallback(async (nodeIds = []) => {
+    const qs = nodeIds.length ? '?nodeIds=' + nodeIds.join(',') : '';
+    const res = await makeAuthenticatedRequest('/api/v1/scheduler/runtime-config/status' + qs);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to get runtime config status');
+    return data.data?.results || [];
+  }, [makeAuthenticatedRequest]);
+
+  const applyRuntimeConfig = useCallback(async (nodeIds, config) => {
+    const res = await makeAuthenticatedRequest('/api/v1/scheduler/runtime-config/apply', {
+      method: 'POST',
+      body: JSON.stringify({ nodeIds, config }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Failed to apply runtime config');
+    return data.data?.results || [];
+  }, [makeAuthenticatedRequest]);
 
   // Save API config
   const saveApiConfig = useCallback((url) => {
@@ -168,7 +279,9 @@ export function AppProvider({ children }) {
     logout,
     getApiUrl,
     makeAuthenticatedRequest,
-    saveApiConfig
+    saveApiConfig,
+    getRuntimeConfigStatus,
+    applyRuntimeConfig
   };
 
   return (

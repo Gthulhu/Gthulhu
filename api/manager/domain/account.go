@@ -17,6 +17,8 @@ type User struct {
 	Status         UserStatus        `bson:"status,omitempty"`
 	Roles          []string          `bson:"roles,omitempty"`
 	PermissionKeys []string          `bson:"permissionKeys,omitempty"`
+	TokenVersion   int64             `bson:"tokenVersion,omitempty"`
+	RefreshTokens  []RefreshSession  `bson:"refreshTokens,omitempty"`
 }
 
 type Role struct {

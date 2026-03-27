@@ -50,6 +50,12 @@ scheduler:
   # Tolerations to allow scheduling on any node
   tolerations:
     - operator: Exists
+
+  # Daemon mode configuration (gthulhud)
+  daemon:
+    controlAddr: ":18080"
+    runtimeConfigPath: "/tmp/gthulhu/runtime-config.yaml"
+    restartDelay: "2s"
   
   # Sidecar container configuration (formerly Decision Maker)
   # Shares PID namespace with the host
@@ -77,6 +83,7 @@ scheduler:
     env:
       serverHost: ":8080"
       loggingLevel: "info"
+      daemonEndpoint: "http://127.0.0.1:18080"
     
     # Service configuration (headless service for daemonset)
     service:

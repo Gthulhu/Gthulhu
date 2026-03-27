@@ -22,13 +22,17 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		apiV1 := api.Group("/v1")
 		// auth routes
 		apiV1.POST("/auth/login", h.echoHandler(h.Login))
+		apiV1.POST("/auth/refresh", h.echoHandler(h.RefreshToken))
+		apiV1.POST("/auth/logout", h.echoHandler(h.Logout))
+		apiV1.POST("/auth/logout-all", h.echoHandler(h.LogoutAll), echo.WrapMiddleware(h.GetAuthMiddleware("")))
+		apiV1.GET("/auth/validate", h.echoHandler(h.ValidateToken), echo.WrapMiddleware(h.GetAuthMiddleware("")))
 
 		// users  routes
 		apiV1.POST("/users", h.echoHandler(h.CreateUser), echo.WrapMiddleware(h.GetAuthMiddleware(domain.CreateUser)))
 		apiV1.PUT("/users/password", h.echoHandler(h.ResetPassword), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ResetUserPassword)))
 		apiV1.PUT("/users/permissions", h.echoHandler(h.UpdateUserPermissions), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ChangeUserPermission)))
 		apiV1.GET("/users", h.echoHandler(h.ListUsers), echo.WrapMiddleware(h.GetAuthMiddleware(domain.UserRead)))
-		apiV1.PUT("/users/self/password", h.echoHandler(h.ChangePassword), echo.WrapMiddleware(h.GetAuthMiddleware("")))
+		apiV1.PUT("/users/self/password", h.echoHandler(h.ChangePassword), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ChangeOwnPassword)))
 		apiV1.GET("/users/self", h.echoHandler(h.GetSelfUser), echo.WrapMiddleware(h.GetAuthMiddleware("")))
 
 		// role routes
@@ -56,6 +60,10 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		apiV1.GET("/pod-scheduling-metrics/runtime", h.echoHandler(h.ListPodSchedulingMetricValues), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMRead)))
 		apiV1.PUT("/pod-scheduling-metrics", h.echoHandler(h.UpdatePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMUpdate)))
 		apiV1.DELETE("/pod-scheduling-metrics", h.echoHandler(h.DeletePodSchedulingMetrics), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PSMDelete)))
+
+		// scheduler runtime config routes
+		apiV1.POST("/scheduler/runtime-config/apply", h.echoHandler(h.ApplyRuntimeConfig), echo.WrapMiddleware(h.GetAuthMiddleware(domain.SchedulerConfigUpdate)))
+		apiV1.GET("/scheduler/runtime-config/status", h.echoHandler(h.GetRuntimeConfigStatus), echo.WrapMiddleware(h.GetAuthMiddleware(domain.SchedulerConfigRead)))
 	}
 
 }

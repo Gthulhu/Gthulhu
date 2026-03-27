@@ -58,7 +58,15 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	Token string `json:"token"`
+	Token        string `json:"token"`
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+}
+
+type ValidateTokenResponse struct {
+	Valid              bool   `json:"valid"`
+	UID                string `json:"uid"`
+	NeedChangePassword bool   `json:"needChangePassword"`
 }
 
 // Login godoc
@@ -86,13 +94,149 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.Svc.Login(ctx, req.UserName, req.Password)
+	tokenPair, err := h.Svc.Login(ctx, req.UserName, req.Password)
 	if err != nil {
 		h.HandleError(ctx, w, err)
 		return
 	}
 	respData := LoginResponse{
-		Token: token,
+		Token:        tokenPair.AccessToken,
+		AccessToken:  tokenPair.AccessToken,
+		RefreshToken: tokenPair.RefreshToken,
+	}
+	response := NewSuccessResponse(&respData)
+	h.JSONResponse(ctx, w, http.StatusOK, response)
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+// RefreshToken godoc
+// @Summary Refresh access token
+// @Description Exchange a valid refresh token for a new token pair.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token payload"
+// @Success 200 {object} SuccessResponse[LoginResponse]
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/auth/refresh [post]
+func (h *Handler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req RefreshTokenRequest
+	err := h.JSONBind(r, &req)
+	if err != nil {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if req.RefreshToken == "" {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "refreshToken is required", errors.New("refreshToken is empty"))
+		return
+	}
+
+	tokenPair, err := h.Svc.RefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		h.HandleError(ctx, w, err)
+		return
+	}
+
+	respData := LoginResponse{
+		Token:        tokenPair.AccessToken,
+		AccessToken:  tokenPair.AccessToken,
+		RefreshToken: tokenPair.RefreshToken,
+	}
+	response := NewSuccessResponse(&respData)
+	h.JSONResponse(ctx, w, http.StatusOK, response)
+}
+
+// Logout godoc
+// @Summary Logout current session
+// @Description Revoke the provided refresh token.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token payload"
+// @Success 200 {object} SuccessResponse[EmptyResponse]
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/auth/logout [post]
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req RefreshTokenRequest
+	err := h.JSONBind(r, &req)
+	if err != nil {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if req.RefreshToken == "" {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "refreshToken is required", errors.New("refreshToken is empty"))
+		return
+	}
+
+	err = h.Svc.Logout(ctx, req.RefreshToken)
+	if err != nil {
+		h.HandleError(ctx, w, err)
+		return
+	}
+
+	response := NewSuccessResponse[string](nil)
+	h.JSONResponse(ctx, w, http.StatusOK, response)
+}
+
+// LogoutAll godoc
+// @Summary Logout all sessions
+// @Description Revoke all sessions for current user by incrementing token version.
+// @Tags Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} SuccessResponse[EmptyResponse]
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/auth/logout-all [post]
+func (h *Handler) LogoutAll(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	claims, ok := h.GetClaimsFromContext(ctx)
+	if !ok {
+		h.ErrorResponse(ctx, w, http.StatusUnauthorized, "Unauthorized", errors.New("claims not found"))
+		return
+	}
+
+	err := h.Svc.LogoutAll(ctx, &claims)
+	if err != nil {
+		h.HandleError(ctx, w, err)
+		return
+	}
+
+	response := NewSuccessResponse[string](nil)
+	h.JSONResponse(ctx, w, http.StatusOK, response)
+}
+
+// ValidateToken godoc
+// @Summary Validate token
+// @Description Validate the bearer token and return current claims.
+// @Tags Auth
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} SuccessResponse[ValidateTokenResponse]
+// @Failure 401 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /api/v1/auth/validate [get]
+func (h *Handler) ValidateToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	claims, ok := h.GetClaimsFromContext(ctx)
+	if !ok {
+		h.ErrorResponse(ctx, w, http.StatusUnauthorized, "Unauthorized", errors.New("claims not found"))
+		return
+	}
+
+	respData := ValidateTokenResponse{
+		Valid:              true,
+		UID:                claims.UID,
+		NeedChangePassword: claims.NeedChangePassword,
 	}
 	response := NewSuccessResponse(&respData)
 	h.JSONResponse(ctx, w, http.StatusOK, response)

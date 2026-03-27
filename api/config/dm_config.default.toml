@@ -80,3 +80,7 @@ ca_pem = """
 YOUR_CA_CERTIFICATE_HERE
 -----END CERTIFICATE-----
 """
+
+[daemon]
+endpoint = "http://127.0.0.1:18080"
+timeout_sec = 5

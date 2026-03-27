@@ -81,7 +81,10 @@ type Repository interface {
 type Service interface {
 	CreateNewUser(ctx context.Context, operator *Claims, username, password string) error
 	CreateAdminUserIfNotExists(ctx context.Context, username, password string) error
-	Login(ctx context.Context, email, password string) (token string, err error)
+	Login(ctx context.Context, email, password string) (TokenPair, error)
+	RefreshToken(ctx context.Context, refreshToken string) (TokenPair, error)
+	Logout(ctx context.Context, refreshToken string) error
+	LogoutAll(ctx context.Context, user *Claims) error
 	ChangePassword(ctx context.Context, user *Claims, oldPassword, newPassword string) error
 	ResetPassword(ctx context.Context, operator *Claims, id, newPassword string) error
 	UpdateUserPermissions(ctx context.Context, operator *Claims, id string, opt UpdateUserPermissionsOptions) error

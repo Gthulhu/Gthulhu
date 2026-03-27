@@ -82,8 +82,11 @@ export default function LoginModal() {
       
       const data = await response.json();
       
-      if (response.ok && data.success && data.data && data.data.token) {
-        login(data.data.token);
+      if (response.ok && data.success && data.data && (data.data.accessToken || data.data.token)) {
+        login({
+          accessToken: data.data.accessToken || data.data.token,
+          refreshToken: data.data.refreshToken || ''
+        });
         handleClose();
         showToast('success', 'Authentication successful!');
         

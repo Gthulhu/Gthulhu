@@ -2417,22 +2417,22 @@ func (_c *MockService_ListScheduleStrategies_Call) RunAndReturn(run func(ctx con
 }
 
 // Login provides a mock function for the type MockService
-func (_mock *MockService) Login(ctx context.Context, email string, password string) (string, error) {
+func (_mock *MockService) Login(ctx context.Context, email string, password string) (TokenPair, error) {
 	ret := _mock.Called(ctx, email, password)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Login")
 	}
 
-	var r0 string
+	var r0 TokenPair
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (TokenPair, error)); ok {
 		return returnFunc(ctx, email, password)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) TokenPair); ok {
 		r0 = returnFunc(ctx, email, password)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(TokenPair)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
 		r1 = returnFunc(ctx, email, password)
@@ -2478,14 +2478,74 @@ func (_c *MockService_Login_Call) Run(run func(ctx context.Context, email string
 	return _c
 }
 
-func (_c *MockService_Login_Call) Return(token string, err error) *MockService_Login_Call {
+func (_c *MockService_Login_Call) Return(token TokenPair, err error) *MockService_Login_Call {
 	_c.Call.Return(token, err)
 	return _c
 }
 
-func (_c *MockService_Login_Call) RunAndReturn(run func(ctx context.Context, email string, password string) (string, error)) *MockService_Login_Call {
+func (_c *MockService_Login_Call) RunAndReturn(run func(ctx context.Context, email string, password string) (TokenPair, error)) *MockService_Login_Call {
 	_c.Call.Return(run)
 	return _c
+}
+
+// Logout provides a mock function for the type MockService
+func (_mock *MockService) Logout(ctx context.Context, refreshToken string) error {
+	ret := _mock.Called(ctx, refreshToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Logout")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, refreshToken)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// LogoutAll provides a mock function for the type MockService
+func (_mock *MockService) LogoutAll(ctx context.Context, user *Claims) error {
+	ret := _mock.Called(ctx, user)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LogoutAll")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims) error); ok {
+		r0 = returnFunc(ctx, user)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// RefreshToken provides a mock function for the type MockService
+func (_mock *MockService) RefreshToken(ctx context.Context, refreshToken string) (TokenPair, error) {
+	ret := _mock.Called(ctx, refreshToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshToken")
+	}
+
+	var r0 TokenPair
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (TokenPair, error)); ok {
+		return returnFunc(ctx, refreshToken)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) TokenPair); ok {
+		r0 = returnFunc(ctx, refreshToken)
+	} else {
+		r0 = ret.Get(0).(TokenPair)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, refreshToken)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // QueryPermissions provides a mock function for the type MockService

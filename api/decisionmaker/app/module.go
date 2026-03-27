@@ -22,6 +22,9 @@ func ConfigModule(cfg config.DecisionMakerConfig) (fx.Option, error) {
 		fx.Provide(func(dmCfg config.DecisionMakerConfig) config.MTLSConfig {
 			return dmCfg.MTLS
 		}),
+		fx.Provide(func(dmCfg config.DecisionMakerConfig) config.DaemonConfig {
+			return dmCfg.Daemon
+		}),
 	), nil
 }
 
