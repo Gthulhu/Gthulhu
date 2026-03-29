@@ -19,12 +19,13 @@ type RuntimeConfigApplyOptions struct {
 }
 
 type RuntimeConfigApplyResult struct {
-	NodeID        string `json:"nodeId"`
-	Host          string `json:"host,omitempty"`
-	Success       bool   `json:"success"`
-	Error         string `json:"error,omitempty"`
-	ConfigVersion string `json:"configVersion,omitempty"`
-	AppliedAt     string `json:"appliedAt,omitempty"`
-	RestartCount  int64  `json:"restartCount,omitempty"`
-	LastError     string `json:"lastError,omitempty"`
+	NodeID        string                  `json:"nodeId"`
+	Host          string                  `json:"host,omitempty"`
+	Success       bool                    `json:"success"`
+	Error         string                  `json:"error,omitempty"`
+	ConfigVersion string                  `json:"configVersion,omitempty"`
+	AppliedAt     string                  `json:"appliedAt,omitempty"`
+	RestartCount  int64                   `json:"restartCount,omitempty"`
+	LastError     string                  `json:"lastError,omitempty"`
+	Config        *RuntimeSchedulerConfig `json:"config,omitempty"`
 }

@@ -54,28 +54,111 @@ type daemonRuntimeConfigRequest struct {
 }
 
 type daemonRuntimeConfigStatus struct {
-	ConfigVersion string `json:"configVersion,omitempty"`
-	Applied       bool   `json:"applied"`
-	AppliedAt     string `json:"appliedAt,omitempty"` // ISO 8601 timestamp
-	RestartCount  int64  `json:"restartCount,omitempty"`
-	LastError     string `json:"lastError,omitempty"`
+	ConfigVersion     string `json:"configVersion,omitempty"`
+	Applied           bool   `json:"applied"`
+	AppliedAt         string `json:"appliedAt,omitempty"`
+	RestartCount      int64  `json:"restartCount,omitempty"`
+	LastError         string `json:"lastError,omitempty"`
+	ConfigAvailable   bool   `json:"configAvailable"`
+	Mode              string `json:"mode,omitempty"`
+	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
+	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
+	KernelMode        *bool  `json:"kernelMode,omitempty"`
+	MaxTimeWatchdog   *bool  `json:"maxTimeWatchdog,omitempty"`
+	EarlyProcessing   *bool  `json:"earlyProcessing,omitempty"`
+	BuiltinIdle       *bool  `json:"builtinIdle,omitempty"`
+	SchedulerEnabled  *bool  `json:"schedulerEnabled,omitempty"`
+	MonitoringEnabled *bool  `json:"monitoringEnabled,omitempty"`
 }
 
 type daemonDetailedStatus struct {
-	ConfigVersion string `json:"configVersion,omitempty"`
-	Applied       bool   `json:"applied"`
-	AppliedAt     string `json:"appliedAt,omitempty" `
-	RestartCount  int64  `json:"restartCount"`
-	LastError     string `json:"lastError,omitempty"`
+	ConfigVersion     string `json:"configVersion,omitempty"`
+	Applied           bool   `json:"applied"`
+	AppliedAt         string `json:"appliedAt,omitempty"`
+	RestartCount      int64  `json:"restartCount"`
+	LastError         string `json:"lastError,omitempty"`
+	ConfigAvailable   bool   `json:"configAvailable"`
+	Mode              string `json:"mode,omitempty"`
+	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
+	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
+	KernelMode        *bool  `json:"kernelMode,omitempty"`
+	MaxTimeWatchdog   *bool  `json:"maxTimeWatchdog,omitempty"`
+	EarlyProcessing   *bool  `json:"earlyProcessing,omitempty"`
+	BuiltinIdle       *bool  `json:"builtinIdle,omitempty"`
+	SchedulerEnabled  *bool  `json:"schedulerEnabled,omitempty"`
+	MonitoringEnabled *bool  `json:"monitoringEnabled,omitempty"`
+}
+
+type daemonCurrentConfig struct {
+	Mode              string
+	SliceNsDefault    uint64
+	SliceNsMin        uint64
+	KernelMode        bool
+	MaxTimeWatchdog   bool
+	EarlyProcessing   bool
+	BuiltinIdle       bool
+	SchedulerEnabled  bool
+	MonitoringEnabled bool
 }
 
 type daemonControlState struct {
-	mu            sync.RWMutex
-	configVersion string
-	applied       bool
-	appliedAt     time.Time
-	restartCount  int64
-	lastError     string
+	mu                sync.RWMutex
+	configVersion     string
+	applied           bool
+	appliedAt         time.Time
+	restartCount      int64
+	lastError         string
+	runtimeConfigPath string
+	cachedConfig      *daemonCurrentConfig
+	cachedConfigMTime time.Time
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+// readCurrentConfig reads and caches runtime YAML by file mtime.
+func (s *daemonControlState) readCurrentConfig() (*daemonCurrentConfig, bool) {
+	s.mu.RLock()
+	runtimeConfigPath := s.runtimeConfigPath
+	cachedConfig := s.cachedConfig
+	cachedConfigMTime := s.cachedConfigMTime
+	s.mu.RUnlock()
+
+	if runtimeConfigPath == "" {
+		return nil, false
+	}
+
+	fi, err := os.Stat(runtimeConfigPath)
+	if err != nil {
+		return nil, false
+	}
+
+	if cachedConfig != nil && fi.ModTime().Equal(cachedConfigMTime) {
+		return cachedConfig, true
+	}
+
+	cfg, err := config.LoadConfig(runtimeConfigPath)
+	if err != nil {
+		return nil, false
+	}
+
+	loadedConfig := &daemonCurrentConfig{
+		Mode:              cfg.Scheduler.Mode,
+		SliceNsDefault:    cfg.Scheduler.SliceNsDefault,
+		SliceNsMin:        cfg.Scheduler.SliceNsMin,
+		KernelMode:        cfg.Scheduler.KernelMode,
+		MaxTimeWatchdog:   cfg.Scheduler.MaxTimeWatchdog,
+		EarlyProcessing:   cfg.EarlyProcessing,
+		BuiltinIdle:       cfg.BuiltinIdle,
+		SchedulerEnabled:  cfg.IsSchedulerEnabled(),
+		MonitoringEnabled: cfg.Monitor.Enabled,
+	}
+
+	s.mu.Lock()
+	s.cachedConfig = loadedConfig
+	s.cachedConfigMTime = fi.ModTime()
+	s.mu.Unlock()
+
+	return loadedConfig, true
 }
 
 func (s *daemonControlState) set(version string, applied bool) {
@@ -103,34 +186,76 @@ func (s *daemonControlState) recordRestart() {
 
 func (s *daemonControlState) snapshot() daemonRuntimeConfigStatus {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	configVersion := s.configVersion
+	applied := s.applied
+	restartCount := s.restartCount
+	lastError := s.lastError
+	appliedAt := s.appliedAt
+	s.mu.RUnlock()
+
 	var appliedAtStr string
-	if !s.appliedAt.IsZero() {
-		appliedAtStr = s.appliedAt.UTC().Format(time.RFC3339)
+	if !appliedAt.IsZero() {
+		appliedAtStr = appliedAt.UTC().Format(time.RFC3339)
 	}
-	return daemonRuntimeConfigStatus{
-		ConfigVersion: s.configVersion,
-		Applied:       s.applied,
+
+	resp := daemonRuntimeConfigStatus{
+		ConfigVersion: configVersion,
+		Applied:       applied,
 		AppliedAt:     appliedAtStr,
-		RestartCount:  s.restartCount,
-		LastError:     s.lastError,
+		RestartCount:  restartCount,
+		LastError:     lastError,
 	}
+	if cfg, ok := s.readCurrentConfig(); ok {
+		resp.ConfigAvailable = true
+		resp.Mode = cfg.Mode
+		resp.SliceNsDefault = cfg.SliceNsDefault
+		resp.SliceNsMin = cfg.SliceNsMin
+		resp.KernelMode = boolPtr(cfg.KernelMode)
+		resp.MaxTimeWatchdog = boolPtr(cfg.MaxTimeWatchdog)
+		resp.EarlyProcessing = boolPtr(cfg.EarlyProcessing)
+		resp.BuiltinIdle = boolPtr(cfg.BuiltinIdle)
+		resp.SchedulerEnabled = boolPtr(cfg.SchedulerEnabled)
+		resp.MonitoringEnabled = boolPtr(cfg.MonitoringEnabled)
+	}
+
+	return resp
 }
 
 func (s *daemonControlState) detailedSnapshot() daemonDetailedStatus {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	configVersion := s.configVersion
+	applied := s.applied
+	restartCount := s.restartCount
+	lastError := s.lastError
+	appliedAt := s.appliedAt
+	s.mu.RUnlock()
+
 	var appliedAtStr string
-	if !s.appliedAt.IsZero() {
-		appliedAtStr = s.appliedAt.UTC().Format(time.RFC3339)
+	if !appliedAt.IsZero() {
+		appliedAtStr = appliedAt.UTC().Format(time.RFC3339)
 	}
-	return daemonDetailedStatus{
-		ConfigVersion: s.configVersion,
-		Applied:       s.applied,
+
+	resp := daemonDetailedStatus{
+		ConfigVersion: configVersion,
+		Applied:       applied,
 		AppliedAt:     appliedAtStr,
-		RestartCount:  s.restartCount,
-		LastError:     s.lastError,
+		RestartCount:  restartCount,
+		LastError:     lastError,
 	}
+	if cfg, ok := s.readCurrentConfig(); ok {
+		resp.ConfigAvailable = true
+		resp.Mode = cfg.Mode
+		resp.SliceNsDefault = cfg.SliceNsDefault
+		resp.SliceNsMin = cfg.SliceNsMin
+		resp.KernelMode = boolPtr(cfg.KernelMode)
+		resp.MaxTimeWatchdog = boolPtr(cfg.MaxTimeWatchdog)
+		resp.EarlyProcessing = boolPtr(cfg.EarlyProcessing)
+		resp.BuiltinIdle = boolPtr(cfg.BuiltinIdle)
+		resp.SchedulerEnabled = boolPtr(cfg.SchedulerEnabled)
+		resp.MonitoringEnabled = boolPtr(cfg.MonitoringEnabled)
+	}
+
+	return resp
 }
 
 func main() {
@@ -232,7 +357,10 @@ func runDaemonMode(args []string) error {
 	defer signal.Stop(sigCh)
 
 	restartReqCh := make(chan struct{}, 1)
-	state := &daemonControlState{}
+	state := &daemonControlState{
+		runtimeConfigPath: *runtimeConfigPath,
+	}
+	state.set("bootstrap", false)
 	if err := startDaemonControlServer(*controlAddr, *runtimeConfigPath, state, restartReqCh); err != nil {
 		return err
 	}
@@ -443,7 +571,6 @@ func isSchedulerEnabledInConfig(configPath string) bool {
 }
 
 func runSchedulerMode(args []string) error {
-
 	// Parse command line flags
 	fs := flag.NewFlagSet(modeScheduler, flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)

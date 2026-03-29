@@ -9,6 +9,10 @@ import {
   ChevronRight,
   Loader2,
   Inbox,
+  Cpu,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 function truncateText(text, maxLen) {
@@ -19,7 +23,7 @@ function truncateText(text, maxLen) {
 
 export default function NodeDetailPage() {
   const { nodeId } = useParams();
-  const { isAuthenticated, makeAuthenticatedRequest, showToast } = useApp();
+  const { isAuthenticated, makeAuthenticatedRequest, showToast, getRuntimeConfigStatus } = useApp();
 
   const [pods, setPods] = useState([]);
   const [nodeName, setNodeName] = useState('--');
@@ -29,6 +33,10 @@ export default function NodeDetailPage() {
   const [expandedPods, setExpandedPods] = useState(new Set());
   const [autoRefresh, setAutoRefresh] = useState(false);
   const intervalRef = useRef(null);
+
+  // Node scheduler runtime config
+  const [nodeConfig, setNodeConfig] = useState(null);
+  const [loadingConfig, setLoadingConfig] = useState(false);
 
   const fetchPods = useCallback(async () => {
     if (!isAuthenticated || !nodeId) return;
@@ -63,9 +71,26 @@ export default function NodeDetailPage() {
     }
   }, [isAuthenticated, makeAuthenticatedRequest, nodeId, showToast]);
 
+  const fetchNodeConfig = useCallback(async () => {
+    if (!isAuthenticated || !nodeId) return;
+    setLoadingConfig(true);
+    try {
+      const results = await getRuntimeConfigStatus([nodeId]);
+      setNodeConfig(results.length > 0 ? results[0] : null);
+    } catch (err) {
+      // Silently handle — config may not be available for all nodes
+      setNodeConfig(null);
+    } finally {
+      setLoadingConfig(false);
+    }
+  }, [isAuthenticated, nodeId, getRuntimeConfigStatus]);
+
   useEffect(() => {
-    if (isAuthenticated) fetchPods();
-  }, [isAuthenticated, fetchPods]);
+    if (isAuthenticated) {
+      fetchPods();
+      fetchNodeConfig();
+    }
+  }, [isAuthenticated, fetchPods, fetchNodeConfig]);
 
   useEffect(() => {
     if (autoRefresh && isAuthenticated) {
@@ -134,6 +159,142 @@ export default function NodeDetailPage() {
         <div className="stat-card">
           <div className="stat-card-label">Last Updated</div>
           <div className="stat-card-value" style={{ fontSize: 14 }}>{lastUpdated}</div>
+        </div>
+      </div>
+
+      {/* Scheduler Runtime Config for this node */}
+      <div className="card">
+        <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="card-title">
+            <Cpu size={16} />
+            Scheduler Runtime Config
+          </h3>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={fetchNodeConfig}
+            disabled={loadingConfig}
+            title="Refresh config"
+          >
+            <RefreshCw size={14} className={loadingConfig ? 'spin' : ''} />
+          </button>
+        </div>
+        <div className="card-body" style={{ padding: 'var(--space-xl)' }}>
+          {loadingConfig ? (
+            <div className="empty-state">
+              <Loader2 size={20} className="spin" />
+              <p>Loading scheduler config...</p>
+            </div>
+          ) : nodeConfig ? (
+            <div>
+              {/* Status banner */}
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                {nodeConfig.success ? (
+                  <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <CheckCircle size={12} /> Applied
+                  </span>
+                ) : nodeConfig.lastError ? (
+                  <span className="badge badge-danger" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <XCircle size={12} /> Error
+                  </span>
+                ) : (
+                  <span className="badge badge-secondary" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertCircle size={12} /> Unknown
+                  </span>
+                )}
+                {nodeConfig.configVersion && (
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
+                    v{nodeConfig.configVersion}
+                  </span>
+                )}
+              </div>
+
+              {/* Config details grid */}
+              <div className="detail-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                {nodeConfig.config ? (
+                  <>
+                    <div className="detail-item">
+                      <span className="detail-label">Mode</span>
+                      <span className="detail-value">{nodeConfig.config.mode || '—'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Scheduler Enabled</span>
+                      <span className="detail-value">{nodeConfig.config.schedulerEnabled ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Monitoring Enabled</span>
+                      <span className="detail-value">{nodeConfig.config.monitoringEnabled ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Default Slice (ns)</span>
+                      <span className="detail-value" style={{ fontFamily: 'monospace' }}>{nodeConfig.config.sliceNsDefault?.toLocaleString() || '—'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Min Slice (ns)</span>
+                      <span className="detail-value" style={{ fontFamily: 'monospace' }}>{nodeConfig.config.sliceNsMin?.toLocaleString() || '—'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Kernel Mode</span>
+                      <span className="detail-value">{nodeConfig.config.kernelMode ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Max-Time Watchdog</span>
+                      <span className="detail-value">{nodeConfig.config.maxTimeWatchdog ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Early Processing</span>
+                      <span className="detail-value">{nodeConfig.config.earlyProcessing ? 'Yes' : 'No'}</span>
+                    </div>
+                    <div className="detail-item">
+                      <span className="detail-label">Built-in Idle</span>
+                      <span className="detail-value">{nodeConfig.config.builtinIdle ? 'Yes' : 'No'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <p style={{ color: 'var(--color-text-secondary)', marginBottom: 12 }}>
+                      No config has been applied to this node yet. Apply a config from the <a href="#/nodes" style={{ color: 'var(--color-primary)' }}>Nodes & Health</a> page.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                      {nodeConfig.host && (
+                        <div className="detail-item">
+                          <span className="detail-label">Host</span>
+                          <span className="detail-value">{nodeConfig.host}</span>
+                        </div>
+                      )}
+                      <div className="detail-item">
+                        <span className="detail-label">Applied At</span>
+                        <span className="detail-value">{nodeConfig.appliedAt ? new Date(nodeConfig.appliedAt).toLocaleString() : '—'}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-label">Restarts</span>
+                        <span className="detail-value">{nodeConfig.restartCount ?? '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Meta info row */}
+              {nodeConfig.config && (
+                <div style={{ marginTop: 16, display: 'flex', gap: 24, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                  {nodeConfig.host && <span>Host: {nodeConfig.host}</span>}
+                  {nodeConfig.appliedAt && <span>Applied: {new Date(nodeConfig.appliedAt).toLocaleString()}</span>}
+                  {nodeConfig.restartCount != null && <span>Restarts: {nodeConfig.restartCount}</span>}
+                </div>
+              )}
+
+              {nodeConfig.lastError && (
+                <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--color-danger-bg, rgba(239,68,68,0.1))', borderRadius: 6, fontSize: 12, color: 'var(--color-error)' }}>
+                  <strong>Error:</strong> {nodeConfig.lastError}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <Cpu size={20} />
+              <p>No scheduler config available for this node</p>
+            </div>
+          )}
         </div>
       </div>
 
