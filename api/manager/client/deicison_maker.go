@@ -405,15 +405,16 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 			AppliedAt         string `json:"appliedAt,omitempty"`
 			RestartCount      int64  `json:"restartCount,omitempty"`
 			LastError         string `json:"lastError,omitempty"`
+			ConfigAvailable   bool   `json:"configAvailable"`
 			Mode              string `json:"mode,omitempty"`
 			SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 			SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
-			KernelMode        bool   `json:"kernelMode,omitempty"`
-			MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
-			EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
-			BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
-			SchedulerEnabled  bool   `json:"schedulerEnabled"`
-			MonitoringEnabled bool   `json:"monitoringEnabled"`
+			KernelMode        *bool  `json:"kernelMode,omitempty"`
+			MaxTimeWatchdog   *bool  `json:"maxTimeWatchdog,omitempty"`
+			EarlyProcessing   *bool  `json:"earlyProcessing,omitempty"`
+			BuiltinIdle       *bool  `json:"builtinIdle,omitempty"`
+			SchedulerEnabled  *bool  `json:"schedulerEnabled,omitempty"`
+			MonitoringEnabled *bool  `json:"monitoringEnabled,omitempty"`
 		} `json:"data,omitempty"`
 	}
 
@@ -443,20 +444,30 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 				result.Error = "runtime config not applied yet"
 			}
 		}
-		// Include the current config values from the daemon
-		// Config is always available when the daemon reports applied status
-		if statusResp.Data.Applied || statusResp.Data.Mode != "" || statusResp.Data.SliceNsDefault != 0 {
+		if statusResp.Data.ConfigAvailable {
 			result.Config = &domain.RuntimeSchedulerConfig{
-				ConfigVersion:     statusResp.Data.ConfigVersion,
-				Mode:              statusResp.Data.Mode,
-				SliceNsDefault:    statusResp.Data.SliceNsDefault,
-				SliceNsMin:        statusResp.Data.SliceNsMin,
-				KernelMode:        statusResp.Data.KernelMode,
-				MaxTimeWatchdog:   statusResp.Data.MaxTimeWatchdog,
-				EarlyProcessing:   statusResp.Data.EarlyProcessing,
-				BuiltinIdle:       statusResp.Data.BuiltinIdle,
-				SchedulerEnabled:  statusResp.Data.SchedulerEnabled,
-				MonitoringEnabled: statusResp.Data.MonitoringEnabled,
+				ConfigVersion:  statusResp.Data.ConfigVersion,
+				Mode:           statusResp.Data.Mode,
+				SliceNsDefault: statusResp.Data.SliceNsDefault,
+				SliceNsMin:     statusResp.Data.SliceNsMin,
+			}
+			if statusResp.Data.KernelMode != nil {
+				result.Config.KernelMode = *statusResp.Data.KernelMode
+			}
+			if statusResp.Data.MaxTimeWatchdog != nil {
+				result.Config.MaxTimeWatchdog = *statusResp.Data.MaxTimeWatchdog
+			}
+			if statusResp.Data.EarlyProcessing != nil {
+				result.Config.EarlyProcessing = *statusResp.Data.EarlyProcessing
+			}
+			if statusResp.Data.BuiltinIdle != nil {
+				result.Config.BuiltinIdle = *statusResp.Data.BuiltinIdle
+			}
+			if statusResp.Data.SchedulerEnabled != nil {
+				result.Config.SchedulerEnabled = *statusResp.Data.SchedulerEnabled
+			}
+			if statusResp.Data.MonitoringEnabled != nil {
+				result.Config.MonitoringEnabled = *statusResp.Data.MonitoringEnabled
 			}
 		}
 	} else {

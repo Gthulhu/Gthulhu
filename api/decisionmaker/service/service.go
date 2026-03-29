@@ -501,30 +501,45 @@ func (svc *Service) GetRuntimeConfigStatus(ctx context.Context) domain.RuntimeCo
 						AppliedAt         string `json:"appliedAt,omitempty"`
 						RestartCount      int64  `json:"restartCount,omitempty"`
 						LastError         string `json:"lastError,omitempty"`
+						ConfigAvailable   bool   `json:"configAvailable"`
 						Mode              string `json:"mode,omitempty"`
 						SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 						SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
-						KernelMode        bool   `json:"kernelMode,omitempty"`
-						MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
-						EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
-						BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
-						SchedulerEnabled  bool   `json:"schedulerEnabled"`
-						MonitoringEnabled bool   `json:"monitoringEnabled"`
+						KernelMode        *bool  `json:"kernelMode,omitempty"`
+						MaxTimeWatchdog   *bool  `json:"maxTimeWatchdog,omitempty"`
+						EarlyProcessing   *bool  `json:"earlyProcessing,omitempty"`
+						BuiltinIdle       *bool  `json:"builtinIdle,omitempty"`
+						SchedulerEnabled  *bool  `json:"schedulerEnabled,omitempty"`
+						MonitoringEnabled *bool  `json:"monitoringEnabled,omitempty"`
 					} `json:"data,omitempty"`
 				}
 				if decodeErr := json.NewDecoder(resp.Body).Decode(&payload); decodeErr == nil && payload.Success && payload.Data != nil {
-					// Build config from daemon's actual running values
-					daemonConfig := &domain.RuntimeSchedulerConfig{
-						ConfigVersion:     payload.Data.ConfigVersion,
-						Mode:              payload.Data.Mode,
-						SliceNsDefault:    payload.Data.SliceNsDefault,
-						SliceNsMin:        payload.Data.SliceNsMin,
-						KernelMode:        payload.Data.KernelMode,
-						MaxTimeWatchdog:   payload.Data.MaxTimeWatchdog,
-						EarlyProcessing:   payload.Data.EarlyProcessing,
-						BuiltinIdle:       payload.Data.BuiltinIdle,
-						SchedulerEnabled:  payload.Data.SchedulerEnabled,
-						MonitoringEnabled: payload.Data.MonitoringEnabled,
+					var daemonConfig *domain.RuntimeSchedulerConfig
+					if payload.Data.ConfigAvailable {
+						daemonConfig = &domain.RuntimeSchedulerConfig{
+							ConfigVersion:  payload.Data.ConfigVersion,
+							Mode:           payload.Data.Mode,
+							SliceNsDefault: payload.Data.SliceNsDefault,
+							SliceNsMin:     payload.Data.SliceNsMin,
+						}
+						if payload.Data.KernelMode != nil {
+							daemonConfig.KernelMode = *payload.Data.KernelMode
+						}
+						if payload.Data.MaxTimeWatchdog != nil {
+							daemonConfig.MaxTimeWatchdog = *payload.Data.MaxTimeWatchdog
+						}
+						if payload.Data.EarlyProcessing != nil {
+							daemonConfig.EarlyProcessing = *payload.Data.EarlyProcessing
+						}
+						if payload.Data.BuiltinIdle != nil {
+							daemonConfig.BuiltinIdle = *payload.Data.BuiltinIdle
+						}
+						if payload.Data.SchedulerEnabled != nil {
+							daemonConfig.SchedulerEnabled = *payload.Data.SchedulerEnabled
+						}
+						if payload.Data.MonitoringEnabled != nil {
+							daemonConfig.MonitoringEnabled = *payload.Data.MonitoringEnabled
+						}
 					}
 					return domain.RuntimeConfigStatus{
 						ConfigVersion: payload.Data.ConfigVersion,

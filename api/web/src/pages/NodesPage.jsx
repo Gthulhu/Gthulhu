@@ -92,6 +92,7 @@ export default function NodesPage() {
   }, [getApiUrl, setHealthHistory]);
 
   const fetchNodeStatuses = useCallback(async () => {
+    if (!isAuthenticated) return;
     setLoadingStatus(true);
     try {
       const results = await getRuntimeConfigStatus();
@@ -101,7 +102,7 @@ export default function NodesPage() {
     } finally {
       setLoadingStatus(false);
     }
-  }, [getRuntimeConfigStatus, showToast]);
+  }, [isAuthenticated, getRuntimeConfigStatus, showToast]);
 
   const handleApplyRuntimeConfig = async () => {
     setApplying(true);
@@ -118,8 +119,10 @@ export default function NodesPage() {
   };
 
   useEffect(() => {
-    if (isAuthenticated) fetchNodes();
-    fetchNodeStatuses();
+    if (isAuthenticated) {
+      fetchNodes();
+      fetchNodeStatuses();
+    }
   }, [isAuthenticated, fetchNodes, fetchNodeStatuses]);
 
   useEffect(() => {
@@ -384,7 +387,7 @@ export default function NodesPage() {
                   });
                 };
                 return (
-                  <div key={i} style={{ borderBottom: i < nodeStatuses.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                  <div key={n.nodeId || n.host || i} style={{ borderBottom: i < nodeStatuses.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                     {/* Summary row */}
                     <div
                       onClick={toggleExpand}
