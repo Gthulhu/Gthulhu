@@ -1,0 +1,84 @@
+# Multi-stage Dockerfile for building all sched_ext schedulers from scx
+# Usage example:
+#   docker build -f Dockerfile -t gthulhu:latest .
+#   docker build -f Dockerfile.scx --build-arg BASE_IMAGE=gthulhu:latest -t gthulhu:scx .
+
+ARG BASE_IMAGE=gthulhu:latest
+
+FROM --platform=$BUILDPLATFORM ubuntu:25.04 AS scx-builder
+
+ARG TARGETARCH
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    clang \
+    llvm \
+    libelf-dev \
+    libpcap-dev \
+    libseccomp-dev \
+    build-essential \
+    make \
+    git \
+    ca-certificates \
+    wget \
+    curl \
+    pkg-config \
+    libzstd-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cross-compilation toolchain for arm64 when needed.
+RUN if [ "$TARGETARCH" = "arm64" ]; then \
+        dpkg --add-architecture arm64 && \
+        sed -i "s/^Types: deb$/Types: deb\nArchitectures: amd64/" /etc/apt/sources.list.d/ubuntu.sources && \
+        . /etc/os-release && \
+        printf 'Types: deb\nURIs: http://ports.ubuntu.com/ubuntu-ports/\nSuites: %s %s-updates\nComponents: main universe restricted multiverse\nArchitectures: arm64\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' \
+            "$VERSION_CODENAME" "$VERSION_CODENAME" \
+            > /etc/apt/sources.list.d/arm64-cross.sources && \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+        gcc-aarch64-linux-gnu \
+        libc6-dev-arm64-cross \
+        libelf-dev:arm64 \
+        libzstd-dev:arm64 \
+        zlib1g-dev:arm64 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /build
+COPY . .
+
+RUN set -e; \
+    case "$TARGETARCH" in \
+        "arm64") \
+            export RUST_TARGET=aarch64-unknown-linux-gnu; \
+            rustup target add "$RUST_TARGET"; \
+            export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc; \
+            export PKG_CONFIG_ALLOW_CROSS=1; \
+            export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig; \
+            ;; \
+        "amd64") \
+            export RUST_TARGET=x86_64-unknown-linux-gnu; \
+            ;; \
+        *) \
+            echo "Unsupported target arch: $TARGETARCH" >&2; \
+            exit 1; \
+            ;; \
+    esac; \
+    cd scx; \
+    SCHEDULERS="$(find scheds/rust -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)"; \
+    for scheduler in $SCHEDULERS; do \
+        cargo build --release --target "$RUST_TARGET" -p "$scheduler"; \
+    done; \
+    mkdir -p /out; \
+    for scheduler in $SCHEDULERS; do \
+        install -m 0755 "target/$RUST_TARGET/release/$scheduler" "/out/$scheduler"; \
+    done
+
+FROM ${BASE_IMAGE}
+
+WORKDIR /gthulhu
+COPY --from=scx-builder /out/ /gthulhu/
