@@ -56,9 +56,13 @@ RUN set -e; \
         "arm64") \
             export RUST_TARGET=aarch64-unknown-linux-gnu; \
             rustup target add "$RUST_TARGET"; \
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc; \
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_AR=aarch64-linux-gnu-ar; \
             export CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc; \
+            export AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar; \
             export PKG_CONFIG_ALLOW_CROSS=1; \
-            export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig; \
+            export PKG_CONFIG_LIBDIR=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig; \
+            export PKG_CONFIG_PATH="$PKG_CONFIG_LIBDIR"; \
             ;; \
         "amd64") \
             export RUST_TARGET=x86_64-unknown-linux-gnu; \
@@ -68,9 +72,11 @@ RUN set -e; \
             exit 1; \
             ;; \
     esac; \
+    make dep; \
     cd scx; \
     SCHEDULERS="$(find scheds/rust -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort)"; \
     for scheduler in $SCHEDULERS; do \
+        echo "Building $scheduler for $RUST_TARGET"; \
         cargo build --release --target "$RUST_TARGET" -p "$scheduler"; \
     done; \
     mkdir -p /out; \
