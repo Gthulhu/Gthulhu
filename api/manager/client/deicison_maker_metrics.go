@@ -32,6 +32,15 @@ var podSchedulingMetricFamilies = map[string]func(item *domain.PodSchedulingMetr
 	"gthulhu_pod_cpu_migrations_total": func(item *domain.PodSchedulingMetricValue, value uint64) {
 		item.CPUMigrations = value
 	},
+	"gthulhu_pod_smt_migrations_total": func(item *domain.PodSchedulingMetricValue, value uint64) {
+		item.SMTMigrations = value
+	},
+	"gthulhu_pod_l3_migrations_total": func(item *domain.PodSchedulingMetricValue, value uint64) {
+		item.L3Migrations = value
+	},
+	"gthulhu_pod_numa_migrations_total": func(item *domain.PodSchedulingMetricValue, value uint64) {
+		item.NUMAMigrations = value
+	},
 }
 
 func (dm *DecisionMakerClient) GetPodSchedulingMetricValues(ctx context.Context, decisionMaker *domain.DecisionMakerPod) ([]*domain.PodSchedulingMetricValue, error) {

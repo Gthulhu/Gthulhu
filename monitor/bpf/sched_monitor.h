@@ -34,6 +34,18 @@ struct task_sched_metrics {
     __u64 run_count;                   // how many times the task was dispatched
     __u32 last_cpu;                    // last CPU id
     __u32 cpu_migrations;              // number of cross-CPU migrations
+    __u32 smt_migrations;              // migrations between SMT siblings (same core)
+    __u32 l3_migrations;               // migrations across cores in same package/NUMA
+    __u32 numa_migrations;             // migrations across NUMA/package
+};
+
+struct cpu_topology_info {
+    __u32 core_id;
+    __u32 package_id;
+    __u32 numa_id;
+    __u32 llc_id;
+    __u8  valid;
+    __u8  _pad[3];
 };
 
 // ---- Optional ring-buffer event for real-time streaming ----
