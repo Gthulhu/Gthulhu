@@ -13,8 +13,8 @@ import (
 
 func TestMetricNames(t *testing.T) {
 	names := MetricNames()
-	if len(names) != 7 {
-		t.Errorf("expected 7 metric names, got %d", len(names))
+	if len(names) != 10 {
+		t.Errorf("expected 10 metric names, got %d", len(names))
 	}
 
 	want := map[string]bool{
@@ -24,6 +24,9 @@ func TestMetricNames(t *testing.T) {
 		"gthulhu_pod_wait_time_nanoseconds_total":    true,
 		"gthulhu_pod_run_count_total":                true,
 		"gthulhu_pod_cpu_migrations_total":           true,
+		"gthulhu_pod_smt_migrations_total":           true,
+		"gthulhu_pod_l3_migrations_total":            true,
+		"gthulhu_pod_numa_migrations_total":          true,
 		"gthulhu_pod_process_count":                  true,
 	}
 	for _, n := range names {
@@ -51,8 +54,8 @@ func TestPodSchedMetricsCollector_Describe(t *testing.T) {
 	for range ch {
 		count++
 	}
-	if count != 7 {
-		t.Errorf("Describe emitted %d descriptors, want 7", count)
+	if count != 10 {
+		t.Errorf("Describe emitted %d descriptors, want 10", count)
 	}
 }
 
@@ -70,6 +73,9 @@ func TestPodSchedMetricsCollector_Collect_SinglePod(t *testing.T) {
 				WaitTimeNs:             1000000000,
 				RunCount:               200,
 				CpuMigrations:          5,
+				SMTMigrations:          2,
+				L3Migrations:           2,
+				NUMAMigrations:         1,
 				ProcessCount:           3,
 			},
 		},
@@ -84,9 +90,9 @@ func TestPodSchedMetricsCollector_Collect_SinglePod(t *testing.T) {
 	for range ch {
 		count++
 	}
-	// 7 metrics per pod × 1 pod = 7
-	if count != 7 {
-		t.Errorf("Collect emitted %d metrics, want 7", count)
+	// 10 metrics per pod × 1 pod = 10
+	if count != 10 {
+		t.Errorf("Collect emitted %d metrics, want 10", count)
 	}
 }
 
@@ -127,8 +133,8 @@ func TestPodSchedMetricsCollector_Collect_MultiplePods(t *testing.T) {
 	for range ch {
 		count++
 	}
-	// 7 metrics × 3 pods = 21
-	if count != 21 {
-		t.Errorf("Collect emitted %d metrics for 3 pods, want 21", count)
+	// 10 metrics × 3 pods = 30
+	if count != 30 {
+		t.Errorf("Collect emitted %d metrics for 3 pods, want 30", count)
 	}
 }

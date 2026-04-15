@@ -57,6 +57,15 @@ struct {
     __uint(max_entries, 256 * 1024); // 256 KB
 } events_rb SEC(".maps");
 
+// CPU topology injected by user-space collector.
+// Key: cpu id (u32), Value: struct cpu_topology_info
+struct {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, 1024);
+    __type(key, __u32);
+    __type(value, struct cpu_topology_info);
+} cpu_topology_map SEC(".maps");
+
 // ========================== Globals ==========================
 
 // When true every task is monitored; when false only entries in
@@ -92,6 +101,30 @@ static __always_inline struct task_sched_metrics *get_or_init_metrics(__u32 pid,
     };
     bpf_map_update_elem(&task_metrics, &pid, &init, BPF_NOEXIST);
     return bpf_map_lookup_elem(&task_metrics, &pid);
+}
+
+static __always_inline void classify_cpu_migration(struct task_sched_metrics *m, __u32 from_cpu, __u32 to_cpu)
+{
+    const struct cpu_topology_info *old_topo, *new_topo;
+
+    m->cpu_migrations++;
+
+    old_topo = bpf_map_lookup_elem(&cpu_topology_map, &from_cpu);
+    new_topo = bpf_map_lookup_elem(&cpu_topology_map, &to_cpu);
+    if (!old_topo || !new_topo || !old_topo->valid || !new_topo->valid) {
+        // Fallback classification when topology is unavailable.
+        m->l3_migrations++;
+        return;
+    }
+
+    if (old_topo->core_id == new_topo->core_id) {
+        m->smt_migrations++;
+    } else if (old_topo->package_id == new_topo->package_id &&
+               old_topo->numa_id == new_topo->numa_id) {
+        m->l3_migrations++;
+    } else {
+        m->numa_migrations++;
+    }
 }
 
 // ========================== Tracepoints ==========================
@@ -171,9 +204,9 @@ int BPF_PROG(handle_sched_switch,
                 nm->wait_time_ns += now - nm->last_enqueue_ts;
             nm->last_enqueue_ts = 0;
 
-            // Detect CPU migration.
-            if (nm->last_cpu != 0 && nm->last_cpu != cpu)
-                nm->cpu_migrations++;
+            // Detect CPU migration after the first switch-in.
+            if (nm->run_count > 1 && nm->last_cpu != cpu)
+                classify_cpu_migration(nm, nm->last_cpu, cpu);
             nm->last_cpu = cpu;
 
             if (stream_events) {

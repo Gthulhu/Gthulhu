@@ -15,6 +15,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
@@ -25,10 +29,11 @@ import (
 
 // Config controls the collector behaviour.
 type Config struct {
-	BPFObjectPath string        // path to compiled sched_monitor.bpf.o
-	PollInterval  time.Duration // how often to read BPF maps (default 10s)
-	MonitorAll    bool          // mirror of the BPF global monitor_all flag
-	StreamEvents  bool          // mirror of the BPF global stream_events flag
+	BPFObjectPath           string        // path to compiled sched_monitor.bpf.o
+	PollInterval            time.Duration // how often to read BPF maps (default 10s)
+	MonitorAll              bool          // mirror of the BPF global monitor_all flag
+	StreamEvents            bool          // mirror of the BPF global stream_events flag
+	TopologyRefreshInterval time.Duration // how often to refresh CPU topology map (default 5m)
 }
 
 // Collector owns the eBPF lifecycle, reads maps, and provides aggregated data.
@@ -41,6 +46,7 @@ type Collector struct {
 	taskMetricsMap *bpf.BPFMap
 	monitoredPIDs  *bpf.BPFMap
 	monitoredTGIDs *bpf.BPFMap
+	cpuTopologyMap *bpf.BPFMap
 
 	// Pod mapper
 	podMapper *PodMapper
@@ -54,6 +60,9 @@ type Collector struct {
 func New(cfg Config, podMapper *PodMapper, logger *slog.Logger) *Collector {
 	if cfg.PollInterval == 0 {
 		cfg.PollInterval = 10 * time.Second
+	}
+	if cfg.TopologyRefreshInterval == 0 {
+		cfg.TopologyRefreshInterval = 5 * time.Minute
 	}
 	if logger == nil {
 		logger = slog.Default()
@@ -77,6 +86,8 @@ func (c *Collector) Start(ctx context.Context) error {
 
 	ticker := time.NewTicker(c.cfg.PollInterval)
 	defer ticker.Stop()
+	topologyTicker := time.NewTicker(c.cfg.TopologyRefreshInterval)
+	defer topologyTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -84,6 +95,10 @@ func (c *Collector) Start(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			c.poll()
+		case <-topologyTicker.C:
+			if err := c.injectCPUTopology(); err != nil {
+				c.logger.Warn("failed to refresh cpu topology map", "error", err)
+			}
 		}
 	}
 }
@@ -189,6 +204,13 @@ func (c *Collector) loadBPF() error {
 	if err != nil {
 		return fmt.Errorf("get monitored_tgids map: %w", err)
 	}
+	c.cpuTopologyMap, err = mod.GetMap("cpu_topology_map")
+	if err != nil {
+		return fmt.Errorf("get cpu_topology_map map: %w", err)
+	}
+	if err := c.injectCPUTopology(); err != nil {
+		c.logger.Warn("failed to inject cpu topology map", "error", err)
+	}
 
 	return nil
 }
@@ -224,6 +246,9 @@ func (c *Collector) poll() {
 			WaitTimeNs:             uint64(bpfMetrics.wait_time_ns),
 			RunCount:               uint64(bpfMetrics.run_count),
 			CpuMigrations:          uint32(bpfMetrics.cpu_migrations),
+			SMTMigrations:          uint32(bpfMetrics.smt_migrations),
+			L3Migrations:           uint32(bpfMetrics.l3_migrations),
+			NUMAMigrations:         uint32(bpfMetrics.numa_migrations),
 			LastCPU:                uint32(bpfMetrics.last_cpu),
 		}
 	}
@@ -251,6 +276,9 @@ func (c *Collector) poll() {
 		agg.WaitTimeNs += tm.WaitTimeNs
 		agg.RunCount += tm.RunCount
 		agg.CpuMigrations += tm.CpuMigrations
+		agg.SMTMigrations += tm.SMTMigrations
+		agg.L3Migrations += tm.L3Migrations
+		agg.NUMAMigrations += tm.NUMAMigrations
 		agg.ProcessCount++
 	}
 
@@ -259,4 +287,101 @@ func (c *Collector) poll() {
 	c.podMetrics = podAgg
 	c.mu.Unlock()
 	c.logger.Debug("poll complete", "pids", len(pidMetrics), "pods", len(podAgg))
+}
+
+type cpuTopologyInfo struct {
+	CoreID    uint32
+	PackageID uint32
+	NUMAID    uint32
+	LLCID     uint32
+	Valid     uint8
+	Pad       [3]uint8
+}
+
+func (c *Collector) injectCPUTopology() error {
+	if c.cpuTopologyMap == nil {
+		return nil
+	}
+
+	cpuDirs, err := filepath.Glob("/sys/devices/system/cpu/cpu[0-9]*")
+	if err != nil {
+		return fmt.Errorf("glob cpu topology dirs: %w", err)
+	}
+
+	for _, cpuDir := range cpuDirs {
+		cpuID, err := parseCPUID(cpuDir)
+		if err != nil {
+			continue
+		}
+
+		coreID, err := readUint32File(filepath.Join(cpuDir, "topology/core_id"))
+		if err != nil {
+			continue
+		}
+		packageID, err := readUint32File(filepath.Join(cpuDir, "topology/physical_package_id"))
+		if err != nil {
+			continue
+		}
+
+		numaID := packageID
+		if parsedNUMAID, numaErr := readNUMAID(cpuDir); numaErr == nil {
+			numaID = parsedNUMAID
+		}
+
+		llcID := uint32(0)
+		if parsedLLCID, llcErr := readUint32File(filepath.Join(cpuDir, "cache/index3/id")); llcErr == nil {
+			llcID = parsedLLCID
+		}
+
+		key := cpuID
+		value := cpuTopologyInfo{
+			CoreID:    coreID,
+			PackageID: packageID,
+			NUMAID:    numaID,
+			LLCID:     llcID,
+			Valid:     1,
+		}
+		if err := c.cpuTopologyMap.Update(unsafe.Pointer(&key), unsafe.Pointer(&value)); err != nil {
+			c.logger.Debug("failed to update cpu topology entry", "cpu", cpuID, "error", err)
+		}
+	}
+
+	return nil
+}
+
+func parseCPUID(cpuDir string) (uint32, error) {
+	base := filepath.Base(cpuDir)
+	if !strings.HasPrefix(base, "cpu") {
+		return 0, fmt.Errorf("invalid cpu dir: %s", cpuDir)
+	}
+	id, err := strconv.ParseUint(strings.TrimPrefix(base, "cpu"), 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse cpu id %s: %w", cpuDir, err)
+	}
+	return uint32(id), nil
+}
+
+func readNUMAID(cpuDir string) (uint32, error) {
+	nodeDirs, err := filepath.Glob(filepath.Join(cpuDir, "node*"))
+	if err != nil || len(nodeDirs) == 0 {
+		return 0, fmt.Errorf("no numa node for %s", cpuDir)
+	}
+	base := filepath.Base(nodeDirs[0])
+	id, err := strconv.ParseUint(strings.TrimPrefix(base, "node"), 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("parse numa id for %s: %w", cpuDir, err)
+	}
+	return uint32(id), nil
+}
+
+func readUint32File(path string) (uint32, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	value, err := strconv.ParseUint(strings.TrimSpace(string(data)), 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(value), nil
 }

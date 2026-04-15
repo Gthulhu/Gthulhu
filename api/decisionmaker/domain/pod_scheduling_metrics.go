@@ -97,6 +97,9 @@ type TaskSchedMetrics struct {
 	WaitTimeNs             uint64 `json:"waitTimeNs"`
 	RunCount               uint64 `json:"runCount"`
 	CpuMigrations          uint32 `json:"cpuMigrations"`
+	SMTMigrations          uint32 `json:"smtMigr"`
+	L3Migrations           uint32 `json:"l3Migr"`
+	NUMAMigrations         uint32 `json:"numaMigr"`
 	LastCPU                uint32 `json:"lastCpu"`
 }
 
@@ -112,5 +115,8 @@ type PodSchedMetrics struct {
 	WaitTimeNs             uint64 `json:"waitTimeNs"`
 	RunCount               uint64 `json:"runCount"`
 	CpuMigrations          uint32 `json:"cpuMigrations"`
+	SMTMigrations          uint32 `json:"smtMigr"`
+	L3Migrations           uint32 `json:"l3Migr"`
+	NUMAMigrations         uint32 `json:"numaMigr"`
 	ProcessCount           int    `json:"processCount"`
 }

@@ -16,6 +16,9 @@ type PodSchedulingMetricValueItem struct {
 	WaitTimeNs             uint64 `json:"waitTimeNs"`
 	RunCount               uint64 `json:"runCount"`
 	CPUMigrations          uint64 `json:"cpuMigrations"`
+	SMTMigrations          uint64 `json:"smtMigr"`
+	L3Migrations           uint64 `json:"l3Migr"`
+	NUMAMigrations         uint64 `json:"numaMigr"`
 }
 
 type ListPodSchedulingMetricValuesResponse struct {
@@ -65,5 +68,8 @@ func domainPodSchedulingMetricValueToResponse(item *domain.PodSchedulingMetricVa
 		WaitTimeNs:             item.WaitTimeNs,
 		RunCount:               item.RunCount,
 		CPUMigrations:          item.CPUMigrations,
+		SMTMigrations:          item.SMTMigrations,
+		L3Migrations:           item.L3Migrations,
+		NUMAMigrations:         item.NUMAMigrations,
 	}
 }

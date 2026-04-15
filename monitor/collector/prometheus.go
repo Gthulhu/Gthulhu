@@ -23,6 +23,9 @@ type PodSchedMetricsCollector struct {
 	waitTimeNs             *prometheus.Desc
 	runCount               *prometheus.Desc
 	cpuMigrations          *prometheus.Desc
+	smtMigrations          *prometheus.Desc
+	l3Migrations           *prometheus.Desc
+	numaMigrations         *prometheus.Desc
 	processCount           *prometheus.Desc
 }
 
@@ -66,6 +69,21 @@ func NewPodSchedMetricsCollector(c *Collector) *PodSchedMetricsCollector {
 			"Total CPU migration count for processes in a pod",
 			labels, nil,
 		),
+		smtMigrations: prometheus.NewDesc(
+			prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "smt_migrations_total"),
+			"Total SMT-sibling CPU migrations for processes in a pod",
+			labels, nil,
+		),
+		l3Migrations: prometheus.NewDesc(
+			prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "l3_migrations_total"),
+			"Total same-package cross-core CPU migrations for processes in a pod",
+			labels, nil,
+		),
+		numaMigrations: prometheus.NewDesc(
+			prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "numa_migrations_total"),
+			"Total cross-NUMA CPU migrations for processes in a pod",
+			labels, nil,
+		),
 		processCount: prometheus.NewDesc(
 			prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "process_count"),
 			"Number of processes currently tracked for this pod",
@@ -82,6 +100,9 @@ func (p *PodSchedMetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- p.waitTimeNs
 	ch <- p.runCount
 	ch <- p.cpuMigrations
+	ch <- p.smtMigrations
+	ch <- p.l3Migrations
+	ch <- p.numaMigrations
 	ch <- p.processCount
 }
 
@@ -96,6 +117,9 @@ func (p *PodSchedMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 		p.emitGauge(ch, p.waitTimeNs, pm.WaitTimeNs, labels)
 		p.emitGauge(ch, p.runCount, pm.RunCount, labels)
 		p.emitGauge(ch, p.cpuMigrations, uint64(pm.CpuMigrations), labels)
+		p.emitGauge(ch, p.smtMigrations, uint64(pm.SMTMigrations), labels)
+		p.emitGauge(ch, p.l3Migrations, uint64(pm.L3Migrations), labels)
+		p.emitGauge(ch, p.numaMigrations, uint64(pm.NUMAMigrations), labels)
 		p.emitGauge(ch, p.processCount, uint64(pm.ProcessCount), labels)
 	}
 }
@@ -116,6 +140,9 @@ func MetricNames() []string {
 		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "wait_time_nanoseconds_total"),
 		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "run_count_total"),
 		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "cpu_migrations_total"),
+		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "smt_migrations_total"),
+		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "l3_migrations_total"),
+		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "numa_migrations_total"),
 		prometheus.BuildFQName(metricsNamespace, metricsSubsystem, "process_count"),
 	}
 }

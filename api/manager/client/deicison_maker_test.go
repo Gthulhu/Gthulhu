@@ -253,6 +253,70 @@ func TestDecisionMakerClientMTLSEndToEnd(t *testing.T) {
 	assert.Equal(t, rootHash, got)
 }
 
+func TestGetPodSchedulingMetricValues_WithMigrationBreakdown(t *testing.T) {
+	metrics := `
+# TYPE gthulhu_pod_voluntary_ctx_switches_total counter
+gthulhu_pod_voluntary_ctx_switches_total{pod_name="pod-a",namespace="default",node_name="node-1"} 10
+# TYPE gthulhu_pod_involuntary_ctx_switches_total counter
+gthulhu_pod_involuntary_ctx_switches_total{pod_name="pod-a",namespace="default",node_name="node-1"} 3
+# TYPE gthulhu_pod_cpu_time_nanoseconds_total counter
+gthulhu_pod_cpu_time_nanoseconds_total{pod_name="pod-a",namespace="default",node_name="node-1"} 100
+# TYPE gthulhu_pod_wait_time_nanoseconds_total counter
+gthulhu_pod_wait_time_nanoseconds_total{pod_name="pod-a",namespace="default",node_name="node-1"} 20
+# TYPE gthulhu_pod_run_count_total counter
+gthulhu_pod_run_count_total{pod_name="pod-a",namespace="default",node_name="node-1"} 9
+# TYPE gthulhu_pod_cpu_migrations_total counter
+gthulhu_pod_cpu_migrations_total{pod_name="pod-a",namespace="default",node_name="node-1"} 6
+# TYPE gthulhu_pod_smt_migrations_total counter
+gthulhu_pod_smt_migrations_total{pod_name="pod-a",namespace="default",node_name="node-1"} 2
+# TYPE gthulhu_pod_l3_migrations_total counter
+gthulhu_pod_l3_migrations_total{pod_name="pod-a",namespace="default",node_name="node-1"} 3
+# TYPE gthulhu_pod_numa_migrations_total counter
+gthulhu_pod_numa_migrations_total{pod_name="pod-a",namespace="default",node_name="node-1"} 1
+`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodGet, r.Method)
+		assert.Equal(t, "/metrics", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(metrics))
+	}))
+	defer server.Close()
+
+	dm := newDecisionMakerPodFromServerURL(t, server.URL)
+	client := &DecisionMakerClient{Client: server.Client()}
+
+	got, err := client.GetPodSchedulingMetricValues(context.Background(), dm)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, uint64(6), got[0].CPUMigrations)
+	assert.Equal(t, uint64(2), got[0].SMTMigrations)
+	assert.Equal(t, uint64(3), got[0].L3Migrations)
+	assert.Equal(t, uint64(1), got[0].NUMAMigrations)
+}
+
+func TestGetPodSchedulingMetricValues_BackwardCompatibleWithoutBreakdown(t *testing.T) {
+	metrics := `
+# TYPE gthulhu_pod_cpu_migrations_total counter
+gthulhu_pod_cpu_migrations_total{pod_name="pod-a",namespace="default",node_name="node-1"} 4
+`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(metrics))
+	}))
+	defer server.Close()
+
+	dm := newDecisionMakerPodFromServerURL(t, server.URL)
+	client := &DecisionMakerClient{Client: server.Client()}
+
+	got, err := client.GetPodSchedulingMetricValues(context.Background(), dm)
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	assert.Equal(t, uint64(4), got[0].CPUMigrations)
+	assert.Equal(t, uint64(0), got[0].SMTMigrations)
+	assert.Equal(t, uint64(0), got[0].L3Migrations)
+	assert.Equal(t, uint64(0), got[0].NUMAMigrations)
+}
+
 // testCerts holds PEM-encoded self-signed CA + leaf cert for unit testing.
 type testCerts struct {
 	caPEM   string
