@@ -324,12 +324,12 @@ func (c *Collector) injectCPUTopology() error {
 		}
 
 		numaID := packageID
-		if parsedNUMAID, numaErr := readNUMAID(cpuDir); numaErr == nil {
+		if parsedNUMAID, err := readNUMAID(cpuDir); err == nil {
 			numaID = parsedNUMAID
 		}
 
 		llcID := uint32(0)
-		if parsedLLCID, llcErr := readUint32File(filepath.Join(cpuDir, "cache/index3/id")); llcErr == nil {
+		if parsedLLCID, err := readUint32File(filepath.Join(cpuDir, "cache/index3/id")); err == nil {
 			llcID = parsedLLCID
 		}
 

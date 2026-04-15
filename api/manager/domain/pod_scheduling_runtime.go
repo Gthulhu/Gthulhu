@@ -11,9 +11,9 @@ type PodSchedulingMetricValue struct {
 	WaitTimeNs             uint64 `json:"waitTimeNs"`
 	RunCount               uint64 `json:"runCount"`
 	CPUMigrations          uint64 `json:"cpuMigrations"`
-	SMTMigrations          uint64 `json:"smtMigr"`
-	L3Migrations           uint64 `json:"l3Migr"`
-	NUMAMigrations         uint64 `json:"numaMigr"`
+	SMTMigrations          uint64 `json:"smtMigrations"`
+	L3Migrations           uint64 `json:"l3Migrations"`
+	NUMAMigrations         uint64 `json:"numaMigrations"`
 }
 
 // PodSchedulingMetricValuesResult is the aggregated runtime metrics view returned by manager.
