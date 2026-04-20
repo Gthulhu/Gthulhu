@@ -2,6 +2,7 @@ package rest
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/Gthulhu/api/manager/domain"
 )
@@ -52,6 +53,22 @@ func (h *Handler) ListPodSchedulingMetricValues(w http.ResponseWriter, r *http.R
 	}
 	for _, item := range result.Items {
 		resp.Items = append(resp.Items, domainPodSchedulingMetricValueToResponse(item))
+		h.classifier.Ingest(classificationInput{
+			Timestamp: time.Now().Unix(),
+			Namespace: item.Namespace,
+			Pod:       item.PodName,
+			Node:      item.NodeID,
+			Metrics: metricsPayload{
+				VolCtxSW:   item.VoluntaryCtxSwitches,
+				InvolCtxSW: item.InvoluntaryCtxSwitches,
+				CPUTime:    item.CPUTimeNs,
+				WaitTime:   item.WaitTimeNs,
+				RunCount:   item.RunCount,
+				SMTMigr:    item.SMTMigrations,
+				L3Migr:     item.L3Migrations,
+				NUMAMigr:   item.NUMAMigrations,
+			},
+		})
 	}
 
 	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(resp))
