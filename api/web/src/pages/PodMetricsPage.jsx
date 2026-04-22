@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import SlidePanel from '../components/SlidePanel';
 import {
@@ -12,7 +13,83 @@ import {
   Inbox,
   XCircle,
   X,
+  HelpCircle,
 } from 'lucide-react';
+
+function InfoTooltip({ text }) {
+  const [visible, setVisible] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef(null);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const gap = 10;
+    setPos({
+      top: rect.top - gap,
+      left: rect.left + rect.width / 2,
+    });
+  }, []);
+
+  const showTooltip = useCallback(() => {
+    updatePosition();
+    setVisible(true);
+  }, [updatePosition]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    const onViewportChange = () => updatePosition();
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, true);
+    return () => {
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange, true);
+    };
+  }, [visible, updatePosition]);
+
+  return (
+    <span
+      ref={triggerRef}
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 4, verticalAlign: 'middle', cursor: 'default' }}
+      onMouseEnter={showTooltip}
+      onMouseLeave={() => setVisible(false)}
+      onFocus={showTooltip}
+      onBlur={() => setVisible(false)}
+      tabIndex={0}
+      aria-label={text}
+    >
+      <HelpCircle size={12} style={{ color: 'var(--color-text-secondary, #888)', flexShrink: 0 }} />
+      {visible && (
+        createPortal(
+          <span style={{
+            position: 'fixed',
+            top: Math.max(pos.top, 12),
+            left: Math.min(Math.max(pos.left, 240), window.innerWidth - 240),
+            transform: 'translate(-50%, -100%)',
+            background: 'var(--color-surface-raised, #1e2130)',
+            color: 'var(--color-text, #e2e8f0)',
+            border: '1px solid var(--color-border, #334155)',
+            borderRadius: 8,
+            padding: '10px 12px',
+            fontSize: 12,
+            lineHeight: 1.55,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            width: 'min(560px, calc(100vw - 24px))',
+            maxHeight: 'min(60vh, 420px)',
+            overflowY: 'auto',
+            zIndex: 2147483647,
+            boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
+            pointerEvents: 'none',
+          }}>
+            {text}
+          </span>,
+          document.body,
+        )
+      )}
+    </span>
+  );
+}
 
 function formatMetricValue(v) {
   return new Intl.NumberFormat().format(v || 0);
@@ -390,14 +467,14 @@ export default function PodMetricsPage() {
       </div>
 
       {/* Saved Configs */}
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card" style={{ marginTop: 16, overflow: 'visible' }}>
         <div className="card-header">
           <h3 className="card-title">
             <BarChart3 size={16} />
             Metrics Configurations
           </h3>
         </div>
-        <div className="card-body" style={{ padding: 0 }}>
+        <div className="card-body" style={{ padding: 0, overflow: 'visible' }}>
           {loading ? (
             <div className="empty-state">
               <Loader2 size={20} className="spin" />
@@ -525,11 +602,36 @@ export default function PodMetricsPage() {
                 <tr>
                   <th>NAMESPACE</th>
                   <th>POD</th>
-                  <th>PHASE</th>
-                  <th>CURRENT TYPE</th>
-                  <th>CONFIDENCE</th>
-                  <th>DRIFT</th>
-                  <th>ACTION</th>
+                  <th>
+                    PHASE
+                    <InfoTooltip text={
+                      "Lifecycle phase of the classifier:\n• cold_start — insufficient data (< 10 samples)\n• warming_up — preliminary clustering (10–30 samples)\n• stable — model is converged\n• drifting — behavior shift detected, observing\n• transitioning — drift confirmed, re-clustering"
+                    } />
+                  </th>
+                  <th>
+                    CURRENT TYPE
+                    <InfoTooltip text={
+                      "Workload labels inferred by the adaptive clustering model:\n• cpu_heavy — high CPU time per run\n• interactive — high voluntary ctx switch ratio\n• needs_higher_priority — high involuntary preemptions\n• cache_unfriendly — frequent cross-L3 migrations\n• numa_unfriendly — frequent cross-NUMA migrations\n• scheduling_latency — high wait-to-run ratio\n• balanced — no dominant characteristic"
+                    } />
+                  </th>
+                  <th>
+                    CONFIDENCE
+                    <InfoTooltip text={
+                      "How closely the pod's short-term EWMA profile matches its assigned cluster center (0–100%). Low confidence may indicate a transitioning workload or insufficient samples."
+                    } />
+                  </th>
+                  <th>
+                    DRIFT
+                    <InfoTooltip text={
+                      "Drift score = mean deviation between short-term and long-term EWMA profiles, normalized by long-term variance. Score > 1.5 triggers drifting state; 3 consecutive periods confirm transitioning."
+                    } />
+                  </th>
+                  <th>
+                    ACTION
+                    <InfoTooltip text={
+                      "Recommended scheduling action based on classification:\n• increase_cpu_limit — pod is CPU-bound or starved\n• pin_to_numa_node — high NUMA migration rate\n• raise_priority — heavy preemption pressure\n• no_action — workload is balanced or stable"
+                    } />
+                  </th>
                   <th>DETAIL</th>
                 </tr>
               </thead>
