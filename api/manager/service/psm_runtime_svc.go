@@ -68,6 +68,9 @@ func (svc *Service) ListPodSchedulingMetricValues(ctx context.Context) (*domain.
 					WaitTimeNs:             item.WaitTimeNs,
 					RunCount:               item.RunCount,
 					CPUMigrations:          item.CPUMigrations,
+					SMTMigrations:          item.SMTMigrations,
+					L3Migrations:           item.L3Migrations,
+					NUMAMigrations:         item.NUMAMigrations,
 				}
 				continue
 			}
@@ -78,6 +81,9 @@ func (svc *Service) ListPodSchedulingMetricValues(ctx context.Context) (*domain.
 			existing.WaitTimeNs += item.WaitTimeNs
 			existing.RunCount += item.RunCount
 			existing.CPUMigrations += item.CPUMigrations
+			existing.SMTMigrations += item.SMTMigrations
+			existing.L3Migrations += item.L3Migrations
+			existing.NUMAMigrations += item.NUMAMigrations
 		}
 	}
 

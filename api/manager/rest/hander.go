@@ -58,12 +58,14 @@ type Params struct {
 
 func NewHandler(params Params) (*Handler, error) {
 	return &Handler{
-		Svc: params.Svc,
+		Svc:        params.Svc,
+		classifier: NewAdaptiveClassifier(5),
 	}, nil
 }
 
 type Handler struct {
-	Svc domain.Service
+	Svc        domain.Service
+	classifier *AdaptiveClassifier
 }
 
 func (h *Handler) JSONResponse(ctx context.Context, w http.ResponseWriter, status int, data any) {
