@@ -16,6 +16,9 @@ import (
 const (
 	reconcileInterval    = 30 * time.Second
 	reconcileInitialWait = 5 * time.Second
+
+	classifierFeedInterval    = 10 * time.Second
+	classifierFeedInitialWait = 10 * time.Second
 )
 
 func NewRestApp(configName string, configDirPath string) (*fx.App, error) {
@@ -49,6 +52,7 @@ func NewRestApp(configName string, configDirPath string) (*fx.App, error) {
 		fx.Invoke(migration.RunMongoMigration),
 		fx.Invoke(StartRestApp),
 		fx.Invoke(StartIntentReconciler),
+		fx.Invoke(StartClassifierFeeder),
 	)
 	return app, nil
 }
@@ -118,6 +122,59 @@ func StartIntentReconciler(lc fx.Lifecycle, svc domain.Service) error {
 						}
 					case <-stopCh:
 						logger.Logger(bgCtx).Info().Msg("intent reconciler stopped")
+						return
+					}
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			close(stopCh)
+			return nil
+		},
+	})
+
+	return nil
+}
+
+// StartClassifierFeeder starts a background goroutine that periodically
+// fetches pod scheduling metrics from decision makers and feeds them into the
+// adaptive classifier. This is the dedicated write path for the classifier,
+// keeping GET endpoints read-only.
+func StartClassifierFeeder(lc fx.Lifecycle, svc domain.Service, handler *rest.Handler) error {
+	stopCh := make(chan struct{})
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				bgCtx := context.Background()
+				logger.Logger(bgCtx).Info().Msgf("classifier feeder starting, initial wait %s, interval %s", classifierFeedInitialWait, classifierFeedInterval)
+
+				select {
+				case <-time.After(classifierFeedInitialWait):
+				case <-stopCh:
+					return
+				}
+
+				feed := func() {
+					result, err := svc.ListPodSchedulingMetricValues(bgCtx)
+					if err != nil {
+						logger.Logger(bgCtx).Warn().Err(err).Msg("classifier feeder: failed to fetch pod scheduling metrics")
+						return
+					}
+					handler.IngestMetricsIntoClassifier(result)
+				}
+
+				feed()
+
+				ticker := time.NewTicker(classifierFeedInterval)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+						feed()
+					case <-stopCh:
+						logger.Logger(bgCtx).Info().Msg("classifier feeder stopped")
 						return
 					}
 				}

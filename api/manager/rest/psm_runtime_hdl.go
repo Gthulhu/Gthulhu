@@ -2,6 +2,8 @@ package rest
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/Gthulhu/api/manager/domain"
 )
@@ -55,6 +57,37 @@ func (h *Handler) ListPodSchedulingMetricValues(w http.ResponseWriter, r *http.R
 	}
 
 	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(resp))
+}
+
+// IngestMetricsIntoClassifier is called by the background classifier feeder goroutine.
+// It feeds the latest pod scheduling metrics into the adaptive classifier without
+// causing side effects on read endpoints.
+func (h *Handler) IngestMetricsIntoClassifier(result *domain.PodSchedulingMetricValuesResult) {
+	if result == nil {
+		return
+	}
+	now := time.Now().Unix()
+	for _, item := range result.Items {
+		if item == nil {
+			continue
+		}
+		h.classifier.Ingest(classificationInput{
+			Timestamp: now,
+			Namespace: strings.TrimSpace(item.Namespace),
+			Pod:       strings.TrimSpace(item.PodName),
+			Node:      strings.TrimSpace(item.NodeID),
+			Metrics: metricsPayload{
+				VolCtxSW:   item.VoluntaryCtxSwitches,
+				InvolCtxSW: item.InvoluntaryCtxSwitches,
+				CPUTime:    item.CPUTimeNs,
+				WaitTime:   item.WaitTimeNs,
+				RunCount:   item.RunCount,
+				SMTMigr:    item.SMTMigrations,
+				L3Migr:     item.L3Migrations,
+				NUMAMigr:   item.NUMAMigrations,
+			},
+		})
+	}
 }
 
 func domainPodSchedulingMetricValueToResponse(item *domain.PodSchedulingMetricValue) *PodSchedulingMetricValueItem {
