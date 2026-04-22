@@ -33,16 +33,19 @@ func (h *Handler) IngestPodMetrics(w http.ResponseWriter, r *http.Request) {
 		h.ErrorResponse(ctx, w, http.StatusBadRequest, "invalid request body", err)
 		return
 	}
-	if strings.TrimSpace(req.Namespace) == "" || strings.TrimSpace(req.Pod) == "" {
+	namespace := strings.TrimSpace(req.Namespace)
+	pod := strings.TrimSpace(req.Pod)
+	node := strings.TrimSpace(req.Node)
+	if namespace == "" || pod == "" {
 		h.ErrorResponse(ctx, w, http.StatusBadRequest, "namespace and pod are required", nil)
 		return
 	}
 
 	item := h.classifier.Ingest(classificationInput{
 		Timestamp: req.Timestamp,
-		Namespace: req.Namespace,
-		Pod:       req.Pod,
-		Node:      req.Node,
+		Namespace: namespace,
+		Pod:       pod,
+		Node:      node,
 		Metrics:   req.Metrics,
 	})
 	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(item))
@@ -61,8 +64,8 @@ func (h *Handler) IngestPodMetrics(w http.ResponseWriter, r *http.Request) {
 // @Router /api/v1/classify/{namespace}/{pod} [get]
 func (h *Handler) GetPodClassification(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	namespace := h.GetPathParam(r, "namespace")
-	pod := h.GetPathParam(r, "pod")
+	namespace := strings.TrimSpace(h.GetPathParam(r, "namespace"))
+	pod := strings.TrimSpace(h.GetPathParam(r, "pod"))
 	if namespace == "" || pod == "" {
 		h.ErrorResponse(ctx, w, http.StatusBadRequest, "namespace and pod path parameters are required", nil)
 		return

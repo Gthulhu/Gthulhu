@@ -111,16 +111,23 @@ func (p *PodSchedMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	podMetrics := p.collector.GetPodMetrics()
 	for _, pm := range podMetrics {
 		labels := []string{pm.PodName, pm.PodUID, pm.Namespace, pm.NodeName}
-		p.emitGauge(ch, p.voluntaryCtxSwitches, pm.VoluntaryCtxSwitches, labels)
-		p.emitGauge(ch, p.involuntaryCtxSwitches, pm.InvoluntaryCtxSwitches, labels)
-		p.emitGauge(ch, p.cpuTimeNs, pm.CpuTimeNs, labels)
-		p.emitGauge(ch, p.waitTimeNs, pm.WaitTimeNs, labels)
-		p.emitGauge(ch, p.runCount, pm.RunCount, labels)
-		p.emitGauge(ch, p.cpuMigrations, uint64(pm.CpuMigrations), labels)
-		p.emitGauge(ch, p.smtMigrations, uint64(pm.SMTMigrations), labels)
-		p.emitGauge(ch, p.l3Migrations, uint64(pm.L3Migrations), labels)
-		p.emitGauge(ch, p.numaMigrations, uint64(pm.NUMAMigrations), labels)
+		p.emitCounter(ch, p.voluntaryCtxSwitches, pm.VoluntaryCtxSwitches, labels)
+		p.emitCounter(ch, p.involuntaryCtxSwitches, pm.InvoluntaryCtxSwitches, labels)
+		p.emitCounter(ch, p.cpuTimeNs, pm.CpuTimeNs, labels)
+		p.emitCounter(ch, p.waitTimeNs, pm.WaitTimeNs, labels)
+		p.emitCounter(ch, p.runCount, pm.RunCount, labels)
+		p.emitCounter(ch, p.cpuMigrations, uint64(pm.CpuMigrations), labels)
+		p.emitCounter(ch, p.smtMigrations, uint64(pm.SMTMigrations), labels)
+		p.emitCounter(ch, p.l3Migrations, uint64(pm.L3Migrations), labels)
+		p.emitCounter(ch, p.numaMigrations, uint64(pm.NUMAMigrations), labels)
 		p.emitGauge(ch, p.processCount, uint64(pm.ProcessCount), labels)
+	}
+}
+
+func (p *PodSchedMetricsCollector) emitCounter(ch chan<- prometheus.Metric, desc *prometheus.Desc, val uint64, labels []string) {
+	m, err := prometheus.NewConstMetric(desc, prometheus.CounterValue, float64(val), labels...)
+	if err == nil {
+		ch <- m
 	}
 }
 

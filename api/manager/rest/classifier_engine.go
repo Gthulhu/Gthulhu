@@ -18,6 +18,8 @@ const (
 	warmupMinSamples        = 10
 	stableMinSamples        = 30
 	maxClusterBufferSamples = 1000
+	classifierPodTTLSeconds = int64((30 * time.Minute) / time.Second)
+	classifierMaxPods       = 20000
 )
 
 type PodPhase string
@@ -564,9 +566,11 @@ type listClassifyResponse struct {
 }
 
 type AdaptiveClassifier struct {
-	mu    sync.RWMutex
-	pods  map[string]*podState
-	model *adaptiveClusteringModel
+	mu      sync.RWMutex
+	pods    map[string]*podState
+	model   *adaptiveClusteringModel
+	podTTL  int64
+	maxPods int
 }
 
 func NewAdaptiveClassifier(nClusters int) *AdaptiveClassifier {
@@ -574,8 +578,10 @@ func NewAdaptiveClassifier(nClusters int) *AdaptiveClassifier {
 		nClusters = 5
 	}
 	return &AdaptiveClassifier{
-		pods:  map[string]*podState{},
-		model: newAdaptiveClusteringModel(nClusters),
+		pods:    map[string]*podState{},
+		model:   newAdaptiveClusteringModel(nClusters),
+		podTTL:  classifierPodTTLSeconds,
+		maxPods: classifierMaxPods,
 	}
 }
 
@@ -587,6 +593,7 @@ func (c *AdaptiveClassifier) Ingest(input classificationInput) *classifyResponse
 	if ts <= 0 {
 		ts = time.Now().Unix()
 	}
+	c.cleanupLocked(time.Now().Unix())
 	key := input.Namespace + "/" + input.Pod
 	st, ok := c.pods[key]
 	if !ok {
@@ -598,9 +605,51 @@ func (c *AdaptiveClassifier) Ingest(input classificationInput) *classifyResponse
 	return buildClassifyItem(st)
 }
 
+// Cleanup evicts stale or overflow pod states.
+func (c *AdaptiveClassifier) Cleanup(now time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.cleanupLocked(now.Unix())
+}
+
+func (c *AdaptiveClassifier) cleanupLocked(nowUnix int64) {
+	if c.podTTL > 0 {
+		expireBefore := nowUnix - c.podTTL
+		for key, st := range c.pods {
+			if st.lastTimestamp <= 0 {
+				continue
+			}
+			if st.lastTimestamp < expireBefore {
+				delete(c.pods, key)
+			}
+		}
+	}
+
+	if c.maxPods <= 0 || len(c.pods) <= c.maxPods {
+		return
+	}
+
+	type podEntry struct {
+		key       string
+		timestamp int64
+	}
+	entries := make([]podEntry, 0, len(c.pods))
+	for key, st := range c.pods {
+		entries = append(entries, podEntry{key: key, timestamp: st.lastTimestamp})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].timestamp < entries[j].timestamp })
+
+	toDelete := len(entries) - c.maxPods
+	for i := 0; i < toDelete; i++ {
+		delete(c.pods, entries[i].key)
+	}
+}
+
 func (c *AdaptiveClassifier) Get(namespace, pod string) (*classifyResponseItem, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	namespace = strings.TrimSpace(namespace)
+	pod = strings.TrimSpace(pod)
 	st, ok := c.pods[namespace+"/"+pod]
 	if !ok {
 		return nil, false
