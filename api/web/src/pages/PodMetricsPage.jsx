@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useApp } from '../context/AppContext';
 import SlidePanel from '../components/SlidePanel';
 import {
@@ -12,10 +13,96 @@ import {
   Inbox,
   XCircle,
   X,
+  HelpCircle,
 } from 'lucide-react';
+
+function InfoTooltip({ text }) {
+  const [visible, setVisible] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef(null);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const gap = 10;
+    setPos({
+      top: rect.top - gap,
+      left: rect.left + rect.width / 2,
+    });
+  }, []);
+
+  const showTooltip = useCallback(() => {
+    updatePosition();
+    setVisible(true);
+  }, [updatePosition]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    const onViewportChange = () => updatePosition();
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, true);
+    return () => {
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange, true);
+    };
+  }, [visible, updatePosition]);
+
+  return (
+    <span
+      ref={triggerRef}
+      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 4, verticalAlign: 'middle', cursor: 'default' }}
+      onMouseEnter={showTooltip}
+      onMouseLeave={() => setVisible(false)}
+      onFocus={showTooltip}
+      onBlur={() => setVisible(false)}
+      tabIndex={0}
+      aria-label={text}
+    >
+      <HelpCircle size={12} style={{ color: 'var(--color-text-secondary, #888)', flexShrink: 0 }} />
+      {visible && (
+        createPortal(
+          <span style={{
+            position: 'fixed',
+            top: Math.max(pos.top, 12),
+            left: Math.min(Math.max(pos.left, 240), window.innerWidth - 240),
+            transform: 'translate(-50%, -100%)',
+            background: 'var(--color-surface-raised, #1e2130)',
+            color: 'var(--color-text, #e2e8f0)',
+            border: '1px solid var(--color-border, #334155)',
+            borderRadius: 8,
+            padding: '10px 12px',
+            fontSize: 12,
+            lineHeight: 1.55,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            width: 'min(560px, calc(100vw - 24px))',
+            maxHeight: 'min(60vh, 420px)',
+            overflowY: 'auto',
+            zIndex: 2147483647,
+            boxShadow: '0 10px 28px rgba(0,0,0,0.45)',
+            pointerEvents: 'none',
+          }}>
+            {text}
+          </span>,
+          document.body,
+        )
+      )}
+    </span>
+  );
+}
 
 function formatMetricValue(v) {
   return new Intl.NumberFormat().format(v || 0);
+}
+
+function formatPercent(v) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '--';
+  return `${Math.round(Number(v) * 100)}%`;
+}
+
+function formatFloat(v, digits = 3) {
+  if (v === null || v === undefined || Number.isNaN(Number(v))) return '--';
+  return Number(v).toFixed(digits);
 }
 
 function blankForm() {
@@ -65,6 +152,12 @@ export default function PodMetricsPage() {
   const [runtimeWarnings, setRuntimeWarnings] = useState([]);
   const [loadingRuntime, setLoadingRuntime] = useState(false);
 
+  const [classifyItems, setClassifyItems] = useState([]);
+  const [loadingClassify, setLoadingClassify] = useState(false);
+  const [classifyFilters, setClassifyFilters] = useState({ namespace: '', phase: '', type: '' });
+  const [selectedClassify, setSelectedClassify] = useState(null);
+  const [classifyDetailOpen, setClassifyDetailOpen] = useState(false);
+
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState('create');
   const [form, setForm] = useState(blankForm());
@@ -111,14 +204,66 @@ export default function PodMetricsPage() {
     }
   }, [isAuthenticated, makeAuthenticatedRequest]);
 
+  /* ─── load classifications ─── */
+  const loadClassifications = useCallback(async (filters = classifyFilters) => {
+    if (!isAuthenticated) return;
+    setLoadingClassify(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.namespace?.trim()) params.set('namespace', filters.namespace.trim());
+      if (filters.phase?.trim()) params.set('phase', filters.phase.trim());
+      if (filters.type?.trim()) params.set('type', filters.type.trim());
+      const qs = params.toString();
+      const endpoint = qs ? `/api/v1/classify?${qs}` : '/api/v1/classify';
+
+      const res = await makeAuthenticatedRequest(endpoint);
+      const data = await res.json();
+      if (data.success) {
+        setClassifyItems(data.data?.items || []);
+      } else {
+        setClassifyItems([]);
+      }
+    } catch {
+      setClassifyItems([]);
+    } finally {
+      setLoadingClassify(false);
+    }
+  }, [isAuthenticated, makeAuthenticatedRequest, classifyFilters]);
+
+  const openClassificationDetail = useCallback(async (item) => {
+    if (!item?.namespace || !item?.pod) return;
+    try {
+      const ns = encodeURIComponent(item.namespace);
+      const pod = encodeURIComponent(item.pod);
+      const res = await makeAuthenticatedRequest(`/api/v1/classify/${ns}/${pod}`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setSelectedClassify(data.data);
+        setClassifyDetailOpen(true);
+        return;
+      }
+    } catch {
+      // fallback to row data
+    }
+    setSelectedClassify(item);
+    setClassifyDetailOpen(true);
+  }, [makeAuthenticatedRequest]);
+
   const refreshAll = useCallback(() => {
     loadItems();
     loadRuntime();
-  }, [loadItems, loadRuntime]);
+    loadClassifications();
+  }, [loadItems, loadRuntime, loadClassifications]);
 
   useEffect(() => {
     if (isAuthenticated) refreshAll();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, refreshAll]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const h = setTimeout(() => loadClassifications(classifyFilters), 200);
+    return () => clearTimeout(h);
+  }, [classifyFilters, isAuthenticated, loadClassifications]);
 
   /* ─── form helpers ─── */
   const uf = (field, value) => setForm((f) => ({ ...f, [field]: value }));
@@ -322,14 +467,14 @@ export default function PodMetricsPage() {
       </div>
 
       {/* Saved Configs */}
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card" style={{ marginTop: 16, overflow: 'visible' }}>
         <div className="card-header">
           <h3 className="card-title">
             <BarChart3 size={16} />
             Metrics Configurations
           </h3>
         </div>
-        <div className="card-body" style={{ padding: 0 }}>
+        <div className="card-body" style={{ padding: 0, overflow: 'visible' }}>
           {loading ? (
             <div className="empty-state">
               <Loader2 size={20} className="spin" />
@@ -394,6 +539,128 @@ export default function PodMetricsPage() {
                           <Trash2 size={14} />
                         </button>
                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Classification */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-header" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 className="card-title">
+            <BarChart3 size={16} />
+            Adaptive Classification
+          </h3>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              className="form-input"
+              style={{ width: 160 }}
+              placeholder="namespace"
+              value={classifyFilters.namespace}
+              onChange={(e) => setClassifyFilters((f) => ({ ...f, namespace: e.target.value }))}
+            />
+            <select
+              className="form-input"
+              style={{ width: 150 }}
+              value={classifyFilters.phase}
+              onChange={(e) => setClassifyFilters((f) => ({ ...f, phase: e.target.value }))}
+            >
+              <option value="">all phases</option>
+              <option value="cold_start">cold_start</option>
+              <option value="warming_up">warming_up</option>
+              <option value="stable">stable</option>
+              <option value="drifting">drifting</option>
+              <option value="transitioning">transitioning</option>
+            </select>
+            <input
+              className="form-input"
+              style={{ width: 170 }}
+              placeholder="type (e.g. cpu_heavy)"
+              value={classifyFilters.type}
+              onChange={(e) => setClassifyFilters((f) => ({ ...f, type: e.target.value }))}
+            />
+          </div>
+        </div>
+        <div className="card-body" style={{ padding: 0 }}>
+          {loadingClassify ? (
+            <div className="empty-state">
+              <Loader2 size={20} className="spin" />
+              <p>Loading...</p>
+            </div>
+          ) : classifyItems.length === 0 ? (
+            <div className="empty-state">
+              <Inbox size={20} />
+              <p>No classification data yet</p>
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>NAMESPACE</th>
+                  <th>POD</th>
+                  <th>
+                    PHASE
+                    <InfoTooltip text={
+                      "Lifecycle phase of the classifier:\n• cold_start — insufficient data (< 10 samples)\n• warming_up — preliminary clustering (10–30 samples)\n• stable — model is converged\n• drifting — behavior shift detected, observing\n• transitioning — drift confirmed, re-clustering"
+                    } />
+                  </th>
+                  <th>
+                    CURRENT TYPE
+                    <InfoTooltip text={
+                      "Workload labels inferred by the adaptive clustering model:\n• cpu_heavy — high CPU time per run\n• interactive — high voluntary ctx switch ratio\n• needs_higher_priority — high involuntary preemptions\n• cache_unfriendly — frequent cross-L3 migrations\n• numa_unfriendly — frequent cross-NUMA migrations\n• scheduling_latency — high wait-to-run ratio\n• balanced — no dominant characteristic"
+                    } />
+                  </th>
+                  <th>
+                    CONFIDENCE
+                    <InfoTooltip text={
+                      "How closely the pod's short-term EWMA profile matches its assigned cluster center (0–100%). Low confidence may indicate a transitioning workload or insufficient samples."
+                    } />
+                  </th>
+                  <th>
+                    DRIFT
+                    <InfoTooltip text={
+                      "Drift score = mean deviation between short-term and long-term EWMA profiles, normalized by long-term variance. Score > 1.5 triggers drifting state; 3 consecutive periods confirm transitioning."
+                    } />
+                  </th>
+                  <th>
+                    ACTION
+                    <InfoTooltip text={
+                      "Recommended scheduling action based on classification:\n• increase_cpu_limit — pod is CPU-bound or starved\n• pin_to_numa_node — high NUMA migration rate\n• raise_priority — heavy preemption pressure\n• no_action — workload is balanced or stable"
+                    } />
+                  </th>
+                  <th>DETAIL</th>
+                </tr>
+              </thead>
+              <tbody>
+                {classifyItems.map((item, i) => (
+                  <tr key={`${item.namespace}/${item.pod}/${i}`}>
+                    <td>{item.namespace}</td>
+                    <td>{item.pod}</td>
+                    <td>
+                      <span className="badge badge-secondary">{item.phase || '--'}</span>
+                    </td>
+                    <td>
+                      {(item.classification?.current_type || []).map((t, idx) => (
+                        <span key={idx} className="badge badge-primary" style={{ marginRight: 4 }}>
+                          {t}
+                        </span>
+                      ))}
+                    </td>
+                    <td style={{ fontFamily: 'monospace' }}>
+                      {formatPercent(item.classification?.confidence)}
+                    </td>
+                    <td style={{ fontFamily: 'monospace' }}>
+                      {formatFloat(item.drift?.drift_score, 3)}
+                    </td>
+                    <td>{item.recommendation?.action || '--'}</td>
+                    <td>
+                      <button className="btn btn-ghost btn-sm" onClick={() => openClassificationDetail(item)}>
+                        View
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -589,6 +856,86 @@ export default function PodMetricsPage() {
             </button>
           </div>
         </div>
+      </SlidePanel>
+
+      <SlidePanel
+        open={classifyDetailOpen}
+        onClose={() => setClassifyDetailOpen(false)}
+        title="Classification Detail"
+      >
+        {!selectedClassify ? (
+          <div className="empty-state">
+            <Inbox size={20} />
+            <p>No data</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div>
+              <div style={{ fontWeight: 600 }}>{selectedClassify.namespace}/{selectedClassify.pod}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                phase: {selectedClassify.phase || '--'}
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Current Type</label>
+              <div>
+                {(selectedClassify.classification?.current_type || []).map((t, idx) => (
+                  <span key={idx} className="badge badge-primary" style={{ marginRight: 4 }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Previous Type</label>
+              <div>
+                {(selectedClassify.classification?.previous_type || []).length === 0
+                  ? '--'
+                  : (selectedClassify.classification?.previous_type || []).map((t, idx) => (
+                    <span key={idx} className="badge badge-secondary" style={{ marginRight: 4 }}>
+                      {t}
+                    </span>
+                  ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <label className="form-label">Confidence</label>
+                <div style={{ fontFamily: 'monospace' }}>{formatPercent(selectedClassify.classification?.confidence)}</div>
+              </div>
+              <div>
+                <label className="form-label">Drift Score</label>
+                <div style={{ fontFamily: 'monospace' }}>{formatFloat(selectedClassify.drift?.drift_score, 4)}</div>
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Recommendation</label>
+              <div style={{ fontSize: 13, lineHeight: 1.5 }}>
+                <div><strong>action:</strong> {selectedClassify.recommendation?.action || '--'}</div>
+                <div><strong>priority:</strong> {selectedClassify.recommendation?.priority_class || '--'}</div>
+                <div><strong>reason:</strong> {selectedClassify.recommendation?.reason || '--'}</div>
+              </div>
+            </div>
+
+            <div>
+              <label className="form-label">Short Term Profile</label>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {JSON.stringify(selectedClassify.profile?.short_term || {}, null, 2)}
+              </pre>
+            </div>
+
+            <div>
+              <label className="form-label">Long Term Baseline</label>
+              <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {JSON.stringify(selectedClassify.profile?.long_term_baseline || {}, null, 2)}
+              </pre>
+            </div>
+          </div>
+        )}
       </SlidePanel>
     </div>
   );
