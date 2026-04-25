@@ -1,7 +1,12 @@
 /**
  * app.js
  * Alpine.js application data – wires UI state to mock-api calls.
+ *
+ * Both Alpine.js and Chart.js are loaded from CDN before this module runs,
+ * so their globals are available at runtime even though they are not imported.
  */
+
+/* global Alpine, Chart */
 
 import api from "./mock-api.js";
 
@@ -342,7 +347,6 @@ function appData() {
       const labels = this.runtimeMetrics.map((m) => fmt.truncate(`${m.namespace}/${m.podName}`, 28));
       const cpuData = this.runtimeMetrics.map((m) => +(m.cpuTimeNs / 1e9).toFixed(3));
       const waitData = this.runtimeMetrics.map((m) => +(m.waitTimeNs / 1e9).toFixed(3));
-      // eslint-disable-next-line no-undef
       this.runtimeMetricsChart = new Chart(canvas, {
         type: "bar",
         data: {
@@ -444,6 +448,5 @@ function appData() {
 
 // Register with Alpine when it loads
 document.addEventListener("alpine:init", () => {
-  // eslint-disable-next-line no-undef
   Alpine.data("app", appData);
 });
