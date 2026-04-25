@@ -112,7 +112,7 @@ export const handlers = [
 
   // ── Users ────────────────────────────────────────────────────────────────
   http.get('/api/v1/users', () =>
-    ok({ users: state.users.map((u) => ({ id: u.id, username: u.username, roles: u.roles, status: u.status })) })
+    successResponse({ users: state.users.map((u) => ({ id: u.id, username: u.username, roles: u.roles, status: u.status })) })
   ),
 
   http.post('/api/v1/users', async ({ request }) => {
@@ -165,7 +165,7 @@ export const handlers = [
 
   // ── Roles ────────────────────────────────────────────────────────────────
   http.get('/api/v1/roles', () =>
-    ok({ roles: state.roles })
+    successResponse({ roles: state.roles })
   ),
 
   http.post('/api/v1/roles', async ({ request }) => {
@@ -199,12 +199,12 @@ export const handlers = [
 
   // ── Permissions ──────────────────────────────────────────────────────────
   http.get('/api/v1/permissions', () =>
-    ok({ permissions: state.permissions })
+    successResponse({ permissions: state.permissions })
   ),
 
   // ── Strategies ───────────────────────────────────────────────────────────
   http.get('/api/v1/strategies/self', () =>
-    ok({ strategies: state.strategies.map(toStrategy) })
+    successResponse({ strategies: state.strategies.map(toStrategy) })
   ),
 
   http.post('/api/v1/strategies', async ({ request }) => {
@@ -259,7 +259,7 @@ export const handlers = [
 
   // ── Intents ──────────────────────────────────────────────────────────────
   http.get('/api/v1/intents/self', () =>
-    ok({ intents: state.intents.map(toIntent) })
+    successResponse({ intents: state.intents.map(toIntent) })
   ),
 
   http.delete('/api/v1/intents', async ({ request }) => {
@@ -271,7 +271,7 @@ export const handlers = [
 
   // ── Nodes ────────────────────────────────────────────────────────────────
   http.get('/api/v1/nodes', () =>
-    ok({ nodes: state.nodes })
+    successResponse({ nodes: state.nodes })
   ),
 
   http.get('/api/v1/nodes/:nodeId/pods/pids', ({ params }) => {
@@ -327,7 +327,7 @@ export const handlers = [
 
   // ── Pod Scheduling Metrics ────────────────────────────────────────────────
   http.get('/api/v1/pod-scheduling-metrics', () =>
-    ok({ items: [...state.psms] })
+    successResponse({ items: [...state.psms] })
   ),
 
   http.post('/api/v1/pod-scheduling-metrics', async ({ request }) => {
