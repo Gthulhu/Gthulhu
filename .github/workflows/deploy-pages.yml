@@ -38,9 +38,11 @@ jobs:
         working-directory: api/web
         run: npm ci
 
-      - name: Build React frontend
+      - name: Build React frontend (mock mode for GitHub Pages demo)
         working-directory: api/web
         run: npm run build
+        env:
+          VITE_USE_MOCK: 'true'
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
