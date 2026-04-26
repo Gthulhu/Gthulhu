@@ -1,3 +1,4 @@
 dist/*
 !dist/.gitkeep
 node_modules
+.vite
