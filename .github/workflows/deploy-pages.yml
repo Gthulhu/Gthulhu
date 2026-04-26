@@ -7,7 +7,7 @@ on:
       - develop
     paths:
       - 'api/web/**'
-      - 'gh-pages-src/**'
+      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
 # Allow only one deployment at a time
@@ -42,6 +42,10 @@ jobs:
         working-directory: api/web
         run: npm run build
         env:
+          # Subpath under which the site is served on GitHub Pages
+          # (https://<owner>.github.io/Gthulhu/). Trailing slash required.
+          VITE_BASE: /${{ github.event.repository.name }}/
+          # Enable the MSW-based mock API so the demo works without a backend.
           VITE_USE_MOCK: 'true'
 
       - name: Deploy to gh-pages branch
