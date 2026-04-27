@@ -24,7 +24,7 @@ export default function Header() {
       <div className="header-content">
         <div className="logo-section">
           <div className="logo-icon">
-            <img src="/logo.png" alt="Gthulhu Logo" className="logo-image" />
+            <img src={import.meta.env.BASE_URL + 'logo.png'} alt="Gthulhu Logo" className="logo-image" />
           </div>
           <div className="logo-text">
             <h1>GTHULHU</h1>
