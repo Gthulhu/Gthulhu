@@ -48,7 +48,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <img src="/logo.svg" alt="Gthulhu" className="sidebar-logo-icon" />
+        <img src={import.meta.env.BASE_URL + 'logo.svg'} alt="Gthulhu" className="sidebar-logo-icon" />
         <span className="sidebar-logo-text">Gthulhu</span>
       </div>
 
