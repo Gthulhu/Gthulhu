@@ -9,6 +9,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   if (isAuthenticated) {
     return <Navigate to="/nodes" replace />;
@@ -17,17 +18,20 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      showToast('error', 'Please enter username and password');
+      const message = 'Please enter username and password';
+      setErrorMessage(message);
+      showToast('error', message);
       return;
     }
     setLoading(true);
+    setErrorMessage('');
     try {
       const response = await fetch(getApiUrl('/api/v1/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (response.ok && data.success) {
         login({
           accessToken: data.data.accessToken || data.data.token,
@@ -35,10 +39,14 @@ export default function LoginPage() {
         });
         showToast('success', 'Logged in successfully');
       } else {
-        showToast('error', data.message || 'Login failed');
+        const message = data.error || data.message || 'Login failed';
+        setErrorMessage(message);
+        showToast('error', message);
       }
     } catch (err) {
-      showToast('error', 'Connection error: ' + err.message);
+      const message = 'Connection error: ' + err.message;
+      setErrorMessage(message);
+      showToast('error', message);
     } finally {
       setLoading(false);
     }
@@ -46,6 +54,14 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
+      {errorMessage && (
+        <div className="login-failure-popup" role="alert" aria-live="assertive">
+          <span>{errorMessage}</span>
+          <button type="button" onClick={() => setErrorMessage('')} aria-label="Dismiss login error">
+            ×
+          </button>
+        </div>
+      )}
       <div className="login-card">
         <div className="login-header">
           <div className="sidebar-logo-icon" style={{ width: 48, height: 48, fontSize: 20 }}>
