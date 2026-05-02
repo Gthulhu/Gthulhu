@@ -32,9 +32,11 @@ export default function LoginPage() {
         body: JSON.stringify({ username: username.trim(), password }),
       });
       let data = {};
+      let parseFailed = false;
       try {
         data = await response.json();
       } catch (parseError) {
+        parseFailed = true;
         console.warn('Failed to parse login response:', parseError);
       }
       if (response.ok && data.success) {
@@ -44,7 +46,8 @@ export default function LoginPage() {
         });
         showToast('success', 'Logged in successfully');
       } else {
-        const message = data.error || data.message || 'Login failed';
+        // Manager API errors use "error"; MSW mock responses use "message".
+        const message = parseFailed ? 'Invalid server response' : (data.error || data.message || 'Login failed');
         setErrorMessage(message);
         showToast('error', message);
       }
