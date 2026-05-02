@@ -31,7 +31,12 @@ export default function LoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: username.trim(), password }),
       });
-      const data = await response.json().catch(() => ({}));
+      let data = {};
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.warn('Failed to parse login response:', parseError);
+      }
       if (response.ok && data.success) {
         login({
           accessToken: data.data.accessToken || data.data.token,
