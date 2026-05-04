@@ -263,7 +263,7 @@ export default function NodesPage() {
                   <tr key={node.name}>
                     <td style={{ fontWeight: 500 }}>{node.name}</td>
                     <td>
-                      <span className={`badge ${node.status === 'Ready' ? 'badge-success' : 'badge-danger'}`}>
+                      <span className={`badge ${node.status === 'Ready' ? 'badge-success' : 'badge-warning'}`}>
                         {node.status === 'Ready' ? <CheckCircle size={12} /> : <XCircle size={12} />}
                         {node.status}
                       </span>

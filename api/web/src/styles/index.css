@@ -723,6 +723,34 @@ input, button, textarea, select { font-family: inherit; font-size: inherit; }
 .login-form .form-input { height: 42px; }
 .login-submit { width: 100%; height: 42px; margin-top: var(--space-sm); }
 
+.login-failure-popup {
+  position: fixed;
+  top: var(--space-xl);
+  right: var(--space-xl);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  max-width: min(360px, calc(100vw - 2 * var(--space-xl)));
+  padding: var(--space-md) var(--space-lg);
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  border-radius: var(--radius-lg);
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.login-failure-popup button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
 .login-error {
   background: var(--color-danger-light);
   color: var(--color-danger);
