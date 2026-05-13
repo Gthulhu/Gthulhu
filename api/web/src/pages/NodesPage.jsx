@@ -15,6 +15,18 @@ import {
   Eye,
 } from 'lucide-react';
 
+const SCX_SCHEDULERS = [
+  'scx_bpfland',
+  'scx_cake',
+  'scx_lavd',
+  'scx_layered',
+  'scx_rustland',
+  'scx_rusty',
+  'scx_tickless',
+  'scx_timely',
+  'scx_wd40',
+];
+
 export default function NodesPage() {
   const { isAuthenticated, makeAuthenticatedRequest, getApiUrl, showToast, healthHistory, setHealthHistory, applyRuntimeConfig, getRuntimeConfigStatus } = useApp();
   const navigate = useNavigate();
@@ -34,6 +46,7 @@ export default function NodesPage() {
     schedulerEnabled: true,
     monitoringEnabled: true,
     mode: 'gthulhu',
+    schedulerName: 'scx_bpfland',
     sliceNsDefault: 20000000,
     sliceNsMin: 1000000,
     kernelMode: true,
@@ -108,7 +121,13 @@ export default function NodesPage() {
     setApplying(true);
     try {
       const configVersion = new Date().toISOString();
-      const results = await applyRuntimeConfig([], { ...runtimeConfig, configVersion });
+      const config = {
+        ...runtimeConfig,
+        configVersion,
+        schedulerEnabled: runtimeConfig.mode !== 'none',
+        schedulerName: runtimeConfig.mode === 'scx' ? runtimeConfig.schedulerName : '',
+      };
+      const results = await applyRuntimeConfig([], config);
       setNodeStatuses(results);
       showToast('success', 'Runtime config applied successfully');
     } catch (err) {
@@ -331,13 +350,28 @@ export default function NodesPage() {
               <select
                 className="form-input"
                 value={runtimeConfig.mode}
-                onChange={(e) => setRuntimeConfig(prev => ({ ...prev, mode: e.target.value }))}
+                onChange={(e) => setRuntimeConfig(prev => ({ ...prev, mode: e.target.value, schedulerEnabled: e.target.value !== 'none' }))}
               >
+                <option value="none">none</option>
                 <option value="gthulhu">gthulhu</option>
                 <option value="simple">simple</option>
-                <option value="simple-fifo">simple-fifo</option>
+                <option value="scx">scx</option>
               </select>
             </div>
+            {runtimeConfig.mode === 'scx' && (
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">SCX Scheduler</label>
+                <select
+                  className="form-input"
+                  value={runtimeConfig.schedulerName}
+                  onChange={(e) => setRuntimeConfig(prev => ({ ...prev, schedulerName: e.target.value }))}
+                >
+                  {SCX_SCHEDULERS.map(name => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Default Slice (ns)</label>
               <input
@@ -412,6 +446,11 @@ export default function NodesPage() {
                         {n.configVersion && (
                           <span style={{ fontSize: 11, color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>v{n.configVersion}</span>
                         )}
+                        {n.drift && (
+                          <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                            <AlertCircle size={12} /> Drift
+                          </span>
+                        )}
                         {n.success ? (
                           <span className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
                             <CheckCircle size={12} /> OK
@@ -437,6 +476,12 @@ export default function NodesPage() {
                                 <span className="detail-label">Mode</span>
                                 <span className="detail-value">{n.config.mode || '—'}</span>
                               </div>
+                              {n.config.schedulerName && (
+                                <div className="detail-item">
+                                  <span className="detail-label">Scheduler</span>
+                                  <span className="detail-value">{n.config.schedulerName}</span>
+                                </div>
+                              )}
                               <div className="detail-item">
                                 <span className="detail-label">Scheduler Enabled</span>
                                 <span className="detail-value">{n.config.schedulerEnabled ? 'Yes' : 'No'}</span>
@@ -480,6 +525,11 @@ export default function NodesPage() {
                           {n.appliedAt && <span>Applied: {new Date(n.appliedAt).toLocaleString()}</span>}
                           {n.restartCount != null && <span>Restarts: {n.restartCount}</span>}
                         </div>
+                        {n.desiredConfig && (
+                          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                            Desired: {n.desiredConfig.mode || '—'}{n.desiredConfig.schedulerName ? ` / ${n.desiredConfig.schedulerName}` : ''}
+                          </div>
+                        )}
                         {n.lastError && (
                           <div style={{ marginTop: 8, padding: '6px 10px', background: 'var(--color-danger-bg, rgba(239,68,68,0.1))', borderRadius: 6, fontSize: 12, color: 'var(--color-error)' }}>
                             <strong>Error:</strong> {n.lastError}

@@ -1,0 +1,29 @@
+[
+  {
+    "create": "node_runtime_configs",
+    "validator": {
+      "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["nodeId", "configVersion", "config", "updatedAt"],
+        "properties": {
+          "nodeId": { "bsonType": "string" },
+          "configVersion": { "bsonType": "string" },
+          "config": { "bsonType": "object" },
+          "updatedBy": { "bsonType": "string" },
+          "updatedAt": { "bsonType": "long" },
+          "lastApplyResult": { "bsonType": "object" }
+        }
+      }
+    }
+  },
+  {
+    "createIndexes": "node_runtime_configs",
+    "indexes": [
+      {
+        "key": { "nodeId": 1 },
+        "name": "idx_node_runtime_configs_node_id_unique",
+        "unique": true
+      }
+    ]
+  }
+]

@@ -204,14 +204,12 @@ func (c *Collector) loadBPF() error {
 	if err != nil {
 		return fmt.Errorf("get monitored_tgids map: %w", err)
 	}
-	cpuTopologyMap, err := mod.GetMap("cpu_topology_map")
+	c.cpuTopologyMap, err = mod.GetMap("cpu_topology_map")
 	if err != nil {
-		c.logger.Warn("cpu_topology_map not found; continuing without topology injection", "error", err)
-	} else {
-		c.cpuTopologyMap = cpuTopologyMap
-		if err := c.injectCPUTopology(); err != nil {
-			c.logger.Warn("failed to inject cpu topology map", "error", err)
-		}
+		return fmt.Errorf("get cpu_topology_map map: %w", err)
+	}
+	if err := c.injectCPUTopology(); err != nil {
+		c.logger.Warn("failed to inject cpu topology map", "error", err)
 	}
 
 	return nil

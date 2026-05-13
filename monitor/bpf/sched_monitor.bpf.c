@@ -61,7 +61,7 @@ struct {
 // Key: cpu id (u32), Value: struct cpu_topology_info
 struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
-    __uint(max_entries, 8192);
+    __uint(max_entries, 1024);
     __type(key, __u32);
     __type(value, struct cpu_topology_info);
 } cpu_topology_map SEC(".maps");

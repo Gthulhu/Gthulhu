@@ -448,6 +448,10 @@ func (svc *Service) ApplyRuntimeConfig(ctx context.Context, config domain.Runtim
 	if config.ConfigVersion == "" {
 		return fmt.Errorf("configVersion is required")
 	}
+	config.Normalize()
+	if err := config.Validate(); err != nil {
+		return err
+	}
 
 	endpoint := svc.daemonEndpoint + "/api/v1/runtime-config"
 	body, err := json.Marshal(config)
@@ -503,6 +507,7 @@ func (svc *Service) GetRuntimeConfigStatus(ctx context.Context) domain.RuntimeCo
 						LastError         string `json:"lastError,omitempty"`
 						ConfigAvailable   bool   `json:"configAvailable"`
 						Mode              string `json:"mode,omitempty"`
+						SchedulerName     string `json:"schedulerName,omitempty"`
 						SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 						SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 						KernelMode        *bool  `json:"kernelMode,omitempty"`
@@ -519,6 +524,7 @@ func (svc *Service) GetRuntimeConfigStatus(ctx context.Context) domain.RuntimeCo
 						daemonConfig = &domain.RuntimeSchedulerConfig{
 							ConfigVersion:  payload.Data.ConfigVersion,
 							Mode:           payload.Data.Mode,
+							SchedulerName:  payload.Data.SchedulerName,
 							SliceNsDefault: payload.Data.SliceNsDefault,
 							SliceNsMin:     payload.Data.SliceNsMin,
 						}
