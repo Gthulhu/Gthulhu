@@ -206,6 +206,11 @@ export default function NodeDetailPage() {
                     v{nodeConfig.configVersion}
                   </span>
                 )}
+                {nodeConfig.drift && (
+                  <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertCircle size={12} /> Drift
+                  </span>
+                )}
               </div>
 
               {/* Config details grid */}
@@ -216,6 +221,12 @@ export default function NodeDetailPage() {
                       <span className="detail-label">Mode</span>
                       <span className="detail-value">{nodeConfig.config.mode || '—'}</span>
                     </div>
+                    {nodeConfig.config.schedulerName && (
+                      <div className="detail-item">
+                        <span className="detail-label">Scheduler</span>
+                        <span className="detail-value">{nodeConfig.config.schedulerName}</span>
+                      </div>
+                    )}
                     <div className="detail-item">
                       <span className="detail-label">Scheduler Enabled</span>
                       <span className="detail-value">{nodeConfig.config.schedulerEnabled ? 'Yes' : 'No'}</span>
@@ -280,6 +291,12 @@ export default function NodeDetailPage() {
                   {nodeConfig.host && <span>Host: {nodeConfig.host}</span>}
                   {nodeConfig.appliedAt && <span>Applied: {new Date(nodeConfig.appliedAt).toLocaleString()}</span>}
                   {nodeConfig.restartCount != null && <span>Restarts: {nodeConfig.restartCount}</span>}
+                </div>
+              )}
+
+              {nodeConfig.desiredConfig && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                  Desired: {nodeConfig.desiredConfig.mode || '—'}{nodeConfig.desiredConfig.schedulerName ? ` / ${nodeConfig.desiredConfig.schedulerName}` : ''}
                 </div>
               )}
 

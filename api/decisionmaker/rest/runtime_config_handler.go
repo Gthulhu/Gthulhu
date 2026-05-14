@@ -9,6 +9,7 @@ import (
 type ApplyRuntimeConfigRequest struct {
 	ConfigVersion     string `json:"configVersion,omitempty"`
 	Mode              string `json:"mode,omitempty"`
+	SchedulerName     string `json:"schedulerName,omitempty"`
 	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 	KernelMode        bool   `json:"kernelMode,omitempty"`
@@ -27,6 +28,7 @@ type RuntimeConfigStatusResponse struct {
 	LastError         string `json:"lastError,omitempty"`
 	ConfigAvailable   bool   `json:"configAvailable"`
 	Mode              string `json:"mode,omitempty"`
+	SchedulerName     string `json:"schedulerName,omitempty"`
 	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 	KernelMode        *bool  `json:"kernelMode,omitempty"`
@@ -52,6 +54,7 @@ func (h *Handler) ApplyRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	err := h.Service.ApplyRuntimeConfig(ctx, domain.RuntimeSchedulerConfig{
 		ConfigVersion:     req.ConfigVersion,
 		Mode:              req.Mode,
+		SchedulerName:     req.SchedulerName,
 		SliceNsDefault:    req.SliceNsDefault,
 		SliceNsMin:        req.SliceNsMin,
 		KernelMode:        req.KernelMode,
@@ -82,6 +85,7 @@ func (h *Handler) GetRuntimeConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if status.Config != nil {
 		resp.Mode = status.Config.Mode
+		resp.SchedulerName = status.Config.SchedulerName
 		resp.SliceNsDefault = status.Config.SliceNsDefault
 		resp.SliceNsMin = status.Config.SliceNsMin
 		resp.KernelMode = boolPtr(status.Config.KernelMode)

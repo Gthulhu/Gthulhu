@@ -17,7 +17,8 @@ scheduler:
   replicaCount: 1
   
   image:
-    repository: ghcr.io/gthulhu/gthulhu
+    # Use the scx-flavored image so mode=scx can launch bundled /gthulhu/scx_* schedulers.
+    repository: ghcr.io/gthulhu/gthulhu-scx
     pullPolicy: Always
     tag: "develop"
   
