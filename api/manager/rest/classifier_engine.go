@@ -20,6 +20,16 @@ const (
 	maxClusterBufferSamples = 1000
 	classifierPodTTLSeconds = int64((30 * time.Minute) / time.Second)
 	classifierMaxPods       = 20000
+	// Absolute heuristic thresholds used by applyProfileTags. These act as a
+	// safety net so documented tags can still be emitted even when the kmeans
+	// cluster semantics degenerate (e.g. only a handful of pods are observed
+	// or all centers collapse near the EWMA mean after normalization).
+	cpuHeavyPerRunNS          = 10_000_000.0 // >=10ms CPU per run -> cpu_heavy
+	interactiveVolCtxRatio    = 0.5          // voluntary ctx switches per run
+	highPriorityInvolRatio    = 0.5          // involuntary ctx switches per run
+	schedLatencyWaitRatio     = 0.5          // wait_time / (cpu+wait)
+	cacheUnfriendlyMigrPerRun = 0.5          // (L3+NUMA) migrations per run
+	numaUnfriendlyRatio       = 0.5          // NUMA / (L3+NUMA)
 )
 
 type PodPhase string
@@ -32,6 +42,29 @@ const (
 	PodPhaseTransitioning PodPhase = "transitioning"
 )
 
+// featureVector packs the 6 normalized scheduling features used by the
+// classifier. Index layout (must stay in sync with computeFeatures):
+//
+//	[0] vol_ctx_ratio      = VolCtxSW   / RunCount
+//	                         voluntary context switches per run; high values
+//	                         indicate interactive / I/O-bound behavior.
+//	[1] invol_ctx_ratio    = InvolCtxSW / RunCount
+//	                         involuntary (preemption) ctx switches per run;
+//	                         high values indicate CPU contention -> needs
+//	                         higher priority.
+//	[2] cpu_per_run        = CPUTime    / RunCount  (nanoseconds)
+//	                         CPU time consumed per scheduling slice; high
+//	                         values indicate cpu_heavy workloads.
+//	[3] wait_ratio         = WaitTime   / (CPUTime + WaitTime)
+//	                         fraction of time spent waiting in the runqueue;
+//	                         high values indicate scheduling_latency.
+//	[4] cache_migr_per_run = (L3Migr + NUMAMigr) / RunCount
+//	                         cross-cache migrations per run; high values
+//	                         indicate cache_unfriendly placement.
+//	[5] numa_migr_ratio    = NUMAMigr   / (L3Migr + NUMAMigr)
+//	                         share of cross-cache migrations that also cross
+//	                         NUMA nodes; high values indicate numa_unfriendly
+//	                         placement.
 type featureVector [featureCount]float64
 
 type classificationInput struct {
@@ -53,13 +86,22 @@ type metricsPayload struct {
 	NUMAMigr   uint64 `json:"numa_migr"`
 }
 
+// ewmaState keeps two exponentially weighted moving averages per feature:
+//   - short (alpha = ewmaShortAlpha, ~0.3): reacts quickly, represents the
+//     pod's current behavior.
+//   - long  (alpha = ewmaLongAlpha,  ~0.05): reacts slowly, represents the
+//     pod's long-term baseline.
+//
+// The gap between them feeds DriftScore, which is what we call "drift":
+// how far the current behavior has moved away from the historical baseline,
+// expressed in units of long-term standard deviation.
 type ewmaState struct {
 	initialized bool
-	shortMean   featureVector
-	shortVar    featureVector
-	longMean    featureVector
-	longVar     featureVector
-	updateCount int
+	shortMean   featureVector // fast-moving mean (current behavior)
+	shortVar    featureVector // fast-moving variance
+	longMean    featureVector // slow-moving mean (long-term baseline)
+	longVar     featureVector // slow-moving variance
+	updateCount int           // number of samples ingested so far
 }
 
 func (e *ewmaState) Normalize(x featureVector) featureVector {
@@ -98,6 +140,18 @@ func (e *ewmaState) Update(x featureVector) {
 	e.updateCount++
 }
 
+// DriftScore quantifies how far the pod's recent behavior has drifted from
+// its long-term baseline. For each feature we compute
+//
+//	|shortMean_i - longMean_i| / sqrt(longVar_i + epsilon)
+//
+// which is the absolute deviation expressed in long-term standard deviations,
+// then average across all features. Update() uses this score to drive the
+// PodPhase state machine:
+//   - score > driftThreshold for driftConfirmThreshold consecutive samples
+//     -> PodPhaseTransitioning (re-cluster + relabel)
+//   - score > driftThreshold but not yet confirmed -> PodPhaseDrifting
+//   - otherwise -> PodPhaseStable
 func (e *ewmaState) DriftScore() float64 {
 	if !e.initialized {
 		return 0
@@ -388,11 +442,16 @@ type podState struct {
 	phase           PodPhase
 	currentCluster  int
 	previousCluster int
-	driftConfirmed  int
-	lastDriftScore  float64
-	currentTypes    []string
-	previousTypes   []string
-	lastTimestamp   int64
+	// driftConfirmed counts consecutive samples whose DriftScore exceeded
+	// driftThreshold. Once it reaches driftConfirmThreshold we treat the
+	// behavior change as real and transition to a new cluster/profile.
+	driftConfirmed int
+	// lastDriftScore is the most recent DriftScore value, exposed via the
+	// API for observability.
+	lastDriftScore float64
+	currentTypes   []string
+	previousTypes  []string
+	lastTimestamp  int64
 }
 
 func newPodState(namespace, pod string) *podState {
@@ -432,8 +491,10 @@ func (p *podState) Update(ts int64, node string, x featureVector, model *adaptiv
 			cid := model.Predict(norm)
 			if cid >= 0 {
 				p.currentCluster = cid
-				p.currentTypes = cloneStringSlice(model.clusterSemantics[cid])
+				p.currentTypes = applyProfileTags(model.clusterSemantics[cid], x)
 			}
+		} else {
+			p.currentTypes = applyProfileTags(nil, x)
 		}
 		p.lastDriftScore = p.ewma.DriftScore()
 		return
@@ -456,7 +517,7 @@ func (p *podState) Update(ts int64, node string, x featureVector, model *adaptiv
 			model.SnapshotAndRelabel()
 			newCID := model.Predict(norm)
 			p.currentCluster = newCID
-			p.currentTypes = cloneStringSlice(model.clusterSemantics[newCID])
+			p.currentTypes = applyProfileTags(model.clusterSemantics[newCID], x)
 			p.driftConfirmed = 0
 			return
 		}
@@ -469,8 +530,56 @@ func (p *podState) Update(ts int64, node string, x featureVector, model *adaptiv
 	cid := model.Predict(norm)
 	if cid >= 0 {
 		p.currentCluster = cid
-		p.currentTypes = cloneStringSlice(model.clusterSemantics[cid])
+		p.currentTypes = applyProfileTags(model.clusterSemantics[cid], x)
 	}
+}
+
+func applyProfileTags(clusterTags []string, x featureVector) []string {
+	tags := cloneStringSlice(clusterTags)
+	if x[2] >= cpuHeavyPerRunNS {
+		tags = appendTag(tags, "cpu_heavy")
+	}
+	if x[0] >= interactiveVolCtxRatio {
+		tags = appendTag(tags, "interactive")
+	}
+	if x[1] >= highPriorityInvolRatio {
+		tags = appendTag(tags, "needs_higher_priority")
+	}
+	if x[3] >= schedLatencyWaitRatio {
+		tags = appendTag(tags, "scheduling_latency")
+	}
+	if x[4] >= cacheUnfriendlyMigrPerRun {
+		tags = appendTag(tags, "cache_unfriendly")
+	}
+	if x[5] >= numaUnfriendlyRatio {
+		tags = appendTag(tags, "numa_unfriendly")
+	}
+	if len(tags) > 0 {
+		tags = removeTag(tags, "balanced")
+	}
+	if len(tags) == 0 {
+		return []string{"balanced"}
+	}
+	return tags
+}
+
+func appendTag(tags []string, tag string) []string {
+	for _, existing := range tags {
+		if existing == tag {
+			return tags
+		}
+	}
+	return append(tags, tag)
+}
+
+func removeTag(tags []string, tag string) []string {
+	out := tags[:0]
+	for _, existing := range tags {
+		if existing != tag {
+			out = append(out, existing)
+		}
+	}
+	return out
 }
 
 func (p *podState) Confidence() float64 {
@@ -499,10 +608,10 @@ func (p *podState) Confidence() float64 {
 func (p *podState) Recommendation() (action, priorityClass, reason string) {
 	tags := toTagSet(p.currentTypes)
 	switch {
+	case tags["cpu_heavy"]:
+		return "increase_cpu_limit", "default", "CPU per run exceeds heavy threshold; consider increasing CPU limit."
 	case tags["needs_higher_priority"]:
 		return "raise_priority", "high-priority", "Involuntary context switch ratio remains high and indicates CPU contention."
-	case tags["cpu_heavy"]:
-		return "increase_cpu_limit", "default", "CPU per run is dominant in current cluster profile."
 	case tags["numa_unfriendly"] || tags["cache_unfriendly"]:
 		return "enable_cpu_pinning", "default", "Cross-core/NUMA migration pattern suggests topology-unaware placement."
 	default:
@@ -544,6 +653,8 @@ type classifyRecommendation struct {
 }
 
 type classifyResult struct {
+	// type clould be cpu_heavy, balanced, needs_higher_priority, interactive
+	// cache_unfriendly, numa_unfriendly, or scheduling_latency
 	CurrentType  []string `json:"current_type"`
 	PreviousType []string `json:"previous_type"`
 	Confidence   float64  `json:"confidence"`
