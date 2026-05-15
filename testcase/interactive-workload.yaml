@@ -1,0 +1,23 @@
+# REF: https://github.com/Gthulhu/Gthulhu/issues/52
+# Interactive-style workload: frequent short sleeps yield voluntarily and should
+# produce a higher voluntary context-switch ratio than CPU-heavy busy loops.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-interactive-pod
+  labels:
+    test: interactive
+    workload-type: interactive
+spec:
+  nodeName: myvm
+  containers:
+  - name: test-container
+    image: ubuntu:latest
+    command:
+    - /bin/sh
+    - -c
+    - |
+      while true; do
+        printf 'interactive tick\n' > /dev/null
+        sleep 0.01
+      done

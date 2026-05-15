@@ -29,7 +29,63 @@ func (svc *Service) ReconcileIntents(ctx context.Context) error {
 	}
 
 	// Step 2: Re-send intents to DM pods where Merkle root doesn't match
-	return svc.resyncIntentsToDMs(ctx)
+	if err := svc.resyncIntentsToDMs(ctx); err != nil {
+		return err
+	}
+
+	// Step 3: Re-apply persisted node runtime configs to online DM pods
+	if err := svc.resyncRuntimeConfigsToDMs(ctx); err != nil {
+		logger.Logger(ctx).Warn().Err(err).Msg("failed to resync runtime configs during reconciliation")
+	}
+	return nil
+}
+
+func (svc *Service) resyncRuntimeConfigsToDMs(ctx context.Context) error {
+	repo, ok := svc.Repo.(runtimeConfigRepository)
+	if !ok {
+		return nil
+	}
+	dmAdapter, ok := svc.DMAdapter.(runtimeConfigDMAdapter)
+	if !ok {
+		return nil
+	}
+	queryOpt := &domain.QueryNodeRuntimeConfigOptions{}
+	if err := repo.QueryNodeRuntimeConfigs(ctx, queryOpt); err != nil {
+		return fmt.Errorf("query node runtime configs: %w", err)
+	}
+	if len(queryOpt.Result) == 0 {
+		return nil
+	}
+
+	dms, err := svc.K8SAdapter.QueryDecisionMakerPods(ctx, &domain.QueryDecisionMakerPodsOptions{
+		DecisionMakerLabel: domain.LabelSelector{Key: "app", Value: "decisionmaker"},
+	})
+	if err != nil {
+		return fmt.Errorf("query decision maker pods: %w", err)
+	}
+	dmByNode := make(map[string]*domain.DecisionMakerPod, len(dms))
+	for _, dm := range dms {
+		dmByNode[dm.NodeID] = dm
+	}
+
+	for _, desired := range queryOpt.Result {
+		dm := dmByNode[desired.NodeID]
+		if dm == nil || dm.State != domain.NodeStateOnline {
+			continue
+		}
+		result := domain.RuntimeConfigApplyResult{NodeID: dm.NodeID, Host: dm.Host, ConfigVersion: desired.ConfigVersion}
+		if err := dmAdapter.ApplyRuntimeConfig(ctx, dm, desired.Config); err != nil {
+			result.Success = false
+			result.Error = err.Error()
+		} else {
+			result.Success = true
+		}
+		desired.LastApplyResult = result
+		if err := repo.UpsertNodeRuntimeConfig(ctx, desired); err != nil {
+			logger.Logger(ctx).Warn().Err(err).Msgf("failed to update runtime config apply result for node %s", desired.NodeID)
+		}
+	}
+	return nil
 }
 
 // refreshStaleIntents checks all strategies for pods that no longer exist

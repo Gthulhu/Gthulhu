@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
   ArrowLeft,
@@ -13,7 +13,34 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Save,
+  ExternalLink,
 } from 'lucide-react';
+
+const SCX_SCHEDULERS = [
+  'scx_bpfland',
+  'scx_cake',
+  'scx_lavd',
+  'scx_layered',
+  'scx_rustland',
+  'scx_rusty',
+  'scx_tickless',
+  'scx_timely',
+  'scx_wd40',
+];
+
+const DEFAULT_RUNTIME_CONFIG = {
+  schedulerEnabled: true,
+  monitoringEnabled: true,
+  mode: 'gthulhu',
+  schedulerName: 'scx_bpfland',
+  sliceNsDefault: 20000000,
+  sliceNsMin: 1000000,
+  kernelMode: true,
+  maxTimeWatchdog: true,
+  earlyProcessing: false,
+  builtinIdle: false,
+};
 
 function truncateText(text, maxLen) {
   if (!text) return '--';
@@ -23,7 +50,8 @@ function truncateText(text, maxLen) {
 
 export default function NodeDetailPage() {
   const { nodeId } = useParams();
-  const { isAuthenticated, makeAuthenticatedRequest, showToast, getRuntimeConfigStatus } = useApp();
+  const location = useLocation();
+  const { isAuthenticated, makeAuthenticatedRequest, showToast, getRuntimeConfigStatus, applyRuntimeConfig } = useApp();
 
   const [pods, setPods] = useState([]);
   const [nodeName, setNodeName] = useState('--');
@@ -37,6 +65,17 @@ export default function NodeDetailPage() {
   // Node scheduler runtime config
   const [nodeConfig, setNodeConfig] = useState(null);
   const [loadingConfig, setLoadingConfig] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [form, setForm] = useState(DEFAULT_RUNTIME_CONFIG);
+
+  // Open editor automatically when navigated with ?edit=1 query param.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('edit') === '1') {
+      setEditing(true);
+    }
+  }, [location.search]);
 
   const fetchPods = useCallback(async () => {
     if (!isAuthenticated || !nodeId) return;
@@ -84,6 +123,74 @@ export default function NodeDetailPage() {
       setLoadingConfig(false);
     }
   }, [isAuthenticated, nodeId, getRuntimeConfigStatus]);
+
+  // Seed edit form from the latest nodeConfig whenever it changes (and not actively editing).
+  useEffect(() => {
+    if (editing) return;
+    const cfg = nodeConfig?.config || nodeConfig?.desiredConfig;
+    if (cfg) {
+      setForm({
+        schedulerEnabled: cfg.schedulerEnabled ?? true,
+        monitoringEnabled: cfg.monitoringEnabled ?? true,
+        mode: cfg.mode || 'gthulhu',
+        schedulerName: cfg.schedulerName || 'scx_bpfland',
+        sliceNsDefault: cfg.sliceNsDefault ?? 20000000,
+        sliceNsMin: cfg.sliceNsMin ?? 1000000,
+        kernelMode: cfg.kernelMode ?? true,
+        maxTimeWatchdog: cfg.maxTimeWatchdog ?? true,
+        earlyProcessing: cfg.earlyProcessing ?? false,
+        builtinIdle: cfg.builtinIdle ?? false,
+      });
+    } else {
+      setForm(DEFAULT_RUNTIME_CONFIG);
+    }
+  }, [nodeConfig, editing]);
+
+  const updateForm = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const handleApplyNodeConfig = async () => {
+    if (!nodeId) return;
+    setApplying(true);
+    try {
+      const configVersion = new Date().toISOString();
+      const config = {
+        ...form,
+        configVersion,
+        schedulerEnabled: form.mode !== 'none',
+        schedulerName: form.mode === 'scx' ? form.schedulerName : '',
+      };
+      const results = await applyRuntimeConfig([nodeId], config);
+      setNodeConfig(results.length > 0 ? results[0] : null);
+      setEditing(false);
+      showToast('success', `Applied runtime config to ${nodeId}`);
+    } catch (err) {
+      showToast('error', err.message);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setEditing(false);
+    // Re-seed form by triggering the effect via a no-op state change.
+    const cfg = nodeConfig?.config || nodeConfig?.desiredConfig;
+    if (cfg) {
+      setForm({
+        schedulerEnabled: cfg.schedulerEnabled ?? true,
+        monitoringEnabled: cfg.monitoringEnabled ?? true,
+        mode: cfg.mode || 'gthulhu',
+        schedulerName: cfg.schedulerName || 'scx_bpfland',
+        sliceNsDefault: cfg.sliceNsDefault ?? 20000000,
+        sliceNsMin: cfg.sliceNsMin ?? 1000000,
+        kernelMode: cfg.kernelMode ?? true,
+        maxTimeWatchdog: cfg.maxTimeWatchdog ?? true,
+        earlyProcessing: cfg.earlyProcessing ?? false,
+        builtinIdle: cfg.builtinIdle ?? false,
+      });
+    } else {
+      setForm(DEFAULT_RUNTIME_CONFIG);
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -169,20 +276,137 @@ export default function NodeDetailPage() {
             <Cpu size={16} />
             Scheduler Runtime Config
           </h3>
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={fetchNodeConfig}
-            disabled={loadingConfig}
-            title="Refresh config"
-          >
-            <RefreshCw size={14} className={loadingConfig ? 'spin' : ''} />
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <a
+              href="https://wiki.cachyos.org/configuration/sched-ext/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+              title="Learn more about scx schedulers"
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <ExternalLink size={14} />
+              <span>About scx schedulers</span>
+            </a>
+            {!editing && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setEditing(true)}
+                disabled={loadingConfig}
+                title="Edit config for this node"
+              >
+                Edit
+              </button>
+            )}
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={fetchNodeConfig}
+              disabled={loadingConfig}
+              title="Refresh config"
+            >
+              <RefreshCw size={14} className={loadingConfig ? 'spin' : ''} />
+            </button>
+          </div>
         </div>
         <div className="card-body" style={{ padding: 'var(--space-xl)' }}>
           {loadingConfig ? (
             <div className="empty-state">
               <Loader2 size={20} className="spin" />
               <p>Loading scheduler config...</p>
+            </div>
+          ) : editing ? (
+            <div>
+              <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
+                Editing runtime config for node <strong>{nodeId}</strong> only. Changes will be applied to this node when you click <em>Apply to this Node</em>.
+              </p>
+
+              {/* Toggle row */}
+              <div style={{ display: 'flex', gap: 24, marginBottom: 20, flexWrap: 'wrap' }}>
+                {[
+                  { key: 'schedulerEnabled', label: 'Scheduler Enabled' },
+                  { key: 'monitoringEnabled', label: 'Monitoring Enabled' },
+                  { key: 'kernelMode', label: 'Kernel Mode' },
+                  { key: 'maxTimeWatchdog', label: 'Max-Time Watchdog' },
+                  { key: 'earlyProcessing', label: 'Early Processing' },
+                  { key: 'builtinIdle', label: 'Built-in Idle' },
+                ].map(({ key, label }) => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={form[key]}
+                      onChange={(e) => updateForm(key, e.target.checked)}
+                    />
+                    <span style={{ fontSize: 13 }}>{label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {/* Form fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Mode</label>
+                  <select
+                    className="form-input"
+                    value={form.mode}
+                    onChange={(e) => updateForm('mode', e.target.value)}
+                  >
+                    <option value="none">none</option>
+                    <option value="gthulhu">gthulhu</option>
+                    <option value="simple">simple</option>
+                    <option value="scx">scx</option>
+                  </select>
+                </div>
+                {form.mode === 'scx' && (
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">SCX Scheduler</label>
+                    <select
+                      className="form-input"
+                      value={form.schedulerName}
+                      onChange={(e) => updateForm('schedulerName', e.target.value)}
+                    >
+                      {SCX_SCHEDULERS.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Default Slice (ns)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    step={1000000}
+                    min={1000000}
+                    value={form.sliceNsDefault}
+                    onChange={(e) => updateForm('sliceNsDefault', Number(e.target.value))}
+                  />
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Min Slice (ns)</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    step={100000}
+                    min={100000}
+                    value={form.sliceNsMin}
+                    onChange={(e) => updateForm('sliceNsMin', Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={cancelEdit} disabled={applying}>
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleApplyNodeConfig}
+                  disabled={applying}
+                >
+                  <Save size={14} />
+                  <span>{applying ? 'Applying…' : 'Apply to this Node'}</span>
+                </button>
+              </div>
             </div>
           ) : nodeConfig ? (
             <div>
@@ -206,6 +430,11 @@ export default function NodeDetailPage() {
                     v{nodeConfig.configVersion}
                   </span>
                 )}
+                {nodeConfig.drift && (
+                  <span className="badge badge-warning" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <AlertCircle size={12} /> Drift
+                  </span>
+                )}
               </div>
 
               {/* Config details grid */}
@@ -216,6 +445,12 @@ export default function NodeDetailPage() {
                       <span className="detail-label">Mode</span>
                       <span className="detail-value">{nodeConfig.config.mode || '—'}</span>
                     </div>
+                    {nodeConfig.config.schedulerName && (
+                      <div className="detail-item">
+                        <span className="detail-label">Scheduler</span>
+                        <span className="detail-value">{nodeConfig.config.schedulerName}</span>
+                      </div>
+                    )}
                     <div className="detail-item">
                       <span className="detail-label">Scheduler Enabled</span>
                       <span className="detail-value">{nodeConfig.config.schedulerEnabled ? 'Yes' : 'No'}</span>
@@ -283,6 +518,12 @@ export default function NodeDetailPage() {
                 </div>
               )}
 
+              {nodeConfig.desiredConfig && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                  Desired: {nodeConfig.desiredConfig.mode || '—'}{nodeConfig.desiredConfig.schedulerName ? ` / ${nodeConfig.desiredConfig.schedulerName}` : ''}
+                </div>
+              )}
+
               {nodeConfig.lastError && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--color-danger-bg, rgba(239,68,68,0.1))', borderRadius: 6, fontSize: 12, color: 'var(--color-error)' }}>
                   <strong>Error:</strong> {nodeConfig.lastError}
@@ -293,6 +534,13 @@ export default function NodeDetailPage() {
             <div className="empty-state">
               <Cpu size={20} />
               <p>No scheduler config available for this node</p>
+              <button
+                className="btn btn-primary btn-sm"
+                style={{ marginTop: 8 }}
+                onClick={() => setEditing(true)}
+              >
+                Create config
+              </button>
             </div>
           )}
         </div>

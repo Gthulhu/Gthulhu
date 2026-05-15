@@ -18,7 +18,8 @@ import (
 type SchedulerConfig struct {
 	SliceNsDefault  uint64 `yaml:"slice_ns_default" description:"Default time slice in nanoseconds for task scheduling"`
 	SliceNsMin      uint64 `yaml:"slice_ns_min" description:"Minimum time slice in nanoseconds for task scheduling"`
-	Mode            string `yaml:"mode,omitempty" description:"Scheduler mode (e.g. 'simple' or 'gthulhu')"`
+	Mode            string `yaml:"mode,omitempty" description:"Scheduler mode ('none', 'gthulhu', 'simple', or 'scx')"`
+	SchedulerName   string `yaml:"scheduler_name,omitempty" description:"scx scheduler binary name when scheduler mode is 'scx'"`
 	KernelMode      bool   `yaml:"kernel_mode,omitempty" description:"Enable kernel-mode scheduling (BPF-only dispatching without user-space loop)"`
 	MaxTimeWatchdog bool   `yaml:"max_time_watchdog,omitempty" description:"Enable watchdog to detect scheduling stalls"`
 }
@@ -152,7 +153,7 @@ func (c *Config) IsMonitorEnabled() bool {
 // IsSchedulerEnabled returns whether the advanced scheduler is enabled.
 // The scheduler is considered enabled when a scheduler mode is explicitly set.
 func (c *Config) IsSchedulerEnabled() bool {
-	return c.Scheduler.Mode != ""
+	return c.Scheduler.Mode != "" && c.Scheduler.Mode != "none"
 }
 
 // ExplainConfig prints all configuration keys with their descriptions.

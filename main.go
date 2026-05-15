@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -43,6 +44,7 @@ const (
 type daemonRuntimeConfigRequest struct {
 	ConfigVersion     string `json:"configVersion,omitempty"`
 	Mode              string `json:"mode,omitempty"`
+	SchedulerName     string `json:"schedulerName,omitempty"`
 	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 	KernelMode        bool   `json:"kernelMode,omitempty"`
@@ -61,6 +63,7 @@ type daemonRuntimeConfigStatus struct {
 	LastError         string `json:"lastError,omitempty"`
 	ConfigAvailable   bool   `json:"configAvailable"`
 	Mode              string `json:"mode,omitempty"`
+	SchedulerName     string `json:"schedulerName,omitempty"`
 	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 	KernelMode        *bool  `json:"kernelMode,omitempty"`
@@ -79,6 +82,7 @@ type daemonDetailedStatus struct {
 	LastError         string `json:"lastError,omitempty"`
 	ConfigAvailable   bool   `json:"configAvailable"`
 	Mode              string `json:"mode,omitempty"`
+	SchedulerName     string `json:"schedulerName,omitempty"`
 	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 	KernelMode        *bool  `json:"kernelMode,omitempty"`
@@ -91,6 +95,7 @@ type daemonDetailedStatus struct {
 
 type daemonCurrentConfig struct {
 	Mode              string
+	SchedulerName     string
 	SliceNsDefault    uint64
 	SliceNsMin        uint64
 	KernelMode        bool
@@ -99,6 +104,26 @@ type daemonCurrentConfig struct {
 	BuiltinIdle       bool
 	SchedulerEnabled  bool
 	MonitoringEnabled bool
+}
+
+var allowedSCXSchedulers = map[string]struct{}{
+	"scx_beerland":    {},
+	"scx_bpfland":     {},
+	"scx_cake":        {},
+	"scx_chaos":       {},
+	"scx_cosmos":      {},
+	"scx_flash":       {},
+	"scx_lavd":        {},
+	"scx_layered":     {},
+	"scx_mitosis":     {},
+	"scx_p2dq":        {},
+	"scx_pandemonium": {},
+	"scx_rlfifo":      {},
+	"scx_rustland":    {},
+	"scx_rusty":       {},
+	"scx_tickless":    {},
+	"scx_timely":      {},
+	"scx_wd40":        {},
 }
 
 type daemonControlState struct {
@@ -143,6 +168,7 @@ func (s *daemonControlState) readCurrentConfig() (*daemonCurrentConfig, bool) {
 
 	loadedConfig := &daemonCurrentConfig{
 		Mode:              cfg.Scheduler.Mode,
+		SchedulerName:     cfg.Scheduler.SchedulerName,
 		SliceNsDefault:    cfg.Scheduler.SliceNsDefault,
 		SliceNsMin:        cfg.Scheduler.SliceNsMin,
 		KernelMode:        cfg.Scheduler.KernelMode,
@@ -208,6 +234,7 @@ func (s *daemonControlState) snapshot() daemonRuntimeConfigStatus {
 	if cfg, ok := s.readCurrentConfig(); ok {
 		resp.ConfigAvailable = true
 		resp.Mode = cfg.Mode
+		resp.SchedulerName = cfg.SchedulerName
 		resp.SliceNsDefault = cfg.SliceNsDefault
 		resp.SliceNsMin = cfg.SliceNsMin
 		resp.KernelMode = boolPtr(cfg.KernelMode)
@@ -245,6 +272,7 @@ func (s *daemonControlState) detailedSnapshot() daemonDetailedStatus {
 	if cfg, ok := s.readCurrentConfig(); ok {
 		resp.ConfigAvailable = true
 		resp.Mode = cfg.Mode
+		resp.SchedulerName = cfg.SchedulerName
 		resp.SliceNsDefault = cfg.SliceNsDefault
 		resp.SliceNsMin = cfg.SliceNsMin
 		resp.KernelMode = boolPtr(cfg.KernelMode)
@@ -350,8 +378,6 @@ func runDaemonMode(args []string) error {
 		return err
 	}
 
-	childArgs := []string{modeScheduler, "-config", *runtimeConfigPath}
-
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
@@ -361,14 +387,18 @@ func runDaemonMode(args []string) error {
 		runtimeConfigPath: *runtimeConfigPath,
 	}
 	state.set("bootstrap", false)
-	if err := startDaemonControlServer(*controlAddr, *runtimeConfigPath, state, restartReqCh); err != nil {
+	if err := startDaemonControlServer(*controlAddr, *runtimeConfigPath, binPath, state, restartReqCh); err != nil {
 		return err
 	}
 
 	gracefulStopTimeout := 5 * time.Second
 
 	for {
-		if !isSchedulerEnabledInConfig(*runtimeConfigPath) {
+		childBinPath, childArgs, enabled, err := schedulerCommandFromConfig(*runtimeConfigPath, binPath)
+		if err != nil {
+			return err
+		}
+		if !enabled {
 			slog.Info("scheduler disabled by runtime config, waiting for config update", "configPath", *runtimeConfigPath)
 			select {
 			case sig := <-sigCh:
@@ -379,12 +409,12 @@ func runDaemonMode(args []string) error {
 			}
 		}
 
-		cmd := exec.Command(binPath, childArgs...)
+		cmd := exec.Command(childBinPath, childArgs...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin
 
-		slog.Info("starting scheduler child process", "binary", binPath, "args", childArgs)
+		slog.Info("starting scheduler child process", "binary", childBinPath, "args", childArgs)
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("start scheduler child process: %w", err)
 		}
@@ -456,7 +486,7 @@ func initializeRuntimeConfig(bootstrapConfigPath string, runtimeConfigPath strin
 	return nil
 }
 
-func startDaemonControlServer(addr, runtimeConfigPath string, state *daemonControlState, restartReqCh chan<- struct{}) error {
+func startDaemonControlServer(addr, runtimeConfigPath string, schedulerBinPath string, state *daemonControlState, restartReqCh chan<- struct{}) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -491,7 +521,19 @@ func startDaemonControlServer(addr, runtimeConfigPath string, state *daemonContr
 				return
 			}
 
-			if err := applyRuntimeConfigToFile(runtimeConfigPath, req); err != nil {
+			// If the manager re-posts the same configVersion that we already
+			// applied successfully, treat the request as a no-op so we don't
+			// restart the scheduler child on every reconcile cycle.
+			state.mu.RLock()
+			sameVersion := state.applied && state.configVersion == req.ConfigVersion
+			state.mu.RUnlock()
+			if sameVersion {
+				writeDaemonJSON(w, http.StatusOK, map[string]any{"success": true, "noop": true})
+				return
+			}
+
+			changed, err := applyRuntimeConfigToFile(runtimeConfigPath, schedulerBinPath, req)
+			if err != nil {
 				slog.ErrorContext(ctx, "failed to apply runtime config", "error", err)
 				errMsg := err.Error()
 				state.recordError(errMsg)
@@ -499,11 +541,15 @@ func startDaemonControlServer(addr, runtimeConfigPath string, state *daemonContr
 				return
 			}
 			state.set(req.ConfigVersion, true)
-			select {
-			case restartReqCh <- struct{}{}:
-			default:
+			if changed {
+				select {
+				case restartReqCh <- struct{}{}:
+				default:
+				}
+			} else {
+				slog.Info("runtime config request matched current state, skipping restart", "configVersion", req.ConfigVersion)
 			}
-			writeDaemonJSON(w, http.StatusOK, map[string]any{"success": true})
+			writeDaemonJSON(w, http.StatusOK, map[string]any{"success": true, "noop": !changed})
 			return
 		default:
 			writeDaemonJSON(w, http.StatusMethodNotAllowed, map[string]any{"success": false, "error": "method not allowed"})
@@ -527,30 +573,80 @@ func writeDaemonJSON(w http.ResponseWriter, status int, payload map[string]any) 
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func applyRuntimeConfigToFile(runtimeConfigPath string, req daemonRuntimeConfigRequest) error {
+func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string, req daemonRuntimeConfigRequest) (bool, error) {
 	cfg, err := config.LoadConfig(runtimeConfigPath)
 	if err != nil {
-		return fmt.Errorf("load current runtime config: %w", err)
+		return false, fmt.Errorf("load current runtime config: %w", err)
 	}
+
+	// Snapshot prior effective fields so we can detect whether this request
+	// actually changes anything. The API manager may periodically re-post the
+	// same config during reconcile; without this check the daemon would keep
+	// restarting the scheduler child every reconcile interval.
+	prev := struct {
+		Mode              string
+		SchedulerName     string
+		SliceNsDefault    uint64
+		SliceNsMin        uint64
+		KernelMode        bool
+		MaxTimeWatchdog   bool
+		EarlyProcessing   bool
+		BuiltinIdle       bool
+		MonitoringEnabled bool
+	}{
+		Mode:              cfg.Scheduler.Mode,
+		SchedulerName:     cfg.Scheduler.SchedulerName,
+		SliceNsDefault:    cfg.Scheduler.SliceNsDefault,
+		SliceNsMin:        cfg.Scheduler.SliceNsMin,
+		KernelMode:        cfg.Scheduler.KernelMode,
+		MaxTimeWatchdog:   cfg.Scheduler.MaxTimeWatchdog,
+		EarlyProcessing:   cfg.EarlyProcessing,
+		BuiltinIdle:       cfg.BuiltinIdle,
+		MonitoringEnabled: cfg.Monitor.Enabled,
+	}
+
 	cfg.Scheduler.Mode = req.Mode
+	cfg.Scheduler.SchedulerName = req.SchedulerName
 	cfg.Scheduler.SliceNsDefault = req.SliceNsDefault
 	cfg.Scheduler.SliceNsMin = req.SliceNsMin
 	cfg.Scheduler.KernelMode = req.KernelMode
 	cfg.Scheduler.MaxTimeWatchdog = req.MaxTimeWatchdog
 	cfg.EarlyProcessing = req.EarlyProcessing
 	cfg.BuiltinIdle = req.BuiltinIdle
-	if req.SchedulerEnabled {
-		if cfg.Scheduler.Mode == "" {
-			cfg.Scheduler.Mode = "gthulhu"
+	if !req.SchedulerEnabled && cfg.Scheduler.Mode == "" {
+		cfg.Scheduler.Mode = "none"
+	}
+	if req.SchedulerEnabled && cfg.Scheduler.Mode == "" {
+		cfg.Scheduler.Mode = "gthulhu"
+	}
+	if err := validateDaemonRuntimeScheduler(cfg.Scheduler.Mode, cfg.Scheduler.SchedulerName); err != nil {
+		return false, err
+	}
+	if cfg.Scheduler.Mode == "scx" {
+		if err := ensureExecutable(filepath.Join(filepath.Dir(schedulerBinPath), cfg.Scheduler.SchedulerName)); err != nil {
+			return false, err
 		}
-	} else {
-		cfg.Scheduler.Mode = ""
 	}
 	cfg.Monitor.Enabled = req.MonitoringEnabled
-	if err := writeConfigFile(runtimeConfigPath, cfg); err != nil {
-		return fmt.Errorf("write runtime config: %w", err)
+
+	changed := prev.Mode != cfg.Scheduler.Mode ||
+		prev.SchedulerName != cfg.Scheduler.SchedulerName ||
+		prev.SliceNsDefault != cfg.Scheduler.SliceNsDefault ||
+		prev.SliceNsMin != cfg.Scheduler.SliceNsMin ||
+		prev.KernelMode != cfg.Scheduler.KernelMode ||
+		prev.MaxTimeWatchdog != cfg.Scheduler.MaxTimeWatchdog ||
+		prev.EarlyProcessing != cfg.EarlyProcessing ||
+		prev.BuiltinIdle != cfg.BuiltinIdle ||
+		prev.MonitoringEnabled != cfg.Monitor.Enabled
+
+	if !changed {
+		return false, nil
 	}
-	return nil
+
+	if err := writeConfigFile(runtimeConfigPath, cfg); err != nil {
+		return true, fmt.Errorf("write runtime config: %w", err)
+	}
+	return true, nil
 }
 
 func writeConfigFile(path string, cfg *config.Config) error {
@@ -568,6 +664,77 @@ func isSchedulerEnabledInConfig(configPath string) bool {
 		return true
 	}
 	return cfg.IsSchedulerEnabled()
+}
+
+func schedulerCommandFromConfig(configPath string, gthulhuBin string) (string, []string, bool, error) {
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		return "", nil, false, fmt.Errorf("load runtime config: %w", err)
+	}
+	mode := strings.TrimSpace(cfg.Scheduler.Mode)
+	if mode == "" {
+		mode = "gthulhu"
+	}
+	if mode == "none" {
+		return "", nil, false, nil
+	}
+	if err := validateDaemonRuntimeScheduler(mode, cfg.Scheduler.SchedulerName); err != nil {
+		return "", nil, false, err
+	}
+	switch mode {
+	case "gthulhu", "simple":
+		return gthulhuBin, []string{modeScheduler, "-config", configPath}, true, nil
+	case "scx":
+		path := filepath.Join(filepath.Dir(gthulhuBin), cfg.Scheduler.SchedulerName)
+		if err := ensureExecutable(path); err != nil {
+			return "", nil, false, err
+		}
+		return path, nil, true, nil
+	default:
+		return "", nil, false, fmt.Errorf("unsupported scheduler mode %q", mode)
+	}
+}
+
+func validateDaemonRuntimeScheduler(mode string, schedulerName string) error {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		mode = "gthulhu"
+	}
+	switch mode {
+	case "none", "gthulhu", "simple":
+		return nil
+	case "scx":
+		name := strings.TrimSpace(schedulerName)
+		if name == "" {
+			return fmt.Errorf("schedulerName is required when mode is scx")
+		}
+		if filepath.Base(name) != name || strings.Contains(name, string(filepath.Separator)) {
+			return fmt.Errorf("schedulerName must be a binary name, got %q", schedulerName)
+		}
+		if _, ok := allowedSCXSchedulers[name]; !ok {
+			return fmt.Errorf("schedulerName %q is not in the allowed scx scheduler list", name)
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported scheduler mode %q", mode)
+	}
+}
+
+func ensureExecutable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("scheduler binary not found: %s", path)
+		}
+		return fmt.Errorf("stat scheduler binary %s: %w", path, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("scheduler binary path is a directory: %s", path)
+	}
+	if info.Mode()&0o111 == 0 {
+		return fmt.Errorf("scheduler binary is not executable: %s", path)
+	}
+	return nil
 }
 
 func runSchedulerMode(args []string) error {

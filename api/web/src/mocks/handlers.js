@@ -300,9 +300,15 @@ export const handlers = [
 
     const results = targetNodeIds.map((nodeId) => {
       const existing = state.schedulerConfig.results.find((r) => r.nodeId === nodeId);
-      const merged = { ...config };
+      const merged = {
+        ...config,
+        schedulerEnabled: config.mode !== 'none',
+        schedulerName: config.mode === 'scx' ? config.schedulerName : '',
+      };
       if (existing) {
         existing.config = { ...existing.config, ...merged };
+        existing.desiredConfig = { ...existing.config };
+        existing.drift = false;
         existing.configVersion = merged.configVersion || new Date().toISOString();
         existing.appliedAt = new Date().toISOString();
         existing.success = true;
@@ -317,8 +323,10 @@ export const handlers = [
         configVersion: merged.configVersion || new Date().toISOString(),
         appliedAt: new Date().toISOString(),
         restartCount: 0,
-        config: { mode: 'gthulhu', schedulerEnabled: true, monitoringEnabled: true, sliceNsDefault: 20000000, sliceNsMin: 1000000, kernelMode: true, maxTimeWatchdog: true, earlyProcessing: false, builtinIdle: false, ...merged },
+        drift: false,
+        config: { mode: 'gthulhu', schedulerName: '', schedulerEnabled: true, monitoringEnabled: true, sliceNsDefault: 20000000, sliceNsMin: 1000000, kernelMode: true, maxTimeWatchdog: true, earlyProcessing: false, builtinIdle: false, ...merged },
       };
+      newResult.desiredConfig = { ...newResult.config };
       state.schedulerConfig.results.push(newResult);
       return newResult;
     });

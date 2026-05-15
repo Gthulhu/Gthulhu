@@ -325,6 +325,7 @@ func (dm *DecisionMakerClient) ApplyRuntimeConfig(ctx context.Context, decisionM
 	type applyRuntimeConfigRequest struct {
 		ConfigVersion     string `json:"configVersion,omitempty"`
 		Mode              string `json:"mode,omitempty"`
+		SchedulerName     string `json:"schedulerName,omitempty"`
 		SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 		SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 		KernelMode        bool   `json:"kernelMode,omitempty"`
@@ -338,6 +339,7 @@ func (dm *DecisionMakerClient) ApplyRuntimeConfig(ctx context.Context, decisionM
 	reqPayload := applyRuntimeConfigRequest{
 		ConfigVersion:     config.ConfigVersion,
 		Mode:              config.Mode,
+		SchedulerName:     config.SchedulerName,
 		SliceNsDefault:    config.SliceNsDefault,
 		SliceNsMin:        config.SliceNsMin,
 		KernelMode:        config.KernelMode,
@@ -407,6 +409,7 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 			LastError         string `json:"lastError,omitempty"`
 			ConfigAvailable   bool   `json:"configAvailable"`
 			Mode              string `json:"mode,omitempty"`
+			SchedulerName     string `json:"schedulerName,omitempty"`
 			SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 			SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
 			KernelMode        *bool  `json:"kernelMode,omitempty"`
@@ -448,6 +451,7 @@ func (dm *DecisionMakerClient) GetRuntimeConfigStatus(ctx context.Context, decis
 			result.Config = &domain.RuntimeSchedulerConfig{
 				ConfigVersion:  statusResp.Data.ConfigVersion,
 				Mode:           statusResp.Data.Mode,
+				SchedulerName:  statusResp.Data.SchedulerName,
 				SliceNsDefault: statusResp.Data.SliceNsDefault,
 				SliceNsMin:     statusResp.Data.SliceNsMin,
 			}
