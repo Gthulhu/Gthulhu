@@ -521,7 +521,19 @@ func startDaemonControlServer(addr, runtimeConfigPath string, schedulerBinPath s
 				return
 			}
 
-			if err := applyRuntimeConfigToFile(runtimeConfigPath, schedulerBinPath, req); err != nil {
+			// If the manager re-posts the same configVersion that we already
+			// applied successfully, treat the request as a no-op so we don't
+			// restart the scheduler child on every reconcile cycle.
+			state.mu.RLock()
+			sameVersion := state.applied && state.configVersion == req.ConfigVersion
+			state.mu.RUnlock()
+			if sameVersion {
+				writeDaemonJSON(w, http.StatusOK, map[string]any{"success": true, "noop": true})
+				return
+			}
+
+			changed, err := applyRuntimeConfigToFile(runtimeConfigPath, schedulerBinPath, req)
+			if err != nil {
 				slog.ErrorContext(ctx, "failed to apply runtime config", "error", err)
 				errMsg := err.Error()
 				state.recordError(errMsg)
@@ -529,11 +541,15 @@ func startDaemonControlServer(addr, runtimeConfigPath string, schedulerBinPath s
 				return
 			}
 			state.set(req.ConfigVersion, true)
-			select {
-			case restartReqCh <- struct{}{}:
-			default:
+			if changed {
+				select {
+				case restartReqCh <- struct{}{}:
+				default:
+				}
+			} else {
+				slog.Info("runtime config request matched current state, skipping restart", "configVersion", req.ConfigVersion)
 			}
-			writeDaemonJSON(w, http.StatusOK, map[string]any{"success": true})
+			writeDaemonJSON(w, http.StatusOK, map[string]any{"success": true, "noop": !changed})
 			return
 		default:
 			writeDaemonJSON(w, http.StatusMethodNotAllowed, map[string]any{"success": false, "error": "method not allowed"})
@@ -557,11 +573,38 @@ func writeDaemonJSON(w http.ResponseWriter, status int, payload map[string]any) 
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string, req daemonRuntimeConfigRequest) error {
+func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string, req daemonRuntimeConfigRequest) (bool, error) {
 	cfg, err := config.LoadConfig(runtimeConfigPath)
 	if err != nil {
-		return fmt.Errorf("load current runtime config: %w", err)
+		return false, fmt.Errorf("load current runtime config: %w", err)
 	}
+
+	// Snapshot prior effective fields so we can detect whether this request
+	// actually changes anything. The API manager may periodically re-post the
+	// same config during reconcile; without this check the daemon would keep
+	// restarting the scheduler child every reconcile interval.
+	prev := struct {
+		Mode              string
+		SchedulerName     string
+		SliceNsDefault    uint64
+		SliceNsMin        uint64
+		KernelMode        bool
+		MaxTimeWatchdog   bool
+		EarlyProcessing   bool
+		BuiltinIdle       bool
+		MonitoringEnabled bool
+	}{
+		Mode:              cfg.Scheduler.Mode,
+		SchedulerName:     cfg.Scheduler.SchedulerName,
+		SliceNsDefault:    cfg.Scheduler.SliceNsDefault,
+		SliceNsMin:        cfg.Scheduler.SliceNsMin,
+		KernelMode:        cfg.Scheduler.KernelMode,
+		MaxTimeWatchdog:   cfg.Scheduler.MaxTimeWatchdog,
+		EarlyProcessing:   cfg.EarlyProcessing,
+		BuiltinIdle:       cfg.BuiltinIdle,
+		MonitoringEnabled: cfg.Monitor.Enabled,
+	}
+
 	cfg.Scheduler.Mode = req.Mode
 	cfg.Scheduler.SchedulerName = req.SchedulerName
 	cfg.Scheduler.SliceNsDefault = req.SliceNsDefault
@@ -577,18 +620,33 @@ func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string,
 		cfg.Scheduler.Mode = "gthulhu"
 	}
 	if err := validateDaemonRuntimeScheduler(cfg.Scheduler.Mode, cfg.Scheduler.SchedulerName); err != nil {
-		return err
+		return false, err
 	}
 	if cfg.Scheduler.Mode == "scx" {
 		if err := ensureExecutable(filepath.Join(filepath.Dir(schedulerBinPath), cfg.Scheduler.SchedulerName)); err != nil {
-			return err
+			return false, err
 		}
 	}
 	cfg.Monitor.Enabled = req.MonitoringEnabled
-	if err := writeConfigFile(runtimeConfigPath, cfg); err != nil {
-		return fmt.Errorf("write runtime config: %w", err)
+
+	changed := prev.Mode != cfg.Scheduler.Mode ||
+		prev.SchedulerName != cfg.Scheduler.SchedulerName ||
+		prev.SliceNsDefault != cfg.Scheduler.SliceNsDefault ||
+		prev.SliceNsMin != cfg.Scheduler.SliceNsMin ||
+		prev.KernelMode != cfg.Scheduler.KernelMode ||
+		prev.MaxTimeWatchdog != cfg.Scheduler.MaxTimeWatchdog ||
+		prev.EarlyProcessing != cfg.EarlyProcessing ||
+		prev.BuiltinIdle != cfg.BuiltinIdle ||
+		prev.MonitoringEnabled != cfg.Monitor.Enabled
+
+	if !changed {
+		return false, nil
 	}
-	return nil
+
+	if err := writeConfigFile(runtimeConfigPath, cfg); err != nil {
+		return true, fmt.Errorf("write runtime config: %w", err)
+	}
+	return true, nil
 }
 
 func writeConfigFile(path string, cfg *config.Config) error {
