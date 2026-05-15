@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
+  ExternalLink,
 } from 'lucide-react';
 
 const SCX_SCHEDULERS = [
@@ -295,6 +296,14 @@ export default function NodesPage() {
                         <Eye size={14} />
                         View Details
                       </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => navigate(`/nodes/${encodeURIComponent(node.name)}?edit=1`)}
+                        style={{ marginLeft: 4 }}
+                      >
+                        <Cpu size={14} />
+                        Edit Config
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -311,15 +320,28 @@ export default function NodesPage() {
             <Cpu size={16} />
             Scheduler Runtime Config
           </h3>
-          <button
-            className="btn btn-sm"
-            onClick={fetchNodeStatuses}
-            disabled={loadingStatus}
-            style={{ display: 'flex', alignItems: 'center', gap: 4 }}
-            title="Refresh node statuses"
-          >
-            <RefreshCw size={14} style={{ animation: loadingStatus ? 'spin 1s linear infinite' : 'none' }} />
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <a
+              href="https://wiki.cachyos.org/configuration/sched-ext/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+              title="Learn more about scx schedulers"
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <ExternalLink size={14} />
+              <span>About scx schedulers</span>
+            </a>
+            <button
+              className="btn btn-sm"
+              onClick={fetchNodeStatuses}
+              disabled={loadingStatus}
+              style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+              title="Refresh node statuses"
+            >
+              <RefreshCw size={14} style={{ animation: loadingStatus ? 'spin 1s linear infinite' : 'none' }} />
+            </button>
+          </div>
         </div>
         <div className="card-body" style={{ padding: 'var(--space-xl)' }}>
           {/* Toggle row */}
@@ -535,13 +557,20 @@ export default function NodesPage() {
                             <strong>Error:</strong> {n.lastError}
                           </div>
                         )}
-                        <div style={{ marginTop: 10 }}>
+                        <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
                           <button
                             className="btn btn-ghost btn-sm"
                             onClick={() => navigate(`/nodes/${encodeURIComponent(n.nodeId)}`)}
                           >
                             <Eye size={14} />
                             View Full Node Details
+                          </button>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => navigate(`/nodes/${encodeURIComponent(n.nodeId)}?edit=1`)}
+                          >
+                            <Cpu size={14} />
+                            Edit this Node's Config
                           </button>
                         </div>
                       </div>
