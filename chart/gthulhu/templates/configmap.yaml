@@ -38,10 +38,10 @@ data:
       kubeconfig_path: {{ .Values.scheduler.monitor.kubeConfigPath | quote }}
     scheduler:
       # Default time slice in nanoseconds (default: 5000000 = 5ms)
-      slice_ns_default: {{ .Values.scheduler.scheduling.sliceNsDefault }}
+      slice_ns_default: {{ int64 .Values.scheduler.scheduling.sliceNsDefault }}
        
       # Minimum time slice in nanoseconds (default: 500000 = 0.5ms)
-      slice_ns_min: {{ .Values.scheduler.scheduling.sliceNsMin }}
+      slice_ns_min: {{ int64 .Values.scheduler.scheduling.sliceNsMin }}
 
       # Mode could be: none, simple, gthulhu, scx
       mode: {{ ternary .Values.scheduler.scheduling.mode "none" .Values.scheduler.scheduling.enabled | quote }}
