@@ -789,7 +789,7 @@ func checkSchedExtSupport() error {
 	if err := syscall.Uname(&uts); err != nil {
 		return fmt.Errorf("%w: failed to read kernel version: %v", errSchedExtUnsupported, err)
 	}
-	release := charsToString(uts.Release[:])
+	release := cStringToGoString(uts.Release[:])
 	major, minor, err := parseKernelMajorMinor(release)
 	if err != nil {
 		return fmt.Errorf("%w: failed to parse kernel release %q: %v", errSchedExtUnsupported, release, err)
@@ -814,7 +814,7 @@ func parseKernelMajorMinor(release string) (int, int, error) {
 	return major, minor, nil
 }
 
-func charsToString(chars []int8) string {
+func cStringToGoString(chars []int8) string {
 	var b strings.Builder
 	b.Grow(len(chars))
 	for _, c := range chars {
