@@ -38,11 +38,11 @@ import (
 )
 
 const (
-	modeScheduler                   = "scheduler"
-	modeDaemon                      = "daemon"
-	unsupportedSchedExtExitCode int = 78
-	minSchedExtKernelMajor          = 6
-	minSchedExtKernelMinor          = 12
+	modeScheduler               = "scheduler"
+	modeDaemon                  = "daemon"
+	unsupportedSchedExtExitCode = 78
+	minSchedExtKernelMajor      = 6
+	minSchedExtKernelMinor      = 12
 )
 
 var errSchedExtUnsupported = errors.New("sched_ext is unsupported on this kernel")
@@ -816,6 +816,7 @@ func parseKernelMajorMinor(release string) (int, int, error) {
 
 func charsToString(chars []int8) string {
 	var b strings.Builder
+	b.Grow(len(chars))
 	for _, c := range chars {
 		if c == 0 {
 			break
