@@ -55,6 +55,7 @@ The following table lists the configurable parameters and their default values:
 | Parameter | Description | Default |
 |-----------|-------------|---------|
 | `scheduler.enabled` | Enable the BPF scheduler | `true` |
+| `scheduler.scheduling.enabled` | Enable sched_ext scheduling; set to `false` for monitoring-only mode | `true` |
 | `scheduler.image.repository` | Scheduler image repository | `gthulhu` |
 | `scheduler.image.tag` | Scheduler image tag | `latest` |
 | `scheduler.image.pullPolicy` | Image pull policy | `IfNotPresent` |
@@ -148,6 +149,21 @@ api:
 
 ```bash
 helm install gthulhu-dev ./gthulhu -f dev-values.yaml
+```
+
+### Monitoring-only Installation
+
+Use this when nodes can run the eBPF monitor but should not attach the sched_ext scheduler:
+
+```yaml
+scheduler:
+  enabled: true
+  scheduling:
+    enabled: false
+  sidecar:
+    enabled: false
+monitoring:
+  enabled: true
 ```
 
 ## Accessing the API

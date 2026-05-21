@@ -103,6 +103,7 @@ WORKDIR /gthulhu
 
 # Copy the built binary from builder stage
 COPY --from=builder /build/main ./main
+COPY --from=builder /build/sched_monitor.bpf.o ./sched_monitor.bpf.o
 COPY --from=builder /build/bpftool/src/bpftool /usr/local/bin/bpftool
 
 ENTRYPOINT ["bash"]

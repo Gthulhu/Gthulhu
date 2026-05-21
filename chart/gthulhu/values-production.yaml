@@ -12,6 +12,23 @@ crdNamespace:
 scheduler:
   enabled: true
   replicaCount: 1
+
+  scheduling:
+    enabled: true
+    mode: gthulhu
+    sliceNsDefault: 20000000
+    sliceNsMin: 1000000
+    kernelMode: true
+    maxTimeWatchdog: true
+
+  monitor:
+    bpfObjectPath: sched_monitor.bpf.o
+    collectionIntervalSec: 10
+    monitorAll: false
+    streamEvents: false
+    prometheusPort: 9090
+    enableCRDWatcher: true
+    kubeConfigPath: ""
   
   image:
     repository: ghcr.io/gthulhu/gthulhu

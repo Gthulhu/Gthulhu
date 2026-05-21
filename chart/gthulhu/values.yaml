@@ -15,6 +15,25 @@ mongodb:
 scheduler:
   enabled: true
   replicaCount: 1
+
+  # sched_ext scheduling can be disabled while keeping the DaemonSet running
+  # for eBPF pod scheduling metrics ("monitoring only" mode).
+  scheduling:
+    enabled: true
+    mode: gthulhu
+    sliceNsDefault: 20000000
+    sliceNsMin: 1000000
+    kernelMode: true
+    maxTimeWatchdog: true
+
+  monitor:
+    bpfObjectPath: sched_monitor.bpf.o
+    collectionIntervalSec: 10
+    monitorAll: false
+    streamEvents: false
+    prometheusPort: 9090
+    enableCRDWatcher: true
+    kubeConfigPath: ""
   
   image:
     # Use the scx-flavored image so mode=scx can launch bundled /gthulhu/scx_* schedulers.

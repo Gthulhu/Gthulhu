@@ -65,6 +65,12 @@ spec:
               mountPath: /tmp/gthulhu
           resources:
             {{- toYaml .Values.scheduler.resources | nindent 12 }}
+          {{- if .Values.monitoring.enabled }}
+          ports:
+            - name: monitor-metrics
+              containerPort: {{ .Values.scheduler.monitor.prometheusPort }}
+              protocol: TCP
+          {{- end }}
         {{- if .Values.scheduler.sidecar.enabled }}
         - name: scheduler-sidecar
           image: "{{ .Values.scheduler.sidecar.image.repository }}:{{ .Values.scheduler.sidecar.image.tag | default .Chart.AppVersion }}"
@@ -323,4 +329,3 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 {{- end }}
-

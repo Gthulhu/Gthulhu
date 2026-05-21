@@ -18,7 +18,7 @@ spec:
   selector:
     matchLabels:
       {{- include "gthulhu.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: scheduler
+      app.kubernetes.io/component: monitor
   endpoints:
     - port: monitor-metrics
       path: /metrics
