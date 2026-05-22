@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -37,9 +38,14 @@ import (
 )
 
 const (
-	modeScheduler = "scheduler"
-	modeDaemon    = "daemon"
+	modeScheduler               = "scheduler"
+	modeDaemon                  = "daemon"
+	unsupportedSchedExtExitCode = 78
+	minSchedExtKernelMajor      = 6
+	minSchedExtKernelMinor      = 12
 )
+
+var errSchedExtUnsupported = errors.New("sched_ext is unsupported on this kernel")
 
 type daemonRuntimeConfigRequest struct {
 	ConfigVersion     string `json:"configVersion,omitempty"`
@@ -310,6 +316,9 @@ func main() {
 	default:
 		if err := runSchedulerMode(modeArgs); err != nil {
 			slog.Error("scheduler exited with error", "error", err)
+			if errors.Is(err, errSchedExtUnsupported) {
+				os.Exit(unsupportedSchedExtExitCode)
+			}
 			os.Exit(1)
 		}
 	}
@@ -396,6 +405,17 @@ func runDaemonMode(args []string) error {
 	for {
 		childBinPath, childArgs, enabled, err := schedulerCommandFromConfig(*runtimeConfigPath, binPath)
 		if err != nil {
+			if errors.Is(err, errSchedExtUnsupported) {
+				state.recordError(err.Error())
+				slog.Error("sched_ext is unavailable; not starting scheduler child", "error", err)
+				select {
+				case sig := <-sigCh:
+					slog.Info("daemon received signal while scheduler unsupported", "signal", sig)
+					return nil
+				case <-restartReqCh:
+					continue
+				}
+			}
 			return err
 		}
 		if !enabled {
@@ -442,6 +462,18 @@ func runDaemonMode(args []string) error {
 			continue
 		case err := <-done:
 			recordSchedulerRestart(state)
+			if isUnsupportedSchedExtExit(err) {
+				errMsg := fmt.Sprintf("scheduler child exited because sched_ext is unsupported by this kernel: %v", err)
+				state.recordError(errMsg)
+				slog.Error("scheduler child reported unsupported sched_ext; not restarting", "error", err)
+				select {
+				case sig := <-sigCh:
+					slog.Info("daemon received signal while scheduler unsupported", "signal", sig)
+					return nil
+				case <-restartReqCh:
+					continue
+				}
+			}
 			if err != nil {
 				slog.Warn("scheduler child exited unexpectedly, restarting", "error", err, "delay", restartDelay.String())
 			} else {
@@ -469,6 +501,11 @@ func stopChildProcess(cmd *exec.Cmd, done <-chan error, sig os.Signal, timeout t
 
 func recordSchedulerRestart(state *daemonControlState) {
 	state.recordRestart()
+}
+
+func isUnsupportedSchedExtExit(err error) bool {
+	var exitErr *exec.ExitError
+	return errors.As(err, &exitErr) && exitErr.ExitCode() == unsupportedSchedExtExitCode
 }
 
 func initializeRuntimeConfig(bootstrapConfigPath string, runtimeConfigPath string) error {
@@ -676,9 +713,19 @@ func schedulerCommandFromConfig(configPath string, gthulhuBin string) (string, [
 		mode = "gthulhu"
 	}
 	if mode == "none" {
+		if cfg.IsMonitorEnabled() {
+			return gthulhuBin, []string{modeScheduler, "-config", configPath}, true, nil
+		}
 		return "", nil, false, nil
 	}
 	if err := validateDaemonRuntimeScheduler(mode, cfg.Scheduler.SchedulerName); err != nil {
+		return "", nil, false, err
+	}
+	if err := checkSchedExtSupport(); err != nil {
+		if cfg.IsMonitorEnabled() {
+			slog.Warn("sched_ext is unavailable; starting Gthulhu in monitor-only mode", "error", err)
+			return gthulhuBin, []string{modeScheduler, "-config", configPath}, true, nil
+		}
 		return "", nil, false, err
 	}
 	switch mode {
@@ -735,6 +782,48 @@ func ensureExecutable(path string) error {
 		return fmt.Errorf("scheduler binary is not executable: %s", path)
 	}
 	return nil
+}
+
+func checkSchedExtSupport() error {
+	var uts syscall.Utsname
+	if err := syscall.Uname(&uts); err != nil {
+		return fmt.Errorf("%w: failed to read kernel version: %v", errSchedExtUnsupported, err)
+	}
+	release := cStringToGoString(uts.Release[:])
+	major, minor, err := parseKernelMajorMinor(release)
+	if err != nil {
+		return fmt.Errorf("%w: failed to parse kernel release %q: %v", errSchedExtUnsupported, release, err)
+	}
+	if major < minSchedExtKernelMajor || (major == minSchedExtKernelMajor && minor < minSchedExtKernelMinor) {
+		return fmt.Errorf("%w: Linux kernel %s is older than required %d.%d+", errSchedExtUnsupported, release, minSchedExtKernelMajor, minSchedExtKernelMinor)
+	}
+	if _, err := os.Stat("/sys/kernel/sched_ext"); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("%w: /sys/kernel/sched_ext is missing; enable CONFIG_SCHED_CLASS_EXT", errSchedExtUnsupported)
+		}
+		return fmt.Errorf("%w: cannot access /sys/kernel/sched_ext: %v", errSchedExtUnsupported, err)
+	}
+	return nil
+}
+
+func parseKernelMajorMinor(release string) (int, int, error) {
+	var major, minor int
+	if _, err := fmt.Sscanf(release, "%d.%d", &major, &minor); err != nil {
+		return 0, 0, err
+	}
+	return major, minor, nil
+}
+
+func cStringToGoString(chars []int8) string {
+	var b strings.Builder
+	b.Grow(len(chars))
+	for _, c := range chars {
+		if c == 0 {
+			break
+		}
+		b.WriteByte(byte(c))
+	}
+	return b.String()
 }
 
 func runSchedulerMode(args []string) error {
@@ -799,15 +888,15 @@ func runSchedulerMode(args []string) error {
 	// ── Scheduler (advanced feature, requires sched_ext / Linux 6.12+) ──
 	if !cfg.IsSchedulerEnabled() {
 		slog.Info("running in monitor-only mode (no scheduler mode configured)")
-		sigCh := make(chan os.Signal, 1)
-		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-		select {
-		case sig := <-sigCh:
-			slog.Info("received signal, shutting down", "signal", sig)
-		case <-ctx.Done():
+		return waitForShutdown(ctx)
+	}
+
+	if err := checkSchedExtSupport(); err != nil {
+		if cfg.IsMonitorEnabled() {
+			slog.Warn("sched_ext unavailable; continuing in monitor-only mode", "error", err)
+			return waitForShutdown(ctx)
 		}
-		slog.Info("Gthulhu exit")
-		return nil
+		return err
 	}
 
 	// Apply scheduler configuration before loading eBPF program
@@ -1037,6 +1126,19 @@ func runSchedulerMode(args []string) error {
 		}
 	}
 	slog.Info("scheduler exit")
+	return nil
+}
+
+func waitForShutdown(ctx context.Context) error {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
+	select {
+	case sig := <-sigCh:
+		slog.Info("received signal, shutting down", "signal", sig)
+	case <-ctx.Done():
+	}
+	slog.Info("Gthulhu exit")
 	return nil
 }
 

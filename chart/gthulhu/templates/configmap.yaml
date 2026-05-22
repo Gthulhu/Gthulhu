@@ -27,19 +27,28 @@ data:
   config.yaml: |
     # Gthulhu Scheduler Configuration
     # This configuration file allows you to adjust scheduler parameters before eBPF program loading
+    monitor:
+      enabled: {{ .Values.monitoring.enabled }}
+      bpf_object_path: {{ .Values.scheduler.monitor.bpfObjectPath | quote }}
+      collection_interval_sec: {{ .Values.scheduler.monitor.collectionIntervalSec }}
+      monitor_all: {{ .Values.scheduler.monitor.monitorAll }}
+      stream_events: {{ .Values.scheduler.monitor.streamEvents }}
+      prometheus_port: {{ .Values.scheduler.monitor.prometheusPort }}
+      enable_crd_watcher: {{ .Values.scheduler.monitor.enableCRDWatcher }}
+      kubeconfig_path: {{ .Values.scheduler.monitor.kubeConfigPath | quote }}
     scheduler:
       # Default time slice in nanoseconds (default: 5000000 = 5ms)
-      slice_ns_default: 20000000
-      
+      slice_ns_default: {{ int64 .Values.scheduler.scheduling.sliceNsDefault }}
+       
       # Minimum time slice in nanoseconds (default: 500000 = 0.5ms)
-      slice_ns_min: 1000000
+      slice_ns_min: {{ int64 .Values.scheduler.scheduling.sliceNsMin }}
 
-      # Mode could be: simple, simple-fifo, gthulhu
-      mode: gthulhu
-      kernel_mode: true # experimental feature
-      max_time_watchdog: true
+      # Mode could be: none, simple, gthulhu, scx
+      mode: {{ ternary .Values.scheduler.scheduling.mode "none" .Values.scheduler.scheduling.enabled | quote }}
+      kernel_mode: {{ .Values.scheduler.scheduling.kernelMode }} # experimental feature
+      max_time_watchdog: {{ .Values.scheduler.scheduling.maxTimeWatchdog }}
     api:
-      enabled: true
+      enabled: {{ .Values.scheduler.sidecar.enabled }}
       auth_enabled: true
       url: http://localhost:{{ .Values.scheduler.sidecar.port }}
       interval: 5

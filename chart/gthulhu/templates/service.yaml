@@ -18,6 +18,26 @@ spec:
     app.kubernetes.io/component: manager
 {{- end }}
 ---
+{{- if and .Values.scheduler.enabled .Values.monitoring.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "gthulhu.fullname" . }}-scheduler-monitor
+  labels:
+    {{- include "gthulhu.labels" . | nindent 4 }}
+    app.kubernetes.io/component: monitor
+spec:
+  clusterIP: None
+  ports:
+    - port: {{ .Values.scheduler.monitor.prometheusPort }}
+      targetPort: monitor-metrics
+      protocol: TCP
+      name: monitor-metrics
+  selector:
+    {{- include "gthulhu.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+{{- end }}
+---
 {{- if and .Values.scheduler.enabled .Values.scheduler.sidecar.enabled }}
 apiVersion: v1
 kind: Service
