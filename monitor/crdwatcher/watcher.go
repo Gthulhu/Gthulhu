@@ -43,6 +43,10 @@ type Watcher struct {
 
 	mu    sync.RWMutex
 	specs map[string]*domain.PodSchedulingMetrics // key = namespace/name
+	// monitoredPIDs tracks PIDs we previously pushed into the BPF
+	// monitored_pids map, so we only call RemoveMonitoredPID for entries
+	// we actually added (avoids ENOENT log spam on every reconcile).
+	monitoredPIDs map[uint32]struct{}
 }
 
 // New creates a Watcher.
@@ -58,12 +62,13 @@ func New(
 		return nil, fmt.Errorf("dynamic client: %w", err)
 	}
 	return &Watcher{
-		logger:    logger,
-		client:    dynClient,
-		collector: col,
-		podMapper: podMapper,
-		nodeName:  nodeName,
-		specs:     make(map[string]*domain.PodSchedulingMetrics),
+		logger:        logger,
+		client:        dynClient,
+		collector:     col,
+		podMapper:     podMapper,
+		nodeName:      nodeName,
+		specs:         make(map[string]*domain.PodSchedulingMetrics),
+		monitoredPIDs: make(map[uint32]struct{}),
 	}, nil
 }
 
@@ -150,8 +155,8 @@ func (w *Watcher) reconcilePIDs() {
 	// into the BPF monitored_pids map.
 	w.podMapper.ScanAllPIDs()
 
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	// Gather all pod UIDs that match any enabled PSM
 	desiredPods := make(map[string]bool)
@@ -169,7 +174,9 @@ func (w *Watcher) reconcilePIDs() {
 
 	// Get all PIDs belonging to desired pods and sync to BPF
 	mappedPIDs := w.podMapper.ListMappedPIDs()
+	mapped := make(map[uint32]struct{}, len(mappedPIDs))
 	for _, pid := range mappedPIDs {
+		mapped[pid] = struct{}{}
 		podRef := w.podMapper.GetPodForPID(pid)
 		if podRef == nil {
 			continue
@@ -177,14 +184,29 @@ func (w *Watcher) reconcilePIDs() {
 		if desiredPods[podRef.PodUID] {
 			if err := w.collector.AddMonitoredPID(pid); err != nil {
 				w.logger.Warn("failed to add monitored PID", "pid", pid, "error", err)
+				continue
 			}
-		} else {
+			w.monitoredPIDs[pid] = struct{}{}
+		} else if _, tracked := w.monitoredPIDs[pid]; tracked {
 			if err := w.collector.RemoveMonitoredPID(pid); err != nil {
 				w.logger.Warn("failed to remove monitored PID", "pid", pid, "error", err)
+				continue
 			}
+			delete(w.monitoredPIDs, pid)
 		}
 	}
-	w.logger.Debug("reconcilePIDs done", "desiredPods", len(desiredPods))
+	// Also drop tracked PIDs that have since vanished from /proc so the
+	// bookkeeping stays bounded.
+	for pid := range w.monitoredPIDs {
+		if _, alive := mapped[pid]; alive {
+			continue
+		}
+		if err := w.collector.RemoveMonitoredPID(pid); err != nil {
+			w.logger.Warn("failed to remove monitored PID", "pid", pid, "error", err)
+		}
+		delete(w.monitoredPIDs, pid)
+	}
+	w.logger.Debug("reconcilePIDs done", "desiredPods", len(desiredPods), "tracked", len(w.monitoredPIDs))
 }
 
 // psmMatchesPod checks if a PodSchedulingMetrics spec matches a given pod.
