@@ -89,10 +89,20 @@ func (w *Watcher) watchLoop(ctx context.Context) error {
 	defer watcher.Stop()
 	w.logger.Info("CRD watcher started for PodSchedulingMetrics")
 
+	// Periodic reconcile: the pidCache and podIndex are populated asynchronously
+	// by PodMapper.StartPeriodicScan and podindexer.Run, so the snapshot taken
+	// at PSM ADDED time may be incomplete. A regular tick guarantees that newly
+	// resolved PIDs and pods eventually flow into the monitored_pids BPF map
+	// even when no further CRD events arrive.
+	reconcileTicker := time.NewTicker(15 * time.Second)
+	defer reconcileTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-reconcileTicker.C:
+			w.reconcilePIDs()
 		case event, ok := <-watcher.ResultChan():
 			if !ok {
 				return fmt.Errorf("watch channel closed")
@@ -134,6 +144,12 @@ func (w *Watcher) handleEvent(event watch.Event) {
 // reconcilePIDs computes the desired set of monitored PIDs from all active
 // PodSchedulingMetrics specs and syncs them to the eBPF maps.
 func (w *Watcher) reconcilePIDs() {
+	// Force a fresh /proc scan so pidCache reflects current reality. Without
+	// this, the first reconcile that runs before PodMapper's periodic ticker
+	// fires (default 30s) would see an empty pidCache and never push any PID
+	// into the BPF monitored_pids map.
+	w.podMapper.ScanAllPIDs()
+
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
