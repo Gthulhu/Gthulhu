@@ -63,6 +63,15 @@ spec:
               readOnly: true
             - name: runtime-config-dir
               mountPath: /tmp/gthulhu
+          env:
+            # Required by the monitor pod indexer (and CRD watcher) so it can
+            # list pods scheduled to the local node via the spec.nodeName
+            # field selector. Without this, podMapper.podIndex stays empty
+            # and no pod-level scheduling metrics are collected.
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           resources:
             {{- toYaml .Values.scheduler.resources | nindent 12 }}
           {{- if .Values.monitoring.enabled }}
