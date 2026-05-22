@@ -31,7 +31,7 @@ scheduler:
     kubeConfigPath: ""
   
   image:
-    repository: ghcr.io/gthulhu/gthulhu
+    repository: ghcr.io/gthulhu/gthulhu-scx
     pullPolicy: Always
     tag: "latest"
   
