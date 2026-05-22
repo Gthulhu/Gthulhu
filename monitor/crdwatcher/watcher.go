@@ -203,10 +203,22 @@ func (w *Watcher) psmMatchesPod(psm *domain.PodSchedulingMetrics, ref *collector
 		}
 	}
 
-	// Label selectors are matched against pod labels; however, PodRef doesn't
-	// carry labels. For now, we match on pod name patterns. Full label matching
-	// requires extending PodRef with labels from the K8S informer.
-	// TODO: extend PodRef with labels for precise selector matching
+	// Label selector filter: every selector key must be present on the pod
+	// and the value must match. An empty selector list means "match any pod"
+	// in the chosen namespaces (kept for backward compatibility with specs
+	// that rely solely on namespace + commandRegex filtering).
+	if len(psm.Spec.LabelSelectors) > 0 {
+		for _, sel := range psm.Spec.LabelSelectors {
+			if sel.Key == "" {
+				continue
+			}
+			v, ok := ref.Labels[sel.Key]
+			if !ok || v != sel.Value {
+				return false
+			}
+		}
+	}
+
 	return true
 }
 

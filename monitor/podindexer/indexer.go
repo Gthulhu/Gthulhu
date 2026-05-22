@@ -110,6 +110,7 @@ func (i *Indexer) refresh(ctx context.Context) error {
 			PodUID:    uid,
 			Namespace: p.Namespace,
 			NodeName:  p.Spec.NodeName,
+			Labels:    p.Labels,
 		}
 	}
 	i.podMapper.SetPodIndex(index)

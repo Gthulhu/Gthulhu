@@ -22,6 +22,7 @@ type PodRef struct {
 	PodUID    string
 	Namespace string
 	NodeName  string
+	Labels    map[string]string
 }
 
 // PodMapper resolves PIDs to their owning Kubernetes pod by inspecting
