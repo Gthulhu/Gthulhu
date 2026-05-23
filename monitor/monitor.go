@@ -31,6 +31,7 @@ import (
 
 	"github.com/Gthulhu/Gthulhu/monitor/collector"
 	"github.com/Gthulhu/Gthulhu/monitor/crdwatcher"
+	"github.com/Gthulhu/Gthulhu/monitor/podindexer"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/client-go/rest"
@@ -75,22 +76,42 @@ func StartMonitor(ctx context.Context, cfg Config, logger *slog.Logger) error {
 		StreamEvents:  cfg.StreamEvents,
 	}, podMapper, logger)
 
-	// CRD Watcher (optional — needs Kubernetes API access)
-	if cfg.EnableCRDWatcher {
+	// Kubernetes integration: pod indexer + CRD watcher (both need kubeConfig).
+	// The pod indexer is required for the collector to associate PIDs with pods,
+	// so we start it whenever a kubeConfig is obtainable, even if the CRD
+	// watcher is disabled.
+	if cfg.NodeName == "" {
+		logger.Warn("NODE_NAME not set; pod indexer and CRD watcher disabled (no pod metrics will be collected)")
+	} else {
 		kubeConfig, err := buildKubeConfig(cfg.KubeConfigPath)
 		if err != nil {
-			logger.Warn("kubeconfig unavailable, CRD watcher disabled", "error", err)
+			logger.Warn("kubeconfig unavailable, pod indexer and CRD watcher disabled", "error", err)
 		} else {
-			w, err := crdwatcher.New(kubeConfig, col, podMapper, cfg.NodeName, logger)
-			if err != nil {
-				logger.Warn("CRD watcher creation failed", "error", err)
+			// Pod indexer: keeps PodMapper's podUID→PodRef index fresh.
+			idx, ierr := podindexer.New(kubeConfig, podMapper, cfg.NodeName, 30*time.Second, logger)
+			if ierr != nil {
+				logger.Warn("pod indexer creation failed", "error", ierr)
 			} else {
 				go func() {
-					if err := w.Run(ctx); err != nil {
-						logger.Error("CRD watcher error", "error", err)
+					if err := idx.Run(ctx); err != nil {
+						logger.Error("pod indexer stopped", "error", err)
 					}
 				}()
-				logger.Info("CRD watcher started for PodSchedulingMetrics")
+				logger.Info("pod indexer started", "node", cfg.NodeName)
+			}
+
+			if cfg.EnableCRDWatcher {
+				w, werr := crdwatcher.New(kubeConfig, col, podMapper, cfg.NodeName, logger)
+				if werr != nil {
+					logger.Warn("CRD watcher creation failed", "error", werr)
+				} else {
+					go func() {
+						if err := w.Run(ctx); err != nil {
+							logger.Error("CRD watcher error", "error", err)
+						}
+					}()
+					logger.Info("CRD watcher started for PodSchedulingMetrics")
+				}
 			}
 		}
 	}

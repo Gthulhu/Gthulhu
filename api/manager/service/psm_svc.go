@@ -18,6 +18,13 @@ func (svc *Service) CreatePodSchedulingMetrics(ctx context.Context, operator *do
 	}
 
 	psm.BaseEntity = domain.NewBaseEntity(&operatorID, &operatorID)
+	// NewBaseEntity does not assign an ID. The PSM repo stores the CR using
+	// psm.ID.Hex() as metadata.name, so a missing ID would always produce
+	// the same zero-value name ("000000000000000000000000") and every
+	// subsequent Create would fail with AlreadyExists after a restart.
+	if psm.ID.IsZero() {
+		psm.ID = bson.NewObjectID()
+	}
 	if psm.CollectionIntervalSeconds == 0 {
 		psm.CollectionIntervalSeconds = 10
 	}

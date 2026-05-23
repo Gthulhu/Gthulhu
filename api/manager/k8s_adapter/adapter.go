@@ -21,9 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	_ domain.K8SAdapter = (*Adapter)(nil)
-)
+var _ domain.K8SAdapter = (*Adapter)(nil)
 
 type Options struct {
 	KubeConfigPath string
@@ -353,14 +351,53 @@ func copyLabels(labels map[string]string) map[string]string {
 	return cloned
 }
 
+// decisionMakerPortNames lists the container port names (in priority order)
+// that identify the decision maker (sidecar) API endpoint.
+var decisionMakerPortNames = []string{"http", "api", "sidecar", "dm", "decisionmaker"}
+
+// excludedPortNames lists container port names that must never be treated as
+// the decision maker API port (e.g. Prometheus scrape endpoint).
+var excludedPortNames = map[string]struct{}{
+	"monitor-metrics": {},
+	"metrics":         {},
+	"prometheus":      {},
+}
+
+// firstContainerPort returns the decision maker API port for the pod.
+//
+// A scheduler pod can carry multiple containers (e.g. the scheduler itself
+// plus a sidecar) each exposing different ports. The previous implementation
+// blindly returned the first port of the first container, which on monitoring
+// enabled deployments resolved to the Prometheus scrape port (9090) instead
+// of the sidecar API port. We now scan all containers and:
+//  1. prefer ports whose name matches a known decision maker port name;
+//  2. otherwise return the first port whose name is not in the exclusion list;
+//  3. finally fall back to the very first port found (legacy behaviour).
 func firstContainerPort(pod apiv1.Pod) int {
+	var fallback int32
+	var nonExcluded int32
 	for _, container := range pod.Spec.Containers {
-		if len(container.Ports) == 0 {
-			continue
+		for _, port := range container.Ports {
+			if fallback == 0 {
+				fallback = port.ContainerPort
+			}
+			if _, skip := excludedPortNames[port.Name]; skip {
+				continue
+			}
+			for _, preferred := range decisionMakerPortNames {
+				if port.Name == preferred {
+					return int(port.ContainerPort)
+				}
+			}
+			if nonExcluded == 0 {
+				nonExcluded = port.ContainerPort
+			}
 		}
-		return int(container.Ports[0].ContainerPort)
 	}
-	return 0
+	if nonExcluded != 0 {
+		return int(nonExcluded)
+	}
+	return int(fallback)
 }
 
 func mapPodState(phase apiv1.PodPhase) domain.NodeState {

@@ -1,5 +1,7 @@
 package domain
 
+import "strconv"
+
 // Node represents a Kubernetes node
 type Node struct {
 	Name   string            `json:"name"`
@@ -15,7 +17,7 @@ type DecisionMakerPod struct {
 }
 
 func (d *DecisionMakerPod) String() string {
-	return "(" + d.NodeID + ")" + d.Host + ":" + string(rune(d.Port))
+	return "(" + d.NodeID + ")" + d.Host + ":" + strconv.Itoa(d.Port)
 }
 
 type Pod struct {

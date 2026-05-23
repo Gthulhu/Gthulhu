@@ -16,6 +16,13 @@ rules:
   - apiGroups: ["metrics.k8s.io"]
     resources: ["nodes", "pods"]
     verbs: ["get", "list"]
+  # The scheduler DaemonSet runs the eBPF monitor + CRD watcher
+  # (monitor.enable_crd_watcher), which watches PodSchedulingMetrics
+  # CRs to decide which PIDs to track. Without this rule the watcher
+  # gets 403 Forbidden and the collector never sees any pods.
+  - apiGroups: ["gthulhu.io"]
+    resources: ["podschedulingmetrics"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -13,6 +13,7 @@ import "C"
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -125,11 +127,16 @@ func (c *Collector) AddMonitoredPID(pid uint32) error {
 }
 
 // RemoveMonitoredPID removes a PID from the BPF monitored_pids map.
+// ENOENT (key not present) is treated as a successful no-op so that reconcile
+// loops can call Remove unconditionally without flooding logs.
 func (c *Collector) RemoveMonitoredPID(pid uint32) error {
 	if c.monitoredPIDs == nil {
 		return fmt.Errorf("BPF not loaded")
 	}
-	return c.monitoredPIDs.DeleteKey(unsafe.Pointer(&pid))
+	if err := c.monitoredPIDs.DeleteKey(unsafe.Pointer(&pid)); err != nil && !errors.Is(err, syscall.ENOENT) {
+		return err
+	}
+	return nil
 }
 
 // AddMonitoredTGID inserts a TGID into the BPF monitored_tgids map.
@@ -142,11 +149,15 @@ func (c *Collector) AddMonitoredTGID(tgid uint32) error {
 }
 
 // RemoveMonitoredTGID removes a TGID from the BPF monitored_tgids map.
+// ENOENT is treated as a successful no-op (see RemoveMonitoredPID).
 func (c *Collector) RemoveMonitoredTGID(tgid uint32) error {
 	if c.monitoredTGIDs == nil {
 		return fmt.Errorf("BPF not loaded")
 	}
-	return c.monitoredTGIDs.DeleteKey(unsafe.Pointer(&tgid))
+	if err := c.monitoredTGIDs.DeleteKey(unsafe.Pointer(&tgid)); err != nil && !errors.Is(err, syscall.ENOENT) {
+		return err
+	}
+	return nil
 }
 
 // ========================== internal ==========================

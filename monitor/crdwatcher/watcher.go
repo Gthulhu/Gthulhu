@@ -43,6 +43,10 @@ type Watcher struct {
 
 	mu    sync.RWMutex
 	specs map[string]*domain.PodSchedulingMetrics // key = namespace/name
+	// monitoredPIDs tracks PIDs we previously pushed into the BPF
+	// monitored_pids map, so we only call RemoveMonitoredPID for entries
+	// we actually added (avoids ENOENT log spam on every reconcile).
+	monitoredPIDs map[uint32]struct{}
 }
 
 // New creates a Watcher.
@@ -58,12 +62,13 @@ func New(
 		return nil, fmt.Errorf("dynamic client: %w", err)
 	}
 	return &Watcher{
-		logger:    logger,
-		client:    dynClient,
-		collector: col,
-		podMapper: podMapper,
-		nodeName:  nodeName,
-		specs:     make(map[string]*domain.PodSchedulingMetrics),
+		logger:        logger,
+		client:        dynClient,
+		collector:     col,
+		podMapper:     podMapper,
+		nodeName:      nodeName,
+		specs:         make(map[string]*domain.PodSchedulingMetrics),
+		monitoredPIDs: make(map[uint32]struct{}),
 	}, nil
 }
 
@@ -89,10 +94,20 @@ func (w *Watcher) watchLoop(ctx context.Context) error {
 	defer watcher.Stop()
 	w.logger.Info("CRD watcher started for PodSchedulingMetrics")
 
+	// Periodic reconcile: the pidCache and podIndex are populated asynchronously
+	// by PodMapper.StartPeriodicScan and podindexer.Run, so the snapshot taken
+	// at PSM ADDED time may be incomplete. A regular tick guarantees that newly
+	// resolved PIDs and pods eventually flow into the monitored_pids BPF map
+	// even when no further CRD events arrive.
+	reconcileTicker := time.NewTicker(15 * time.Second)
+	defer reconcileTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-reconcileTicker.C:
+			w.reconcilePIDs()
 		case event, ok := <-watcher.ResultChan():
 			if !ok {
 				return fmt.Errorf("watch channel closed")
@@ -134,8 +149,14 @@ func (w *Watcher) handleEvent(event watch.Event) {
 // reconcilePIDs computes the desired set of monitored PIDs from all active
 // PodSchedulingMetrics specs and syncs them to the eBPF maps.
 func (w *Watcher) reconcilePIDs() {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
+	// Force a fresh /proc scan so pidCache reflects current reality. Without
+	// this, the first reconcile that runs before PodMapper's periodic ticker
+	// fires (default 30s) would see an empty pidCache and never push any PID
+	// into the BPF monitored_pids map.
+	w.podMapper.ScanAllPIDs()
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
 
 	// Gather all pod UIDs that match any enabled PSM
 	desiredPods := make(map[string]bool)
@@ -153,7 +174,9 @@ func (w *Watcher) reconcilePIDs() {
 
 	// Get all PIDs belonging to desired pods and sync to BPF
 	mappedPIDs := w.podMapper.ListMappedPIDs()
+	mapped := make(map[uint32]struct{}, len(mappedPIDs))
 	for _, pid := range mappedPIDs {
+		mapped[pid] = struct{}{}
 		podRef := w.podMapper.GetPodForPID(pid)
 		if podRef == nil {
 			continue
@@ -161,14 +184,29 @@ func (w *Watcher) reconcilePIDs() {
 		if desiredPods[podRef.PodUID] {
 			if err := w.collector.AddMonitoredPID(pid); err != nil {
 				w.logger.Warn("failed to add monitored PID", "pid", pid, "error", err)
+				continue
 			}
-		} else {
+			w.monitoredPIDs[pid] = struct{}{}
+		} else if _, tracked := w.monitoredPIDs[pid]; tracked {
 			if err := w.collector.RemoveMonitoredPID(pid); err != nil {
 				w.logger.Warn("failed to remove monitored PID", "pid", pid, "error", err)
+				continue
 			}
+			delete(w.monitoredPIDs, pid)
 		}
 	}
-	w.logger.Debug("reconcilePIDs done", "desiredPods", len(desiredPods))
+	// Also drop tracked PIDs that have since vanished from /proc so the
+	// bookkeeping stays bounded.
+	for pid := range w.monitoredPIDs {
+		if _, alive := mapped[pid]; alive {
+			continue
+		}
+		if err := w.collector.RemoveMonitoredPID(pid); err != nil {
+			w.logger.Warn("failed to remove monitored PID", "pid", pid, "error", err)
+		}
+		delete(w.monitoredPIDs, pid)
+	}
+	w.logger.Debug("reconcilePIDs done", "desiredPods", len(desiredPods), "tracked", len(w.monitoredPIDs))
 }
 
 // psmMatchesPod checks if a PodSchedulingMetrics spec matches a given pod.
@@ -187,10 +225,22 @@ func (w *Watcher) psmMatchesPod(psm *domain.PodSchedulingMetrics, ref *collector
 		}
 	}
 
-	// Label selectors are matched against pod labels; however, PodRef doesn't
-	// carry labels. For now, we match on pod name patterns. Full label matching
-	// requires extending PodRef with labels from the K8S informer.
-	// TODO: extend PodRef with labels for precise selector matching
+	// Label selector filter: every selector key must be present on the pod
+	// and the value must match. An empty selector list means "match any pod"
+	// in the chosen namespaces (kept for backward compatibility with specs
+	// that rely solely on namespace + commandRegex filtering).
+	if len(psm.Spec.LabelSelectors) > 0 {
+		for _, sel := range psm.Spec.LabelSelectors {
+			if sel.Key == "" {
+				continue
+			}
+			v, ok := ref.Labels[sel.Key]
+			if !ok || v != sel.Value {
+				return false
+			}
+		}
+	}
+
 	return true
 }
 
