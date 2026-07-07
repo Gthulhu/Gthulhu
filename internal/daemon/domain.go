@@ -1,18 +1,19 @@
 package daemon
 
 // runtimeConfigRequest is the daemon control API payload for runtime updates.
+// Pointer fields are optional: a nil value means "keep the existing config value".
 type runtimeConfigRequest struct {
 	ConfigVersion     string `json:"configVersion,omitempty"`
 	Mode              string `json:"mode,omitempty"`
 	SchedulerName     string `json:"schedulerName,omitempty"`
 	SliceNsDefault    uint64 `json:"sliceNsDefault,omitempty"`
 	SliceNsMin        uint64 `json:"sliceNsMin,omitempty"`
-	KernelMode        bool   `json:"kernelMode,omitempty"`
-	MaxTimeWatchdog   bool   `json:"maxTimeWatchdog,omitempty"`
-	EarlyProcessing   bool   `json:"earlyProcessing,omitempty"`
-	BuiltinIdle       bool   `json:"builtinIdle,omitempty"`
-	SchedulerEnabled  bool   `json:"schedulerEnabled"`
-	MonitoringEnabled bool   `json:"monitoringEnabled"`
+	KernelMode        *bool  `json:"kernelMode,omitempty"`
+	MaxTimeWatchdog   *bool  `json:"maxTimeWatchdog,omitempty"`
+	EarlyProcessing   *bool  `json:"earlyProcessing,omitempty"`
+	BuiltinIdle       *bool  `json:"builtinIdle,omitempty"`
+	SchedulerEnabled  *bool  `json:"schedulerEnabled,omitempty"`
+	MonitoringEnabled *bool  `json:"monitoringEnabled,omitempty"`
 }
 
 type runtimeConfigStatus struct {

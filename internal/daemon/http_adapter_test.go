@@ -86,7 +86,8 @@ func TestControlAPI_RuntimeConfigApplyChangedTriggersRestart(t *testing.T) {
 	restartReqCh := make(chan struct{}, 1)
 	h := newTestHandler(state, store, restartReqCh)
 
-	body := runtimeConfigRequest{ConfigVersion: "v2", Mode: "gthulhu", SchedulerEnabled: true}
+	schedulerEnabled := true
+	body := runtimeConfigRequest{ConfigVersion: "v2", Mode: "gthulhu", SchedulerEnabled: &schedulerEnabled}
 	buf, _ := json.Marshal(body)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/runtime-config", bytes.NewReader(buf))
 	rr := httptest.NewRecorder()

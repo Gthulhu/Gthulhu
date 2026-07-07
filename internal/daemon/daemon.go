@@ -213,19 +213,37 @@ func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string,
 		MonitoringEnabled: cfg.Monitor.Enabled,
 	}
 
-	cfg.Scheduler.Mode = req.Mode
-	cfg.Scheduler.SchedulerName = req.SchedulerName
-	cfg.Scheduler.SliceNsDefault = req.SliceNsDefault
-	cfg.Scheduler.SliceNsMin = req.SliceNsMin
-	cfg.Scheduler.KernelMode = req.KernelMode
-	cfg.Scheduler.MaxTimeWatchdog = req.MaxTimeWatchdog
-	cfg.EarlyProcessing = req.EarlyProcessing
-	cfg.BuiltinIdle = req.BuiltinIdle
-	if !req.SchedulerEnabled && cfg.Scheduler.Mode == "" {
-		cfg.Scheduler.Mode = "none"
+	if req.Mode != "" {
+		cfg.Scheduler.Mode = req.Mode
 	}
-	if req.SchedulerEnabled && cfg.Scheduler.Mode == "" {
-		cfg.Scheduler.Mode = "gthulhu"
+	if req.SchedulerName != "" {
+		cfg.Scheduler.SchedulerName = req.SchedulerName
+	}
+	if req.SliceNsDefault != 0 {
+		cfg.Scheduler.SliceNsDefault = req.SliceNsDefault
+	}
+	if req.SliceNsMin != 0 {
+		cfg.Scheduler.SliceNsMin = req.SliceNsMin
+	}
+	if req.KernelMode != nil {
+		cfg.Scheduler.KernelMode = *req.KernelMode
+	}
+	if req.MaxTimeWatchdog != nil {
+		cfg.Scheduler.MaxTimeWatchdog = *req.MaxTimeWatchdog
+	}
+	if req.EarlyProcessing != nil {
+		cfg.EarlyProcessing = *req.EarlyProcessing
+	}
+	if req.BuiltinIdle != nil {
+		cfg.BuiltinIdle = *req.BuiltinIdle
+	}
+	if req.SchedulerEnabled != nil {
+		if !*req.SchedulerEnabled && cfg.Scheduler.Mode == "" {
+			cfg.Scheduler.Mode = "none"
+		}
+		if *req.SchedulerEnabled && cfg.Scheduler.Mode == "" {
+			cfg.Scheduler.Mode = "gthulhu"
+		}
 	}
 	if err := validateScheduler(cfg.Scheduler.Mode, cfg.Scheduler.SchedulerName); err != nil {
 		return false, err
@@ -235,7 +253,9 @@ func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string,
 			return false, err
 		}
 	}
-	cfg.Monitor.Enabled = req.MonitoringEnabled
+	if req.MonitoringEnabled != nil {
+		cfg.Monitor.Enabled = *req.MonitoringEnabled
+	}
 
 	changed := prev.Mode != cfg.Scheduler.Mode ||
 		prev.SchedulerName != cfg.Scheduler.SchedulerName ||
