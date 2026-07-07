@@ -231,7 +231,7 @@ func applyRuntimeConfigToFile(runtimeConfigPath string, schedulerBinPath string,
 		return false, err
 	}
 	if cfg.Scheduler.Mode == "scx" {
-		if err := ensureExecutableInDir(filepath.Dir(schedulerBinPath), cfg.Scheduler.SchedulerName); err != nil {
+		if _, err := ensureExecutableInDir(filepath.Dir(schedulerBinPath), cfg.Scheduler.SchedulerName); err != nil {
 			return false, err
 		}
 	}
@@ -294,10 +294,10 @@ func schedulerCommandFromConfig(configPath string, gthulhuBin string) (string, [
 	case "gthulhu", "simple":
 		return gthulhuBin, []string{modeScheduler, "-config", configPath}, true, nil
 	case "scx":
-		if err := ensureExecutableInDir(filepath.Dir(gthulhuBin), cfg.Scheduler.SchedulerName); err != nil {
+		path, err := ensureExecutableInDir(filepath.Dir(gthulhuBin), cfg.Scheduler.SchedulerName)
+		if err != nil {
 			return "", nil, false, err
 		}
-		path := filepath.Clean(filepath.Join(filepath.Dir(gthulhuBin), cfg.Scheduler.SchedulerName))
 		return path, nil, true, nil
 	default:
 		return "", nil, false, fmt.Errorf("unsupported scheduler mode %q", mode)
@@ -330,16 +330,19 @@ func validateScheduler(mode string, schedulerName string) error {
 }
 
 // ensureExecutableInDir verifies that name resolves to an executable file
-// strictly inside dir.  It constructs the path, cleans it, and checks that
-// the result is actually confined to dir before touching the file system.
-func ensureExecutableInDir(dir, name string) error {
+// strictly inside dir.  It constructs the path, cleans it, checks that the
+// result is actually confined to dir, and returns the validated path.
+func ensureExecutableInDir(dir, name string) (string, error) {
 	cleanDir := filepath.Clean(dir)
 	cleanPath := filepath.Clean(filepath.Join(cleanDir, name))
 	// Prevent path traversal: the joined path must be a direct child of cleanDir.
-	if cleanPath == cleanDir || !strings.HasPrefix(cleanPath, cleanDir+string(filepath.Separator)) {
-		return fmt.Errorf("scheduler binary path %q is outside the allowed directory", name)
+	if !strings.HasPrefix(cleanPath, cleanDir+string(filepath.Separator)) {
+		return "", fmt.Errorf("scheduler binary path %q is outside the allowed directory", name)
 	}
-	return ensureExecutable(cleanPath)
+	if err := ensureExecutable(cleanPath); err != nil {
+		return "", err
+	}
+	return cleanPath, nil
 }
 
 func ensureExecutable(path string) error {

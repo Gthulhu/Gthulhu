@@ -5,8 +5,6 @@ go 1.24.5
 require (
 	github.com/Gthulhu/api v0.0.0
 	github.com/Gthulhu/plugin v1.1.1-0.20260223021833-8f174def9e15
-	github.com/Gthulhu/qumun v0.3.2-0.20250105095341-21d6627bc161
-	github.com/aquasecurity/libbpfgo v0.8.0-libbpf-1.5
 	github.com/prometheus/client_golang v1.23.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.0
@@ -17,7 +15,6 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cilium/ebpf v0.20.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
