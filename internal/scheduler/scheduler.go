@@ -232,7 +232,9 @@ func Run(args []string) error {
 
 	if cfg.IsDebugEnabled() {
 		go func() {
-			http.ListenAndServe(":6060", nil)
+			if err := http.ListenAndServe(":6060", nil); err != nil {
+				slog.Warn("pprof server error", "error", err)
+			}
 		}()
 	}
 
@@ -276,7 +278,7 @@ func Run(args []string) error {
 		}
 	}
 
-	if err = runSchedulerLoop(ctx, bpfModule, p, sliceNsDefault, sliceNsMin); err != nil {
+	if err = runSchedulerLoop(ctx, bpfModule, sliceNsDefault, sliceNsMin); err != nil {
 		slog.Info("Scheduler loop exited with error", "error", err)
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {

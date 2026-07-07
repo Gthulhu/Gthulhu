@@ -5,14 +5,12 @@ import (
 	"log/slog"
 
 	"github.com/Gthulhu/plugin/models"
-	"github.com/Gthulhu/plugin/plugin"
 	core "github.com/Gthulhu/qumun/goland_core"
 )
 
 func runSchedulerLoop(
 	ctx context.Context,
 	bpfModule *core.Sched,
-	_ plugin.CustomScheduler,
 	sliceNsDefault,
 	sliceNsMin uint64,
 ) error {
