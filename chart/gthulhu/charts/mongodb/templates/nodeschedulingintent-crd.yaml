@@ -1,0 +1,65 @@
+{{- $existingCrd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "nodeschedulingintents.gthulhu.io" }}
+{{- if not $existingCrd }}
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: nodeschedulingintents.gthulhu.io
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  group: gthulhu.io
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                policyID:
+                  type: string
+                nodeID:
+                  type: string
+                commandRegex:
+                  type: string
+                priority:
+                  type: integer
+                executionTime:
+                  type: integer
+                  format: int64
+                state:
+                  type: integer
+                creatorID:
+                  type: string
+                updaterID:
+                  type: string
+                createdTime:
+                  type: integer
+                  format: int64
+                updatedTime:
+                  type: integer
+                  format: int64
+      additionalPrinterColumns:
+        - name: Policy
+          type: string
+          jsonPath: .spec.policyID
+        - name: Node
+          type: string
+          jsonPath: .spec.nodeID
+        - name: State
+          type: integer
+          jsonPath: .spec.state
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+  scope: Namespaced
+  names:
+    plural: nodeschedulingintents
+    singular: nodeschedulingintent
+    kind: NodeSchedulingIntent
+    shortNames:
+      - nsi
+{{- end }}
