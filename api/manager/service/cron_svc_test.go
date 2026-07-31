@@ -170,6 +170,19 @@ func TestCheckDMIntentsHappyPathOnlineOnly(t *testing.T) {
 		Return(expectedRoot, nil).
 		Once()
 
+	mockRepo.EXPECT().
+		QueryNodePolicies(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodePolicyOptions) {
+			opt.Result = []*domain.NodeSchedulingPolicy{}
+		}).
+		Return(nil).Once()
+	mockRepo.EXPECT().
+		QueryNodeIntents(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodeIntentOptions) {
+			opt.Result = []*domain.NodeSchedulingIntent{}
+		}).
+		Return(nil).Once()
+
 	svc := &Service{
 		K8SAdapter: mockK8S,
 		Repo:       mockRepo,
@@ -268,6 +281,19 @@ func TestCheckDMIntentsComparesNodeScopedMerkleRoots(t *testing.T) {
 		Return(expectedNodeBRoot, nil).
 		Once()
 
+	mockRepo.EXPECT().
+		QueryNodePolicies(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodePolicyOptions) {
+			opt.Result = []*domain.NodeSchedulingPolicy{}
+		}).
+		Return(nil).Once()
+	mockRepo.EXPECT().
+		QueryNodeIntents(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodeIntentOptions) {
+			opt.Result = []*domain.NodeSchedulingIntent{}
+		}).
+		Return(nil).Once()
+
 	svc := &Service{
 		K8SAdapter: mockK8S,
 		Repo:       mockRepo,
@@ -333,6 +359,19 @@ func TestReconcileIntentsResendOnMerkleMismatch(t *testing.T) {
 		BatchUpdateIntentsState(mock.Anything, []bson.ObjectID{intent.ID}, domain.IntentStateSent).
 		Return(nil).Once()
 
+	mockRepo.EXPECT().
+		QueryNodePolicies(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodePolicyOptions) {
+			opt.Result = []*domain.NodeSchedulingPolicy{}
+		}).
+		Return(nil).Once()
+	mockRepo.EXPECT().
+		QueryNodeIntents(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodeIntentOptions) {
+			opt.Result = []*domain.NodeSchedulingIntent{}
+		}).
+		Return(nil).Once()
+
 	svc := &Service{
 		K8SAdapter: mockK8S,
 		Repo:       mockRepo,
@@ -391,6 +430,19 @@ func TestReconcileIntentsNoResendOnMatchingMerkle(t *testing.T) {
 		GetIntentMerkleRoot(mock.Anything, dm).
 		Return(expectedRoot, nil).Once()
 	// SendSchedulingIntent should NOT be called (test will fail if it is)
+
+	mockRepo.EXPECT().
+		QueryNodePolicies(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodePolicyOptions) {
+			opt.Result = []*domain.NodeSchedulingPolicy{}
+		}).
+		Return(nil).Once()
+	mockRepo.EXPECT().
+		QueryNodeIntents(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodeIntentOptions) {
+			opt.Result = []*domain.NodeSchedulingIntent{}
+		}).
+		Return(nil).Once()
 
 	svc := &Service{
 		K8SAdapter: mockK8S,
@@ -511,6 +563,19 @@ func TestReconcileIntentsRefreshStaleIntents(t *testing.T) {
 	mockDM.EXPECT().
 		GetIntentMerkleRoot(mock.Anything, dm).
 		Return(emptyRootHash, nil).Once()
+
+	mockRepo.EXPECT().
+		QueryNodePolicies(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodePolicyOptions) {
+			opt.Result = []*domain.NodeSchedulingPolicy{}
+		}).
+		Return(nil).Once()
+	mockRepo.EXPECT().
+		QueryNodeIntents(mock.Anything, mock.Anything).
+		Run(func(_ context.Context, opt *domain.QueryNodeIntentOptions) {
+			opt.Result = []*domain.NodeSchedulingIntent{}
+		}).
+		Return(nil).Once()
 
 	svc := &Service{
 		K8SAdapter: mockK8S,
