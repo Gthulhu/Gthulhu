@@ -165,6 +165,10 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) error {
 		apiV1.GET("/intents/merkle", h.echoHandler(h.GetIntentMerkleRoot), echo.WrapMiddleware(authMiddleware))
 		apiV1.DELETE("/intents", h.echoHandler(h.DeleteIntent), echo.WrapMiddleware(authMiddleware))
 		apiV1.GET("/scheduling/strategies", h.echoHandler(h.ListIntents), echo.WrapMiddleware(authMiddleware))
+		// node-level scheduling policy routes
+		apiV1.POST("/node-intents", h.echoHandler(h.HandleNodePolicies), echo.WrapMiddleware(authMiddleware))
+		apiV1.GET("/node-intents/merkle", h.echoHandler(h.GetNodePolicyMerkleRoot), echo.WrapMiddleware(authMiddleware))
+		apiV1.DELETE("/node-intents", h.echoHandler(h.DeleteNodePolicy), echo.WrapMiddleware(authMiddleware))
 		apiV1.POST("/metrics", h.echoHandler(h.UpdateMetrics), echo.WrapMiddleware(authMiddleware))
 		apiV1.POST("/runtime-config", h.echoHandler(h.ApplyRuntimeConfig), echo.WrapMiddleware(authMiddleware))
 		apiV1.GET("/runtime-config", h.echoHandler(h.GetRuntimeConfig), echo.WrapMiddleware(authMiddleware))

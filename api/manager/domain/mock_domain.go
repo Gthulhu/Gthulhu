@@ -101,6 +101,69 @@ func (_c *MockRepository_BatchUpdateIntentsState_Call) RunAndReturn(run func(ctx
 	return _c
 }
 
+// BatchUpdateNodeIntentsState provides a mock function for the type MockRepository
+func (_mock *MockRepository) BatchUpdateNodeIntentsState(ctx context.Context, intentIDs []bson.ObjectID, newState IntentState) error {
+	ret := _mock.Called(ctx, intentIDs, newState)
+
+	if len(ret) == 0 {
+		panic("no return value specified for BatchUpdateNodeIntentsState")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []bson.ObjectID, IntentState) error); ok {
+		r0 = returnFunc(ctx, intentIDs, newState)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_BatchUpdateNodeIntentsState_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'BatchUpdateNodeIntentsState'
+type MockRepository_BatchUpdateNodeIntentsState_Call struct {
+	*mock.Call
+}
+
+// BatchUpdateNodeIntentsState is a helper method to define mock.On call
+//   - ctx context.Context
+//   - intentIDs []bson.ObjectID
+//   - newState IntentState
+func (_e *MockRepository_Expecter) BatchUpdateNodeIntentsState(ctx interface{}, intentIDs interface{}, newState interface{}) *MockRepository_BatchUpdateNodeIntentsState_Call {
+	return &MockRepository_BatchUpdateNodeIntentsState_Call{Call: _e.mock.On("BatchUpdateNodeIntentsState", ctx, intentIDs, newState)}
+}
+
+func (_c *MockRepository_BatchUpdateNodeIntentsState_Call) Run(run func(ctx context.Context, intentIDs []bson.ObjectID, newState IntentState)) *MockRepository_BatchUpdateNodeIntentsState_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []bson.ObjectID
+		if args[1] != nil {
+			arg1 = args[1].([]bson.ObjectID)
+		}
+		var arg2 IntentState
+		if args[2] != nil {
+			arg2 = args[2].(IntentState)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_BatchUpdateNodeIntentsState_Call) Return(err error) *MockRepository_BatchUpdateNodeIntentsState_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_BatchUpdateNodeIntentsState_Call) RunAndReturn(run func(ctx context.Context, intentIDs []bson.ObjectID, newState IntentState) error) *MockRepository_BatchUpdateNodeIntentsState_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateAuditLog provides a mock function for the type MockRepository
 func (_mock *MockRepository) CreateAuditLog(ctx context.Context, log *AuditLog) error {
 	ret := _mock.Called(ctx, log)
@@ -500,6 +563,177 @@ func (_c *MockRepository_DeleteIntentsByStrategyID_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// DeleteNodeIntents provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeleteNodeIntents(ctx context.Context, intentIDs []bson.ObjectID) error {
+	ret := _mock.Called(ctx, intentIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeIntents")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []bson.ObjectID) error); ok {
+		r0 = returnFunc(ctx, intentIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeleteNodeIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeIntents'
+type MockRepository_DeleteNodeIntents_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - intentIDs []bson.ObjectID
+func (_e *MockRepository_Expecter) DeleteNodeIntents(ctx interface{}, intentIDs interface{}) *MockRepository_DeleteNodeIntents_Call {
+	return &MockRepository_DeleteNodeIntents_Call{Call: _e.mock.On("DeleteNodeIntents", ctx, intentIDs)}
+}
+
+func (_c *MockRepository_DeleteNodeIntents_Call) Run(run func(ctx context.Context, intentIDs []bson.ObjectID)) *MockRepository_DeleteNodeIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []bson.ObjectID
+		if args[1] != nil {
+			arg1 = args[1].([]bson.ObjectID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeleteNodeIntents_Call) Return(err error) *MockRepository_DeleteNodeIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeleteNodeIntents_Call) RunAndReturn(run func(ctx context.Context, intentIDs []bson.ObjectID) error) *MockRepository_DeleteNodeIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteNodeIntentsByPolicyID provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeleteNodeIntentsByPolicyID(ctx context.Context, policyID bson.ObjectID) error {
+	ret := _mock.Called(ctx, policyID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeIntentsByPolicyID")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, bson.ObjectID) error); ok {
+		r0 = returnFunc(ctx, policyID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeleteNodeIntentsByPolicyID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeIntentsByPolicyID'
+type MockRepository_DeleteNodeIntentsByPolicyID_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeIntentsByPolicyID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - policyID bson.ObjectID
+func (_e *MockRepository_Expecter) DeleteNodeIntentsByPolicyID(ctx interface{}, policyID interface{}) *MockRepository_DeleteNodeIntentsByPolicyID_Call {
+	return &MockRepository_DeleteNodeIntentsByPolicyID_Call{Call: _e.mock.On("DeleteNodeIntentsByPolicyID", ctx, policyID)}
+}
+
+func (_c *MockRepository_DeleteNodeIntentsByPolicyID_Call) Run(run func(ctx context.Context, policyID bson.ObjectID)) *MockRepository_DeleteNodeIntentsByPolicyID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 bson.ObjectID
+		if args[1] != nil {
+			arg1 = args[1].(bson.ObjectID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeleteNodeIntentsByPolicyID_Call) Return(err error) *MockRepository_DeleteNodeIntentsByPolicyID_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeleteNodeIntentsByPolicyID_Call) RunAndReturn(run func(ctx context.Context, policyID bson.ObjectID) error) *MockRepository_DeleteNodeIntentsByPolicyID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteNodePolicy provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeleteNodePolicy(ctx context.Context, policyID bson.ObjectID) error {
+	ret := _mock.Called(ctx, policyID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodePolicy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, bson.ObjectID) error); ok {
+		r0 = returnFunc(ctx, policyID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeleteNodePolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodePolicy'
+type MockRepository_DeleteNodePolicy_Call struct {
+	*mock.Call
+}
+
+// DeleteNodePolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - policyID bson.ObjectID
+func (_e *MockRepository_Expecter) DeleteNodePolicy(ctx interface{}, policyID interface{}) *MockRepository_DeleteNodePolicy_Call {
+	return &MockRepository_DeleteNodePolicy_Call{Call: _e.mock.On("DeleteNodePolicy", ctx, policyID)}
+}
+
+func (_c *MockRepository_DeleteNodePolicy_Call) Run(run func(ctx context.Context, policyID bson.ObjectID)) *MockRepository_DeleteNodePolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 bson.ObjectID
+		if args[1] != nil {
+			arg1 = args[1].(bson.ObjectID)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeleteNodePolicy_Call) Return(err error) *MockRepository_DeleteNodePolicy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeleteNodePolicy_Call) RunAndReturn(run func(ctx context.Context, policyID bson.ObjectID) error) *MockRepository_DeleteNodePolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeletePSM provides a mock function for the type MockRepository
 func (_mock *MockRepository) DeletePSM(ctx context.Context, name string) error {
 	ret := _mock.Called(ctx, name)
@@ -667,6 +901,126 @@ func (_c *MockRepository_InsertIntents_Call) Return(err error) *MockRepository_I
 }
 
 func (_c *MockRepository_InsertIntents_Call) RunAndReturn(run func(ctx context.Context, intents []*ScheduleIntent) error) *MockRepository_InsertIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// InsertNodeIntents provides a mock function for the type MockRepository
+func (_mock *MockRepository) InsertNodeIntents(ctx context.Context, intents []*NodeSchedulingIntent) error {
+	ret := _mock.Called(ctx, intents)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InsertNodeIntents")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []*NodeSchedulingIntent) error); ok {
+		r0 = returnFunc(ctx, intents)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_InsertNodeIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertNodeIntents'
+type MockRepository_InsertNodeIntents_Call struct {
+	*mock.Call
+}
+
+// InsertNodeIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - intents []*NodeSchedulingIntent
+func (_e *MockRepository_Expecter) InsertNodeIntents(ctx interface{}, intents interface{}) *MockRepository_InsertNodeIntents_Call {
+	return &MockRepository_InsertNodeIntents_Call{Call: _e.mock.On("InsertNodeIntents", ctx, intents)}
+}
+
+func (_c *MockRepository_InsertNodeIntents_Call) Run(run func(ctx context.Context, intents []*NodeSchedulingIntent)) *MockRepository_InsertNodeIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []*NodeSchedulingIntent
+		if args[1] != nil {
+			arg1 = args[1].([]*NodeSchedulingIntent)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_InsertNodeIntents_Call) Return(err error) *MockRepository_InsertNodeIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_InsertNodeIntents_Call) RunAndReturn(run func(ctx context.Context, intents []*NodeSchedulingIntent) error) *MockRepository_InsertNodeIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// InsertNodePolicyAndIntents provides a mock function for the type MockRepository
+func (_mock *MockRepository) InsertNodePolicyAndIntents(ctx context.Context, policy *NodeSchedulingPolicy, intents []*NodeSchedulingIntent) error {
+	ret := _mock.Called(ctx, policy, intents)
+
+	if len(ret) == 0 {
+		panic("no return value specified for InsertNodePolicyAndIntents")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *NodeSchedulingPolicy, []*NodeSchedulingIntent) error); ok {
+		r0 = returnFunc(ctx, policy, intents)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_InsertNodePolicyAndIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InsertNodePolicyAndIntents'
+type MockRepository_InsertNodePolicyAndIntents_Call struct {
+	*mock.Call
+}
+
+// InsertNodePolicyAndIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - policy *NodeSchedulingPolicy
+//   - intents []*NodeSchedulingIntent
+func (_e *MockRepository_Expecter) InsertNodePolicyAndIntents(ctx interface{}, policy interface{}, intents interface{}) *MockRepository_InsertNodePolicyAndIntents_Call {
+	return &MockRepository_InsertNodePolicyAndIntents_Call{Call: _e.mock.On("InsertNodePolicyAndIntents", ctx, policy, intents)}
+}
+
+func (_c *MockRepository_InsertNodePolicyAndIntents_Call) Run(run func(ctx context.Context, policy *NodeSchedulingPolicy, intents []*NodeSchedulingIntent)) *MockRepository_InsertNodePolicyAndIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *NodeSchedulingPolicy
+		if args[1] != nil {
+			arg1 = args[1].(*NodeSchedulingPolicy)
+		}
+		var arg2 []*NodeSchedulingIntent
+		if args[2] != nil {
+			arg2 = args[2].([]*NodeSchedulingIntent)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_InsertNodePolicyAndIntents_Call) Return(err error) *MockRepository_InsertNodePolicyAndIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_InsertNodePolicyAndIntents_Call) RunAndReturn(run func(ctx context.Context, policy *NodeSchedulingPolicy, intents []*NodeSchedulingIntent) error) *MockRepository_InsertNodePolicyAndIntents_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -844,6 +1198,120 @@ func (_c *MockRepository_QueryIntents_Call) Return(err error) *MockRepository_Qu
 }
 
 func (_c *MockRepository_QueryIntents_Call) RunAndReturn(run func(ctx context.Context, opt *QueryIntentOptions) error) *MockRepository_QueryIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryNodeIntents provides a mock function for the type MockRepository
+func (_mock *MockRepository) QueryNodeIntents(ctx context.Context, opt *QueryNodeIntentOptions) error {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryNodeIntents")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodeIntentOptions) error); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_QueryNodeIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryNodeIntents'
+type MockRepository_QueryNodeIntents_Call struct {
+	*mock.Call
+}
+
+// QueryNodeIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt *QueryNodeIntentOptions
+func (_e *MockRepository_Expecter) QueryNodeIntents(ctx interface{}, opt interface{}) *MockRepository_QueryNodeIntents_Call {
+	return &MockRepository_QueryNodeIntents_Call{Call: _e.mock.On("QueryNodeIntents", ctx, opt)}
+}
+
+func (_c *MockRepository_QueryNodeIntents_Call) Run(run func(ctx context.Context, opt *QueryNodeIntentOptions)) *MockRepository_QueryNodeIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryNodeIntentOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryNodeIntentOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_QueryNodeIntents_Call) Return(err error) *MockRepository_QueryNodeIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_QueryNodeIntents_Call) RunAndReturn(run func(ctx context.Context, opt *QueryNodeIntentOptions) error) *MockRepository_QueryNodeIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryNodePolicies provides a mock function for the type MockRepository
+func (_mock *MockRepository) QueryNodePolicies(ctx context.Context, opt *QueryNodePolicyOptions) error {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryNodePolicies")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodePolicyOptions) error); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_QueryNodePolicies_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryNodePolicies'
+type MockRepository_QueryNodePolicies_Call struct {
+	*mock.Call
+}
+
+// QueryNodePolicies is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt *QueryNodePolicyOptions
+func (_e *MockRepository_Expecter) QueryNodePolicies(ctx interface{}, opt interface{}) *MockRepository_QueryNodePolicies_Call {
+	return &MockRepository_QueryNodePolicies_Call{Call: _e.mock.On("QueryNodePolicies", ctx, opt)}
+}
+
+func (_c *MockRepository_QueryNodePolicies_Call) Run(run func(ctx context.Context, opt *QueryNodePolicyOptions)) *MockRepository_QueryNodePolicies_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryNodePolicyOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryNodePolicyOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_QueryNodePolicies_Call) Return(err error) *MockRepository_QueryNodePolicies_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_QueryNodePolicies_Call) RunAndReturn(run func(ctx context.Context, opt *QueryNodePolicyOptions) error) *MockRepository_QueryNodePolicies_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1129,6 +1597,63 @@ func (_c *MockRepository_QueryUsers_Call) Return(err error) *MockRepository_Quer
 }
 
 func (_c *MockRepository_QueryUsers_Call) RunAndReturn(run func(ctx context.Context, opt *QueryUserOptions) error) *MockRepository_QueryUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateNodePolicy provides a mock function for the type MockRepository
+func (_mock *MockRepository) UpdateNodePolicy(ctx context.Context, policy *NodeSchedulingPolicy) error {
+	ret := _mock.Called(ctx, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateNodePolicy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *NodeSchedulingPolicy) error); ok {
+		r0 = returnFunc(ctx, policy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_UpdateNodePolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateNodePolicy'
+type MockRepository_UpdateNodePolicy_Call struct {
+	*mock.Call
+}
+
+// UpdateNodePolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - policy *NodeSchedulingPolicy
+func (_e *MockRepository_Expecter) UpdateNodePolicy(ctx interface{}, policy interface{}) *MockRepository_UpdateNodePolicy_Call {
+	return &MockRepository_UpdateNodePolicy_Call{Call: _e.mock.On("UpdateNodePolicy", ctx, policy)}
+}
+
+func (_c *MockRepository_UpdateNodePolicy_Call) Run(run func(ctx context.Context, policy *NodeSchedulingPolicy)) *MockRepository_UpdateNodePolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *NodeSchedulingPolicy
+		if args[1] != nil {
+			arg1 = args[1].(*NodeSchedulingPolicy)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_UpdateNodePolicy_Call) Return(err error) *MockRepository_UpdateNodePolicy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_UpdateNodePolicy_Call) RunAndReturn(run func(ctx context.Context, policy *NodeSchedulingPolicy) error) *MockRepository_UpdateNodePolicy_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1646,6 +2171,69 @@ func (_c *MockService_CreateNewUser_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// CreateNodeSchedulingPolicy provides a mock function for the type MockService
+func (_mock *MockService) CreateNodeSchedulingPolicy(ctx context.Context, operator *Claims, policy *NodeSchedulingPolicy) error {
+	ret := _mock.Called(ctx, operator, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateNodeSchedulingPolicy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, *NodeSchedulingPolicy) error); ok {
+		r0 = returnFunc(ctx, operator, policy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_CreateNodeSchedulingPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateNodeSchedulingPolicy'
+type MockService_CreateNodeSchedulingPolicy_Call struct {
+	*mock.Call
+}
+
+// CreateNodeSchedulingPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - policy *NodeSchedulingPolicy
+func (_e *MockService_Expecter) CreateNodeSchedulingPolicy(ctx interface{}, operator interface{}, policy interface{}) *MockService_CreateNodeSchedulingPolicy_Call {
+	return &MockService_CreateNodeSchedulingPolicy_Call{Call: _e.mock.On("CreateNodeSchedulingPolicy", ctx, operator, policy)}
+}
+
+func (_c *MockService_CreateNodeSchedulingPolicy_Call) Run(run func(ctx context.Context, operator *Claims, policy *NodeSchedulingPolicy)) *MockService_CreateNodeSchedulingPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 *NodeSchedulingPolicy
+		if args[2] != nil {
+			arg2 = args[2].(*NodeSchedulingPolicy)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_CreateNodeSchedulingPolicy_Call) Return(err error) *MockService_CreateNodeSchedulingPolicy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_CreateNodeSchedulingPolicy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, policy *NodeSchedulingPolicy) error) *MockService_CreateNodeSchedulingPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreatePodSchedulingMetrics provides a mock function for the type MockService
 func (_mock *MockService) CreatePodSchedulingMetrics(ctx context.Context, operator *Claims, psm *PodSchedulingMetrics) error {
 	ret := _mock.Called(ctx, operator, psm)
@@ -1831,6 +2419,132 @@ func (_c *MockService_CreateScheduleStrategy_Call) Return(err error) *MockServic
 }
 
 func (_c *MockService_CreateScheduleStrategy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, strategy *ScheduleStrategy) error) *MockService_CreateScheduleStrategy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteNodeSchedulingIntents provides a mock function for the type MockService
+func (_mock *MockService) DeleteNodeSchedulingIntents(ctx context.Context, operator *Claims, intentIDs []string) error {
+	ret := _mock.Called(ctx, operator, intentIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeSchedulingIntents")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, []string) error); ok {
+		r0 = returnFunc(ctx, operator, intentIDs)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_DeleteNodeSchedulingIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeSchedulingIntents'
+type MockService_DeleteNodeSchedulingIntents_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeSchedulingIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - intentIDs []string
+func (_e *MockService_Expecter) DeleteNodeSchedulingIntents(ctx interface{}, operator interface{}, intentIDs interface{}) *MockService_DeleteNodeSchedulingIntents_Call {
+	return &MockService_DeleteNodeSchedulingIntents_Call{Call: _e.mock.On("DeleteNodeSchedulingIntents", ctx, operator, intentIDs)}
+}
+
+func (_c *MockService_DeleteNodeSchedulingIntents_Call) Run(run func(ctx context.Context, operator *Claims, intentIDs []string)) *MockService_DeleteNodeSchedulingIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 []string
+		if args[2] != nil {
+			arg2 = args[2].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_DeleteNodeSchedulingIntents_Call) Return(err error) *MockService_DeleteNodeSchedulingIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_DeleteNodeSchedulingIntents_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, intentIDs []string) error) *MockService_DeleteNodeSchedulingIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteNodeSchedulingPolicy provides a mock function for the type MockService
+func (_mock *MockService) DeleteNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string) error {
+	ret := _mock.Called(ctx, operator, policyID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeSchedulingPolicy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string) error); ok {
+		r0 = returnFunc(ctx, operator, policyID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_DeleteNodeSchedulingPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeSchedulingPolicy'
+type MockService_DeleteNodeSchedulingPolicy_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeSchedulingPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - policyID string
+func (_e *MockService_Expecter) DeleteNodeSchedulingPolicy(ctx interface{}, operator interface{}, policyID interface{}) *MockService_DeleteNodeSchedulingPolicy_Call {
+	return &MockService_DeleteNodeSchedulingPolicy_Call{Call: _e.mock.On("DeleteNodeSchedulingPolicy", ctx, operator, policyID)}
+}
+
+func (_c *MockService_DeleteNodeSchedulingPolicy_Call) Run(run func(ctx context.Context, operator *Claims, policyID string)) *MockService_DeleteNodeSchedulingPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_DeleteNodeSchedulingPolicy_Call) Return(err error) *MockService_DeleteNodeSchedulingPolicy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_DeleteNodeSchedulingPolicy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, policyID string) error) *MockService_DeleteNodeSchedulingPolicy_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2155,32 +2869,118 @@ func (_c *MockService_GetPodPIDMapping_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
-// ListPodSchedulingMetricValues provides a mock function for the type MockService
-func (_mock *MockService) ListPodSchedulingMetricValues(ctx context.Context) (*PodSchedulingMetricValuesResult, error) {
-	ret := _mock.Called(ctx)
+// ListNodeSchedulingIntents provides a mock function for the type MockService
+func (_mock *MockService) ListNodeSchedulingIntents(ctx context.Context, filterOpts *QueryNodeIntentOptions) error {
+	ret := _mock.Called(ctx, filterOpts)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListPodSchedulingMetricValues")
+		panic("no return value specified for ListNodeSchedulingIntents")
 	}
 
-	var r0 *PodSchedulingMetricValuesResult
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) (*PodSchedulingMetricValuesResult, error)); ok {
-		return returnFunc(ctx)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) *PodSchedulingMetricValuesResult); ok {
-		r0 = returnFunc(ctx)
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodeIntentOptions) error); ok {
+		r0 = returnFunc(ctx, filterOpts)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*PodSchedulingMetricValuesResult)
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_ListNodeSchedulingIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNodeSchedulingIntents'
+type MockService_ListNodeSchedulingIntents_Call struct {
+	*mock.Call
+}
+
+// ListNodeSchedulingIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filterOpts *QueryNodeIntentOptions
+func (_e *MockService_Expecter) ListNodeSchedulingIntents(ctx interface{}, filterOpts interface{}) *MockService_ListNodeSchedulingIntents_Call {
+	return &MockService_ListNodeSchedulingIntents_Call{Call: _e.mock.On("ListNodeSchedulingIntents", ctx, filterOpts)}
+}
+
+func (_c *MockService_ListNodeSchedulingIntents_Call) Run(run func(ctx context.Context, filterOpts *QueryNodeIntentOptions)) *MockService_ListNodeSchedulingIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
 		}
+		var arg1 *QueryNodeIntentOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryNodeIntentOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_ListNodeSchedulingIntents_Call) Return(err error) *MockService_ListNodeSchedulingIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_ListNodeSchedulingIntents_Call) RunAndReturn(run func(ctx context.Context, filterOpts *QueryNodeIntentOptions) error) *MockService_ListNodeSchedulingIntents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListNodeSchedulingPolicies provides a mock function for the type MockService
+func (_mock *MockService) ListNodeSchedulingPolicies(ctx context.Context, filterOpts *QueryNodePolicyOptions) error {
+	ret := _mock.Called(ctx, filterOpts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNodeSchedulingPolicies")
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = returnFunc(ctx)
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodePolicyOptions) error); ok {
+		r0 = returnFunc(ctx, filterOpts)
 	} else {
-		r1 = ret.Error(1)
+		r0 = ret.Error(0)
 	}
-	return r0, r1
+	return r0
+}
+
+// MockService_ListNodeSchedulingPolicies_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNodeSchedulingPolicies'
+type MockService_ListNodeSchedulingPolicies_Call struct {
+	*mock.Call
+}
+
+// ListNodeSchedulingPolicies is a helper method to define mock.On call
+//   - ctx context.Context
+//   - filterOpts *QueryNodePolicyOptions
+func (_e *MockService_Expecter) ListNodeSchedulingPolicies(ctx interface{}, filterOpts interface{}) *MockService_ListNodeSchedulingPolicies_Call {
+	return &MockService_ListNodeSchedulingPolicies_Call{Call: _e.mock.On("ListNodeSchedulingPolicies", ctx, filterOpts)}
+}
+
+func (_c *MockService_ListNodeSchedulingPolicies_Call) Run(run func(ctx context.Context, filterOpts *QueryNodePolicyOptions)) *MockService_ListNodeSchedulingPolicies_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryNodePolicyOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryNodePolicyOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_ListNodeSchedulingPolicies_Call) Return(err error) *MockService_ListNodeSchedulingPolicies_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_ListNodeSchedulingPolicies_Call) RunAndReturn(run func(ctx context.Context, filterOpts *QueryNodePolicyOptions) error) *MockService_ListNodeSchedulingPolicies_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // ListNodes provides a mock function for the type MockService
@@ -2241,6 +3041,68 @@ func (_c *MockService_ListNodes_Call) Return(nodes []*Node, err error) *MockServ
 }
 
 func (_c *MockService_ListNodes_Call) RunAndReturn(run func(ctx context.Context) ([]*Node, error)) *MockService_ListNodes_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPodSchedulingMetricValues provides a mock function for the type MockService
+func (_mock *MockService) ListPodSchedulingMetricValues(ctx context.Context) (*PodSchedulingMetricValuesResult, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPodSchedulingMetricValues")
+	}
+
+	var r0 *PodSchedulingMetricValuesResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (*PodSchedulingMetricValuesResult, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) *PodSchedulingMetricValuesResult); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*PodSchedulingMetricValuesResult)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_ListPodSchedulingMetricValues_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPodSchedulingMetricValues'
+type MockService_ListPodSchedulingMetricValues_Call struct {
+	*mock.Call
+}
+
+// ListPodSchedulingMetricValues is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockService_Expecter) ListPodSchedulingMetricValues(ctx interface{}) *MockService_ListPodSchedulingMetricValues_Call {
+	return &MockService_ListPodSchedulingMetricValues_Call{Call: _e.mock.On("ListPodSchedulingMetricValues", ctx)}
+}
+
+func (_c *MockService_ListPodSchedulingMetricValues_Call) Run(run func(ctx context.Context)) *MockService_ListPodSchedulingMetricValues_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_ListPodSchedulingMetricValues_Call) Return(podSchedulingMetricValuesResult *PodSchedulingMetricValuesResult, err error) *MockService_ListPodSchedulingMetricValues_Call {
+	_c.Call.Return(podSchedulingMetricValuesResult, err)
+	return _c
+}
+
+func (_c *MockService_ListPodSchedulingMetricValues_Call) RunAndReturn(run func(ctx context.Context) (*PodSchedulingMetricValuesResult, error)) *MockService_ListPodSchedulingMetricValues_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2478,8 +3340,8 @@ func (_c *MockService_Login_Call) Run(run func(ctx context.Context, email string
 	return _c
 }
 
-func (_c *MockService_Login_Call) Return(token TokenPair, err error) *MockService_Login_Call {
-	_c.Call.Return(token, err)
+func (_c *MockService_Login_Call) Return(tokenPair TokenPair, err error) *MockService_Login_Call {
+	_c.Call.Return(tokenPair, err)
 	return _c
 }
 
@@ -2505,6 +3367,46 @@ func (_mock *MockService) Logout(ctx context.Context, refreshToken string) error
 	return r0
 }
 
+// MockService_Logout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Logout'
+type MockService_Logout_Call struct {
+	*mock.Call
+}
+
+// Logout is a helper method to define mock.On call
+//   - ctx context.Context
+//   - refreshToken string
+func (_e *MockService_Expecter) Logout(ctx interface{}, refreshToken interface{}) *MockService_Logout_Call {
+	return &MockService_Logout_Call{Call: _e.mock.On("Logout", ctx, refreshToken)}
+}
+
+func (_c *MockService_Logout_Call) Run(run func(ctx context.Context, refreshToken string)) *MockService_Logout_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_Logout_Call) Return(err error) *MockService_Logout_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_Logout_Call) RunAndReturn(run func(ctx context.Context, refreshToken string) error) *MockService_Logout_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LogoutAll provides a mock function for the type MockService
 func (_mock *MockService) LogoutAll(ctx context.Context, user *Claims) error {
 	ret := _mock.Called(ctx, user)
@@ -2522,30 +3424,44 @@ func (_mock *MockService) LogoutAll(ctx context.Context, user *Claims) error {
 	return r0
 }
 
-// RefreshToken provides a mock function for the type MockService
-func (_mock *MockService) RefreshToken(ctx context.Context, refreshToken string) (TokenPair, error) {
-	ret := _mock.Called(ctx, refreshToken)
+// MockService_LogoutAll_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LogoutAll'
+type MockService_LogoutAll_Call struct {
+	*mock.Call
+}
 
-	if len(ret) == 0 {
-		panic("no return value specified for RefreshToken")
-	}
+// LogoutAll is a helper method to define mock.On call
+//   - ctx context.Context
+//   - user *Claims
+func (_e *MockService_Expecter) LogoutAll(ctx interface{}, user interface{}) *MockService_LogoutAll_Call {
+	return &MockService_LogoutAll_Call{Call: _e.mock.On("LogoutAll", ctx, user)}
+}
 
-	var r0 TokenPair
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (TokenPair, error)); ok {
-		return returnFunc(ctx, refreshToken)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) TokenPair); ok {
-		r0 = returnFunc(ctx, refreshToken)
-	} else {
-		r0 = ret.Get(0).(TokenPair)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, refreshToken)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+func (_c *MockService_LogoutAll_Call) Run(run func(ctx context.Context, user *Claims)) *MockService_LogoutAll_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_LogoutAll_Call) Return(err error) *MockService_LogoutAll_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_LogoutAll_Call) RunAndReturn(run func(ctx context.Context, user *Claims) error) *MockService_LogoutAll_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // QueryPermissions provides a mock function for the type MockService
@@ -2770,6 +3686,72 @@ func (_c *MockService_ReconcileIntents_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// RefreshToken provides a mock function for the type MockService
+func (_mock *MockService) RefreshToken(ctx context.Context, refreshToken string) (TokenPair, error) {
+	ret := _mock.Called(ctx, refreshToken)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RefreshToken")
+	}
+
+	var r0 TokenPair
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (TokenPair, error)); ok {
+		return returnFunc(ctx, refreshToken)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) TokenPair); ok {
+		r0 = returnFunc(ctx, refreshToken)
+	} else {
+		r0 = ret.Get(0).(TokenPair)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, refreshToken)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_RefreshToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RefreshToken'
+type MockService_RefreshToken_Call struct {
+	*mock.Call
+}
+
+// RefreshToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - refreshToken string
+func (_e *MockService_Expecter) RefreshToken(ctx interface{}, refreshToken interface{}) *MockService_RefreshToken_Call {
+	return &MockService_RefreshToken_Call{Call: _e.mock.On("RefreshToken", ctx, refreshToken)}
+}
+
+func (_c *MockService_RefreshToken_Call) Run(run func(ctx context.Context, refreshToken string)) *MockService_RefreshToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_RefreshToken_Call) Return(tokenPair TokenPair, err error) *MockService_RefreshToken_Call {
+	_c.Call.Return(tokenPair, err)
+	return _c
+}
+
+func (_c *MockService_RefreshToken_Call) RunAndReturn(run func(ctx context.Context, refreshToken string) (TokenPair, error)) *MockService_RefreshToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ResetPassword provides a mock function for the type MockService
 func (_mock *MockService) ResetPassword(ctx context.Context, operator *Claims, id string, newPassword string) error {
 	ret := _mock.Called(ctx, operator, id, newPassword)
@@ -2835,6 +3817,75 @@ func (_c *MockService_ResetPassword_Call) Return(err error) *MockService_ResetPa
 }
 
 func (_c *MockService_ResetPassword_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, id string, newPassword string) error) *MockService_ResetPassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateNodeSchedulingPolicy provides a mock function for the type MockService
+func (_mock *MockService) UpdateNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) error {
+	ret := _mock.Called(ctx, operator, policyID, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateNodeSchedulingPolicy")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string, *NodeSchedulingPolicy) error); ok {
+		r0 = returnFunc(ctx, operator, policyID, policy)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_UpdateNodeSchedulingPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateNodeSchedulingPolicy'
+type MockService_UpdateNodeSchedulingPolicy_Call struct {
+	*mock.Call
+}
+
+// UpdateNodeSchedulingPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - policyID string
+//   - policy *NodeSchedulingPolicy
+func (_e *MockService_Expecter) UpdateNodeSchedulingPolicy(ctx interface{}, operator interface{}, policyID interface{}, policy interface{}) *MockService_UpdateNodeSchedulingPolicy_Call {
+	return &MockService_UpdateNodeSchedulingPolicy_Call{Call: _e.mock.On("UpdateNodeSchedulingPolicy", ctx, operator, policyID, policy)}
+}
+
+func (_c *MockService_UpdateNodeSchedulingPolicy_Call) Run(run func(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy)) *MockService_UpdateNodeSchedulingPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *NodeSchedulingPolicy
+		if args[3] != nil {
+			arg3 = args[3].(*NodeSchedulingPolicy)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_UpdateNodeSchedulingPolicy_Call) Return(err error) *MockService_UpdateNodeSchedulingPolicy_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_UpdateNodeSchedulingPolicy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) error) *MockService_UpdateNodeSchedulingPolicy_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3350,6 +4401,142 @@ func (_c *MockK8SAdapter_QueryDecisionMakerPods_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// QueryNodesByDRA provides a mock function for the type MockK8SAdapter
+func (_mock *MockK8SAdapter) QueryNodesByDRA(ctx context.Context, opt *QueryNodesByDRAOptions) ([]*Node, error) {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryNodesByDRA")
+	}
+
+	var r0 []*Node
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodesByDRAOptions) ([]*Node, error)); ok {
+		return returnFunc(ctx, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodesByDRAOptions) []*Node); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*Node)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *QueryNodesByDRAOptions) error); ok {
+		r1 = returnFunc(ctx, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockK8SAdapter_QueryNodesByDRA_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryNodesByDRA'
+type MockK8SAdapter_QueryNodesByDRA_Call struct {
+	*mock.Call
+}
+
+// QueryNodesByDRA is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt *QueryNodesByDRAOptions
+func (_e *MockK8SAdapter_Expecter) QueryNodesByDRA(ctx interface{}, opt interface{}) *MockK8SAdapter_QueryNodesByDRA_Call {
+	return &MockK8SAdapter_QueryNodesByDRA_Call{Call: _e.mock.On("QueryNodesByDRA", ctx, opt)}
+}
+
+func (_c *MockK8SAdapter_QueryNodesByDRA_Call) Run(run func(ctx context.Context, opt *QueryNodesByDRAOptions)) *MockK8SAdapter_QueryNodesByDRA_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryNodesByDRAOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryNodesByDRAOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8SAdapter_QueryNodesByDRA_Call) Return(nodes []*Node, err error) *MockK8SAdapter_QueryNodesByDRA_Call {
+	_c.Call.Return(nodes, err)
+	return _c
+}
+
+func (_c *MockK8SAdapter_QueryNodesByDRA_Call) RunAndReturn(run func(ctx context.Context, opt *QueryNodesByDRAOptions) ([]*Node, error)) *MockK8SAdapter_QueryNodesByDRA_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// QueryNodesBySelectors provides a mock function for the type MockK8SAdapter
+func (_mock *MockK8SAdapter) QueryNodesBySelectors(ctx context.Context, opt *QueryNodesOptions) ([]*Node, error) {
+	ret := _mock.Called(ctx, opt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for QueryNodesBySelectors")
+	}
+
+	var r0 []*Node
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodesOptions) ([]*Node, error)); ok {
+		return returnFunc(ctx, opt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *QueryNodesOptions) []*Node); ok {
+		r0 = returnFunc(ctx, opt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*Node)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *QueryNodesOptions) error); ok {
+		r1 = returnFunc(ctx, opt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockK8SAdapter_QueryNodesBySelectors_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'QueryNodesBySelectors'
+type MockK8SAdapter_QueryNodesBySelectors_Call struct {
+	*mock.Call
+}
+
+// QueryNodesBySelectors is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opt *QueryNodesOptions
+func (_e *MockK8SAdapter_Expecter) QueryNodesBySelectors(ctx interface{}, opt interface{}) *MockK8SAdapter_QueryNodesBySelectors_Call {
+	return &MockK8SAdapter_QueryNodesBySelectors_Call{Call: _e.mock.On("QueryNodesBySelectors", ctx, opt)}
+}
+
+func (_c *MockK8SAdapter_QueryNodesBySelectors_Call) Run(run func(ctx context.Context, opt *QueryNodesOptions)) *MockK8SAdapter_QueryNodesBySelectors_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *QueryNodesOptions
+		if args[1] != nil {
+			arg1 = args[1].(*QueryNodesOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockK8SAdapter_QueryNodesBySelectors_Call) Return(nodes []*Node, err error) *MockK8SAdapter_QueryNodesBySelectors_Call {
+	_c.Call.Return(nodes, err)
+	return _c
+}
+
+func (_c *MockK8SAdapter_QueryNodesBySelectors_Call) RunAndReturn(run func(ctx context.Context, opt *QueryNodesOptions) ([]*Node, error)) *MockK8SAdapter_QueryNodesBySelectors_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryPods provides a mock function for the type MockK8SAdapter
 func (_mock *MockK8SAdapter) QueryPods(ctx context.Context, opt *QueryPodsOptions) ([]*Pod, error) {
 	ret := _mock.Called(ctx, opt)
@@ -3443,6 +4630,69 @@ type MockDecisionMakerAdapter_Expecter struct {
 
 func (_m *MockDecisionMakerAdapter) EXPECT() *MockDecisionMakerAdapter_Expecter {
 	return &MockDecisionMakerAdapter_Expecter{mock: &_m.Mock}
+}
+
+// DeleteNodeSchedulingIntents provides a mock function for the type MockDecisionMakerAdapter
+func (_mock *MockDecisionMakerAdapter) DeleteNodeSchedulingIntents(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteNodeIntentsRequest) error {
+	ret := _mock.Called(ctx, decisionMaker, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteNodeSchedulingIntents")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod, *DeleteNodeIntentsRequest) error); ok {
+		r0 = returnFunc(ctx, decisionMaker, req)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteNodeSchedulingIntents'
+type MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call struct {
+	*mock.Call
+}
+
+// DeleteNodeSchedulingIntents is a helper method to define mock.On call
+//   - ctx context.Context
+//   - decisionMaker *DecisionMakerPod
+//   - req *DeleteNodeIntentsRequest
+func (_e *MockDecisionMakerAdapter_Expecter) DeleteNodeSchedulingIntents(ctx interface{}, decisionMaker interface{}, req interface{}) *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call {
+	return &MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call{Call: _e.mock.On("DeleteNodeSchedulingIntents", ctx, decisionMaker, req)}
+}
+
+func (_c *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call) Run(run func(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteNodeIntentsRequest)) *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *DecisionMakerPod
+		if args[1] != nil {
+			arg1 = args[1].(*DecisionMakerPod)
+		}
+		var arg2 *DeleteNodeIntentsRequest
+		if args[2] != nil {
+			arg2 = args[2].(*DeleteNodeIntentsRequest)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call) Return(err error) *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteNodeIntentsRequest) error) *MockDecisionMakerAdapter_DeleteNodeSchedulingIntents_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // DeleteSchedulingIntents provides a mock function for the type MockDecisionMakerAdapter
@@ -3574,6 +4824,72 @@ func (_c *MockDecisionMakerAdapter_GetIntentMerkleRoot_Call) RunAndReturn(run fu
 	return _c
 }
 
+// GetNodePolicyMerkleRoot provides a mock function for the type MockDecisionMakerAdapter
+func (_mock *MockDecisionMakerAdapter) GetNodePolicyMerkleRoot(ctx context.Context, decisionMaker *DecisionMakerPod) (string, error) {
+	ret := _mock.Called(ctx, decisionMaker)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNodePolicyMerkleRoot")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod) (string, error)); ok {
+		return returnFunc(ctx, decisionMaker)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod) string); ok {
+		r0 = returnFunc(ctx, decisionMaker)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *DecisionMakerPod) error); ok {
+		r1 = returnFunc(ctx, decisionMaker)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNodePolicyMerkleRoot'
+type MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call struct {
+	*mock.Call
+}
+
+// GetNodePolicyMerkleRoot is a helper method to define mock.On call
+//   - ctx context.Context
+//   - decisionMaker *DecisionMakerPod
+func (_e *MockDecisionMakerAdapter_Expecter) GetNodePolicyMerkleRoot(ctx interface{}, decisionMaker interface{}) *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call {
+	return &MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call{Call: _e.mock.On("GetNodePolicyMerkleRoot", ctx, decisionMaker)}
+}
+
+func (_c *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call) Run(run func(ctx context.Context, decisionMaker *DecisionMakerPod)) *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *DecisionMakerPod
+		if args[1] != nil {
+			arg1 = args[1].(*DecisionMakerPod)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call) Return(s string, err error) *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod) (string, error)) *MockDecisionMakerAdapter_GetNodePolicyMerkleRoot_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetPodPIDMapping provides a mock function for the type MockDecisionMakerAdapter
 func (_mock *MockDecisionMakerAdapter) GetPodPIDMapping(ctx context.Context, decisionMaker *DecisionMakerPod) (*PodPIDMappingResponse, error) {
 	ret := _mock.Called(ctx, decisionMaker)
@@ -3668,6 +4984,109 @@ func (_mock *MockDecisionMakerAdapter) GetPodSchedulingMetricValues(ctx context.
 		r1 = ret.Error(1)
 	}
 	return r0, r1
+}
+
+// MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPodSchedulingMetricValues'
+type MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call struct {
+	*mock.Call
+}
+
+// GetPodSchedulingMetricValues is a helper method to define mock.On call
+//   - ctx context.Context
+//   - decisionMaker *DecisionMakerPod
+func (_e *MockDecisionMakerAdapter_Expecter) GetPodSchedulingMetricValues(ctx interface{}, decisionMaker interface{}) *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call {
+	return &MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call{Call: _e.mock.On("GetPodSchedulingMetricValues", ctx, decisionMaker)}
+}
+
+func (_c *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call) Run(run func(ctx context.Context, decisionMaker *DecisionMakerPod)) *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *DecisionMakerPod
+		if args[1] != nil {
+			arg1 = args[1].(*DecisionMakerPod)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call) Return(podSchedulingMetricValues []*PodSchedulingMetricValue, err error) *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call {
+	_c.Call.Return(podSchedulingMetricValues, err)
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)) *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SendNodeSchedulingPolicies provides a mock function for the type MockDecisionMakerAdapter
+func (_mock *MockDecisionMakerAdapter) SendNodeSchedulingPolicies(ctx context.Context, decisionMaker *DecisionMakerPod, intents []*NodeSchedulingIntent) error {
+	ret := _mock.Called(ctx, decisionMaker, intents)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SendNodeSchedulingPolicies")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod, []*NodeSchedulingIntent) error); ok {
+		r0 = returnFunc(ctx, decisionMaker, intents)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SendNodeSchedulingPolicies'
+type MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call struct {
+	*mock.Call
+}
+
+// SendNodeSchedulingPolicies is a helper method to define mock.On call
+//   - ctx context.Context
+//   - decisionMaker *DecisionMakerPod
+//   - intents []*NodeSchedulingIntent
+func (_e *MockDecisionMakerAdapter_Expecter) SendNodeSchedulingPolicies(ctx interface{}, decisionMaker interface{}, intents interface{}) *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call {
+	return &MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call{Call: _e.mock.On("SendNodeSchedulingPolicies", ctx, decisionMaker, intents)}
+}
+
+func (_c *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call) Run(run func(ctx context.Context, decisionMaker *DecisionMakerPod, intents []*NodeSchedulingIntent)) *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *DecisionMakerPod
+		if args[1] != nil {
+			arg1 = args[1].(*DecisionMakerPod)
+		}
+		var arg2 []*NodeSchedulingIntent
+		if args[2] != nil {
+			arg2 = args[2].([]*NodeSchedulingIntent)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call) Return(err error) *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod, intents []*NodeSchedulingIntent) error) *MockDecisionMakerAdapter_SendNodeSchedulingPolicies_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // SendSchedulingIntent provides a mock function for the type MockDecisionMakerAdapter

@@ -1,0 +1,37 @@
+[
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$pull": {
+                        "policies": {
+                            "permissionKey": {
+                                "$in": [
+                                    "node_scheduling_policy.create",
+                                    "node_scheduling_policy.read",
+                                    "node_scheduling_policy.update",
+                                    "node_scheduling_policy.delete",
+                                    "node_scheduling_intent.read",
+                                    "node_scheduling_intent.delete"
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "delete": "permissions",
+        "deletes": [
+            { "q": { "key": "node_scheduling_policy.create" }, "limit": 1 },
+            { "q": { "key": "node_scheduling_policy.read" }, "limit": 1 },
+            { "q": { "key": "node_scheduling_policy.update" }, "limit": 1 },
+            { "q": { "key": "node_scheduling_policy.delete" }, "limit": 1 },
+            { "q": { "key": "node_scheduling_intent.read" }, "limit": 1 },
+            { "q": { "key": "node_scheduling_intent.delete" }, "limit": 1 }
+        ]
+    }
+]

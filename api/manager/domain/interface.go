@@ -39,6 +39,21 @@ type QueryStrategyOptions struct {
 	CreatorIDs    []bson.ObjectID
 }
 
+type QueryNodePolicyOptions struct {
+	IDs        []bson.ObjectID
+	Result     []*NodeSchedulingPolicy
+	CreatorIDs []bson.ObjectID
+}
+
+type QueryNodeIntentOptions struct {
+	IDs        []bson.ObjectID
+	PolicyIDs  []bson.ObjectID
+	NodeIDs    []string
+	States     []IntentState
+	Result     []*NodeSchedulingIntent
+	CreatorIDs []bson.ObjectID
+}
+
 type QueryIntentOptions struct {
 	IDs           []bson.ObjectID
 	K8SNamespaces []string
@@ -76,6 +91,16 @@ type Repository interface {
 	QueryPSMs(ctx context.Context, opt *QueryPSMOptions) error
 	UpdatePSM(ctx context.Context, psm *PodSchedulingMetrics) error
 	DeletePSM(ctx context.Context, name string) error
+
+	InsertNodePolicyAndIntents(ctx context.Context, policy *NodeSchedulingPolicy, intents []*NodeSchedulingIntent) error
+	InsertNodeIntents(ctx context.Context, intents []*NodeSchedulingIntent) error
+	BatchUpdateNodeIntentsState(ctx context.Context, intentIDs []bson.ObjectID, newState IntentState) error
+	QueryNodePolicies(ctx context.Context, opt *QueryNodePolicyOptions) error
+	QueryNodeIntents(ctx context.Context, opt *QueryNodeIntentOptions) error
+	UpdateNodePolicy(ctx context.Context, policy *NodeSchedulingPolicy) error
+	DeleteNodePolicy(ctx context.Context, policyID bson.ObjectID) error
+	DeleteNodeIntents(ctx context.Context, intentIDs []bson.ObjectID) error
+	DeleteNodeIntentsByPolicyID(ctx context.Context, policyID bson.ObjectID) error
 }
 
 type Service interface {
@@ -112,6 +137,13 @@ type Service interface {
 	ListPodSchedulingMetricValues(ctx context.Context) (*PodSchedulingMetricValuesResult, error)
 	UpdatePodSchedulingMetrics(ctx context.Context, operator *Claims, name string, psm *PodSchedulingMetrics) error
 	DeletePodSchedulingMetrics(ctx context.Context, operator *Claims, name string) error
+
+	CreateNodeSchedulingPolicy(ctx context.Context, operator *Claims, policy *NodeSchedulingPolicy) error
+	ListNodeSchedulingPolicies(ctx context.Context, filterOpts *QueryNodePolicyOptions) error
+	ListNodeSchedulingIntents(ctx context.Context, filterOpts *QueryNodeIntentOptions) error
+	UpdateNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) error
+	DeleteNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string) error
+	DeleteNodeSchedulingIntents(ctx context.Context, operator *Claims, intentIDs []string) error
 }
 
 type QueryPodsOptions struct {
@@ -126,10 +158,21 @@ type QueryDecisionMakerPodsOptions struct {
 	DecisionMakerLabel LabelSelector
 }
 
+type QueryNodesOptions struct {
+	NodeSelectors []LabelSelector
+	NodeNames     []string
+}
+
+type QueryNodesByDRAOptions struct {
+	DRASelectors []DRASelector
+}
+
 type K8SAdapter interface {
 	QueryPods(ctx context.Context, opt *QueryPodsOptions) ([]*Pod, error)
 	QueryDecisionMakerPods(ctx context.Context, opt *QueryDecisionMakerPodsOptions) ([]*DecisionMakerPod, error)
 	ListNodes(ctx context.Context) ([]*Node, error)
+	QueryNodesBySelectors(ctx context.Context, opt *QueryNodesOptions) ([]*Node, error)
+	QueryNodesByDRA(ctx context.Context, opt *QueryNodesByDRAOptions) ([]*Node, error)
 }
 
 type DeleteIntentsRequest struct {
@@ -143,4 +186,15 @@ type DecisionMakerAdapter interface {
 	DeleteSchedulingIntents(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteIntentsRequest) error
 	GetPodPIDMapping(ctx context.Context, decisionMaker *DecisionMakerPod) (*PodPIDMappingResponse, error)
 	GetPodSchedulingMetricValues(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)
+
+	SendNodeSchedulingPolicies(ctx context.Context, decisionMaker *DecisionMakerPod, intents []*NodeSchedulingIntent) error
+	GetNodePolicyMerkleRoot(ctx context.Context, decisionMaker *DecisionMakerPod) (string, error)
+	DeleteNodeSchedulingIntents(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteNodeIntentsRequest) error
+}
+
+// DeleteNodeIntentsRequest describes a request to remove node scheduling
+// intents from a Decision Maker's in-memory cache.
+type DeleteNodeIntentsRequest struct {
+	PolicyID string // If set, delete only intents for this policy.
+	All      bool   // If true, deletes all node intents on the decision maker.
 }

@@ -1,0 +1,65 @@
+[
+    {
+        "insert": "permissions",
+        "documents": [
+            {
+                "key": "node_scheduling_policy.create",
+                "resource": "node_scheduling_policy",
+                "action": "create",
+                "description": "Create node-level scheduling policies"
+            },
+            {
+                "key": "node_scheduling_policy.read",
+                "resource": "node_scheduling_policy",
+                "action": "read",
+                "description": "Read node-level scheduling policies"
+            },
+            {
+                "key": "node_scheduling_policy.update",
+                "resource": "node_scheduling_policy",
+                "action": "update",
+                "description": "Update node-level scheduling policies"
+            },
+            {
+                "key": "node_scheduling_policy.delete",
+                "resource": "node_scheduling_policy",
+                "action": "delete",
+                "description": "Delete node-level scheduling policies"
+            },
+            {
+                "key": "node_scheduling_intent.read",
+                "resource": "node_scheduling_intent",
+                "action": "read",
+                "description": "Read node-level scheduling intents"
+            },
+            {
+                "key": "node_scheduling_intent.delete",
+                "resource": "node_scheduling_intent",
+                "action": "delete",
+                "description": "Delete node-level scheduling intents"
+            }
+        ]
+    },
+    {
+        "update": "roles",
+        "updates": [
+            {
+                "q": { "name": "admin" },
+                "u": {
+                    "$push": {
+                        "policies": {
+                            "$each": [
+                                { "permissionKey": "node_scheduling_policy.create", "self": false },
+                                { "permissionKey": "node_scheduling_policy.read", "self": false },
+                                { "permissionKey": "node_scheduling_policy.update", "self": false },
+                                { "permissionKey": "node_scheduling_policy.delete", "self": false },
+                                { "permissionKey": "node_scheduling_intent.read", "self": false },
+                                { "permissionKey": "node_scheduling_intent.delete", "self": false }
+                            ]
+                        }
+                    }
+                }
+            }
+        ]
+    }
+]

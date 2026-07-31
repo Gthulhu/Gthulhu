@@ -259,6 +259,115 @@ func (dm *DecisionMakerClient) DeleteSchedulingIntents(ctx context.Context, deci
 	return nil
 }
 
+func (dm *DecisionMakerClient) SendNodeSchedulingPolicies(ctx context.Context, decisionMaker *domain.DecisionMakerPod, intents []*domain.NodeSchedulingIntent) error {
+	token, err := dm.GetToken(ctx, decisionMaker)
+	if err != nil {
+		return err
+	}
+
+	logger.Logger(ctx).Debug().Msgf("Sending %d node scheduling intents to decision maker pod (host:%s nodeID:%s port:%d)", len(intents), decisionMaker.Host, decisionMaker.NodeID, decisionMaker.Port)
+
+	reqPayload := dmrest.HandleNodePoliciesRequest{
+		Policies: make([]dmrest.NodePolicy, 0, len(intents)),
+	}
+	for _, intent := range intents {
+		reqPayload.Policies = append(reqPayload.Policies, dmrest.NodePolicy{
+			PolicyID:      intent.PolicyID.Hex(),
+			NodeID:        intent.NodeID,
+			CommandRegex:  intent.CommandRegex,
+			Priority:      intent.Priority,
+			ExecutionTime: intent.ExecutionTime,
+		})
+	}
+
+	jsonBody, err := json.Marshal(reqPayload)
+	if err != nil {
+		return err
+	}
+	endpoint := dm.scheme() + "://" + decisionMaker.Host + ":" + strconv.Itoa(decisionMaker.Port) + "/api/v1/node-intents"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := dm.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
+	}
+	return nil
+}
+
+func (dm *DecisionMakerClient) GetNodePolicyMerkleRoot(ctx context.Context, decisionMaker *domain.DecisionMakerPod) (string, error) {
+	token, err := dm.GetToken(ctx, decisionMaker)
+	if err != nil {
+		return "", err
+	}
+
+	endpoint := dm.scheme() + "://" + decisionMaker.Host + ":" + strconv.Itoa(decisionMaker.Port) + "/api/v1/node-intents/merkle"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := dm.Client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
+	}
+
+	var merkleResp dmrest.SuccessResponse[dmrest.MerkleRootResponse]
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(&merkleResp); err != nil {
+		return "", err
+	}
+	if merkleResp.Data == nil {
+		return "", fmt.Errorf("decision maker %s returned empty merkle root", decisionMaker)
+	}
+	return merkleResp.Data.RootHash, nil
+}
+
+func (dm *DecisionMakerClient) DeleteNodeSchedulingIntents(ctx context.Context, decisionMaker *domain.DecisionMakerPod, req *domain.DeleteNodeIntentsRequest) error {
+	token, err := dm.GetToken(ctx, decisionMaker)
+	if err != nil {
+		return err
+	}
+
+	logger.Logger(ctx).Debug().Msgf("Deleting node scheduling intents from decision maker pod (host:%s nodeID:%s port:%d)", decisionMaker.Host, decisionMaker.NodeID, decisionMaker.Port)
+
+	deleteReq := dmrest.DeleteNodePolicyRequest{
+		PolicyID: req.PolicyID,
+		All:      req.All,
+	}
+	jsonBody, err := json.Marshal(deleteReq)
+	if err != nil {
+		return err
+	}
+	endpoint := dm.scheme() + "://" + decisionMaker.Host + ":" + strconv.Itoa(decisionMaker.Port) + "/api/v1/node-intents"
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+token)
+	resp, err := dm.Client.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
+	}
+	return nil
+}
+
 func (dm *DecisionMakerClient) GetPodPIDMapping(ctx context.Context, decisionMaker *domain.DecisionMakerPod) (*domain.PodPIDMappingResponse, error) {
 	token, err := dm.GetToken(ctx, decisionMaker)
 	if err != nil {
