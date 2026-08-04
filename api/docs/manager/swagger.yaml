@@ -19,6 +19,7 @@ definitions:
     - user.read
     - user.permission.update
     - user.password.reset
+    - user.password.change
     - role.create
     - role.read
     - role.update
@@ -26,16 +27,30 @@ definitions:
     - permission.read
     - schedule_strategy.create
     - schedule_strategy.read
+    - schedule_strategy.update
     - schedule_strategy.delete
     - schedule_intent.read
     - schedule_intent.delete
     - pod_pid_mapping.read
+    - pod_scheduling_metrics.create
+    - pod_scheduling_metrics.read
+    - pod_scheduling_metrics.update
+    - pod_scheduling_metrics.delete
+    - scheduler_config.read
+    - scheduler_config.update
+    - node_scheduling_policy.create
+    - node_scheduling_policy.read
+    - node_scheduling_policy.update
+    - node_scheduling_policy.delete
+    - node_scheduling_intent.read
+    - node_scheduling_intent.delete
     type: string
     x-enum-varnames:
     - CreateUser
     - UserRead
     - ChangeUserPermission
     - ResetUserPassword
+    - ChangeOwnPassword
     - RoleCrete
     - RoleRead
     - RoleUpdate
@@ -43,10 +58,23 @@ definitions:
     - PermissionRead
     - ScheduleStrategyCreate
     - ScheduleStrategyRead
+    - ScheduleStrategyUpdate
     - ScheduleStrategyDelete
     - ScheduleIntentRead
     - ScheduleIntentDelete
     - PodPIDMappingRead
+    - PSMCreate
+    - PSMRead
+    - PSMUpdate
+    - PSMDelete
+    - SchedulerConfigRead
+    - SchedulerConfigUpdate
+    - NodeSchedulingPolicyCreate
+    - NodeSchedulingPolicyRead
+    - NodeSchedulingPolicyUpdate
+    - NodeSchedulingPolicyDelete
+    - NodeSchedulingIntentRead
+    - NodeSchedulingIntentDelete
   domain.UserStatus:
     enum:
     - 1
@@ -144,6 +172,24 @@ definitions:
       timestamp:
         type: string
     type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingIntentsResponse:
+    properties:
+      data:
+        $ref: '#/definitions/rest.ListNodeSchedulingIntentsResponse'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingPoliciesResponse:
+    properties:
+      data:
+        $ref: '#/definitions/rest.ListNodeSchedulingPoliciesResponse'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
   github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodesResponse:
     properties:
       data:
@@ -153,10 +199,28 @@ definitions:
       timestamp:
         type: string
     type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPSMResponse:
+    properties:
+      data:
+        $ref: '#/definitions/rest.ListPSMResponse'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
   github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPermissionsResponse:
     properties:
       data:
         $ref: '#/definitions/rest.ListPermissionsResponse'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPodSchedulingMetricValuesResponse:
+    properties:
+      data:
+        $ref: '#/definitions/rest.ListPodSchedulingMetricValuesResponse'
       success:
         type: boolean
       timestamp:
@@ -207,6 +271,33 @@ definitions:
       timestamp:
         type: string
     type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ValidateTokenResponse:
+    properties:
+      data:
+        $ref: '#/definitions/rest.ValidateTokenResponse'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_classifyResponseItem:
+    properties:
+      data:
+        $ref: '#/definitions/rest.classifyResponseItem'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_listClassifyResponse:
+    properties:
+      data:
+        $ref: '#/definitions/rest.listClassifyResponse'
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
   github_com_Gthulhu_api_manager_rest.VersionResponse:
     properties:
       endpoints:
@@ -222,6 +313,48 @@ definitions:
         type: string
       oldPassword:
         type: string
+    type: object
+  rest.CreateNodeSchedulingPolicyRequest:
+    properties:
+      commandRegex:
+        type: string
+      draSelectors:
+        items:
+          $ref: '#/definitions/rest.DRASelectorPayload'
+        type: array
+      executionTime:
+        type: integer
+      nodeNames:
+        items:
+          type: string
+        type: array
+      nodeSelectors:
+        items:
+          $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector'
+        type: array
+      priority:
+        type: integer
+    type: object
+  rest.CreatePSMRequest:
+    properties:
+      collectionIntervalSeconds:
+        type: integer
+      commandRegex:
+        type: string
+      enabled:
+        type: boolean
+      k8sNamespaces:
+        items:
+          type: string
+        type: array
+      labelSelectors:
+        items:
+          $ref: '#/definitions/rest.PSMLabelSelector'
+        type: array
+      metrics:
+        $ref: '#/definitions/rest.PSMMetricsDTO'
+      scaling:
+        $ref: '#/definitions/rest.PSMScalingDTO'
     type: object
   rest.CreateRoleRequest:
     properties:
@@ -258,6 +391,32 @@ definitions:
       password:
         type: string
       username:
+        type: string
+    type: object
+  rest.DRASelectorPayload:
+    properties:
+      attributes:
+        items:
+          $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector'
+        type: array
+      deviceClass:
+        type: string
+    type: object
+  rest.DeleteNodeSchedulingIntentsRequest:
+    properties:
+      intentIds:
+        items:
+          type: string
+        type: array
+    type: object
+  rest.DeleteNodeSchedulingPolicyRequest:
+    properties:
+      policyId:
+        type: string
+    type: object
+  rest.DeletePSMRequest:
+    properties:
+      id:
         type: string
     type: object
   rest.DeleteRoleRequest:
@@ -316,11 +475,32 @@ definitions:
       username:
         type: string
     type: object
+  rest.ListNodeSchedulingIntentsResponse:
+    properties:
+      intents:
+        items:
+          $ref: '#/definitions/rest.NodeSchedulingIntentResponse'
+        type: array
+    type: object
+  rest.ListNodeSchedulingPoliciesResponse:
+    properties:
+      policies:
+        items:
+          $ref: '#/definitions/rest.NodeSchedulingPolicyResponse'
+        type: array
+    type: object
   rest.ListNodesResponse:
     properties:
       nodes:
         items:
           $ref: '#/definitions/rest.NodeInfo'
+        type: array
+    type: object
+  rest.ListPSMResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/rest.PSMResponseItem'
         type: array
     type: object
   rest.ListPermissionsResponse:
@@ -333,6 +513,17 @@ definitions:
             key:
               $ref: '#/definitions/domain.PermissionKey'
           type: object
+        type: array
+    type: object
+  rest.ListPodSchedulingMetricValuesResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/rest.PodSchedulingMetricValueItem'
+        type: array
+      warnings:
+        items:
+          type: string
         type: array
     type: object
   rest.ListRolesResponse:
@@ -394,6 +585,10 @@ definitions:
     type: object
   rest.LoginResponse:
     properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
       token:
         type: string
     type: object
@@ -402,6 +597,121 @@ definitions:
       name:
         type: string
       status:
+        type: string
+    type: object
+  rest.NodeSchedulingIntentResponse:
+    properties:
+      commandRegex:
+        type: string
+      executionTime:
+        type: integer
+      id:
+        type: string
+      nodeId:
+        type: string
+      policyId:
+        type: string
+      priority:
+        type: integer
+      state:
+        $ref: '#/definitions/domain.IntentState'
+    type: object
+  rest.NodeSchedulingPolicyResponse:
+    properties:
+      commandRegex:
+        type: string
+      draSelectors:
+        items:
+          $ref: '#/definitions/rest.DRASelectorPayload'
+        type: array
+      executionTime:
+        type: integer
+      id:
+        type: string
+      nodeNames:
+        items:
+          type: string
+        type: array
+      nodeSelectors:
+        items:
+          $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector'
+        type: array
+      priority:
+        type: integer
+    type: object
+  rest.PSMLabelSelector:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
+  rest.PSMMetricsDTO:
+    properties:
+      cpuMigrations:
+        type: boolean
+      cpuTimeNs:
+        type: boolean
+      involuntaryCtxSwitches:
+        type: boolean
+      runCount:
+        type: boolean
+      voluntaryCtxSwitches:
+        type: boolean
+      waitTimeNs:
+        type: boolean
+    type: object
+  rest.PSMResponseItem:
+    properties:
+      collectionIntervalSeconds:
+        type: integer
+      commandRegex:
+        type: string
+      createdTime:
+        type: integer
+      enabled:
+        type: boolean
+      id:
+        type: string
+      k8sNamespaces:
+        items:
+          type: string
+        type: array
+      labelSelectors:
+        items:
+          $ref: '#/definitions/rest.PSMLabelSelector'
+        type: array
+      metrics:
+        $ref: '#/definitions/rest.PSMMetricsDTO'
+      scaling:
+        $ref: '#/definitions/rest.PSMScalingDTO'
+      updatedTime:
+        type: integer
+    type: object
+  rest.PSMScaleTargetRefDTO:
+    properties:
+      apiVersion:
+        type: string
+      kind:
+        type: string
+      name:
+        type: string
+    type: object
+  rest.PSMScalingDTO:
+    properties:
+      cooldownPeriod:
+        type: integer
+      enabled:
+        type: boolean
+      maxReplicaCount:
+        type: integer
+      metricName:
+        type: string
+      minReplicaCount:
+        type: integer
+      scaleTargetRef:
+        $ref: '#/definitions/rest.PSMScaleTargetRefDTO'
+      targetValue:
         type: string
     type: object
   rest.PodInfo:
@@ -437,6 +747,20 @@ definitions:
       ppid:
         type: integer
     type: object
+  rest.PodPhase:
+    enum:
+    - cold_start
+    - warming_up
+    - stable
+    - drifting
+    - transitioning
+    type: string
+    x-enum-varnames:
+    - PodPhaseColdStart
+    - PodPhaseWarmingUp
+    - PodPhaseStable
+    - PodPhaseDrifting
+    - PodPhaseTransitioning
   rest.PodProcess:
     properties:
       command:
@@ -447,6 +771,38 @@ definitions:
         type: integer
       ppid:
         type: integer
+    type: object
+  rest.PodSchedulingMetricValueItem:
+    properties:
+      cpuMigrations:
+        type: integer
+      cpuTimeNs:
+        type: integer
+      involuntaryCtxSwitches:
+        type: integer
+      l3Migrations:
+        type: integer
+      namespace:
+        type: string
+      nodeID:
+        type: string
+      numaMigrations:
+        type: integer
+      podName:
+        type: string
+      runCount:
+        type: integer
+      smtMigrations:
+        type: integer
+      voluntaryCtxSwitches:
+        type: integer
+      waitTimeNs:
+        type: integer
+    type: object
+  rest.RefreshTokenRequest:
+    properties:
+      refreshToken:
+        type: string
     type: object
   rest.ResetPasswordRequest:
     properties:
@@ -512,6 +868,52 @@ definitions:
       strategyNamespace:
         type: string
     type: object
+  rest.UpdateNodeSchedulingPolicyRequest:
+    properties:
+      commandRegex:
+        type: string
+      draSelectors:
+        items:
+          $ref: '#/definitions/rest.DRASelectorPayload'
+        type: array
+      executionTime:
+        type: integer
+      nodeNames:
+        items:
+          type: string
+        type: array
+      nodeSelectors:
+        items:
+          $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector'
+        type: array
+      policyId:
+        type: string
+      priority:
+        type: integer
+    type: object
+  rest.UpdatePSMRequest:
+    properties:
+      collectionIntervalSeconds:
+        type: integer
+      commandRegex:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: string
+      k8sNamespaces:
+        items:
+          type: string
+        type: array
+      labelSelectors:
+        items:
+          $ref: '#/definitions/rest.PSMLabelSelector'
+        type: array
+      metrics:
+        $ref: '#/definitions/rest.PSMMetricsDTO'
+      scaling:
+        $ref: '#/definitions/rest.PSMScalingDTO'
+    type: object
   rest.UpdateRoleRequest:
     properties:
       description:
@@ -525,6 +927,27 @@ definitions:
           $ref: '#/definitions/rest.RolePolicy'
         type: array
     type: object
+  rest.UpdateScheduleStrategyRequest:
+    properties:
+      commandRegex:
+        type: string
+      executionTime:
+        type: integer
+      k8sNamespace:
+        items:
+          type: string
+        type: array
+      labelSelectors:
+        items:
+          $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector'
+        type: array
+      priority:
+        type: integer
+      strategyId:
+        type: string
+      strategyNamespace:
+        type: string
+    type: object
   rest.UpdateUserPermissionsRequest:
     properties:
       roles:
@@ -535,6 +958,120 @@ definitions:
         $ref: '#/definitions/domain.UserStatus'
       userID:
         type: string
+    type: object
+  rest.ValidateTokenResponse:
+    properties:
+      needChangePassword:
+        type: boolean
+      uid:
+        type: string
+      valid:
+        type: boolean
+    type: object
+  rest.classifyDrift:
+    properties:
+      drift_confirmed_periods:
+        type: integer
+      drift_score:
+        type: number
+    type: object
+  rest.classifyProfile:
+    properties:
+      long_term_baseline:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+      short_term:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+    type: object
+  rest.classifyRecommendation:
+    properties:
+      action:
+        type: string
+      priority_class:
+        type: string
+      reason:
+        type: string
+    type: object
+  rest.classifyResponseItem:
+    properties:
+      classification:
+        $ref: '#/definitions/rest.classifyResult'
+      drift:
+        $ref: '#/definitions/rest.classifyDrift'
+      namespace:
+        type: string
+      node:
+        type: string
+      phase:
+        $ref: '#/definitions/rest.PodPhase'
+      pod:
+        type: string
+      profile:
+        $ref: '#/definitions/rest.classifyProfile'
+      recommendation:
+        $ref: '#/definitions/rest.classifyRecommendation'
+      updated_at:
+        type: integer
+    type: object
+  rest.classifyResult:
+    properties:
+      confidence:
+        type: number
+      current_type:
+        description: |-
+          type clould be cpu_heavy, balanced, needs_higher_priority, interactive
+          cache_unfriendly, numa_unfriendly, or scheduling_latency
+        items:
+          type: string
+        type: array
+      previous_type:
+        items:
+          type: string
+        type: array
+    type: object
+  rest.ingestMetricsRequest:
+    properties:
+      metrics:
+        $ref: '#/definitions/rest.metricsPayload'
+      namespace:
+        type: string
+      node:
+        type: string
+      pod:
+        type: string
+      timestamp:
+        type: integer
+    type: object
+  rest.listClassifyResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/rest.classifyResponseItem'
+        type: array
+    type: object
+  rest.metricsPayload:
+    properties:
+      cpu_time:
+        type: integer
+      invol_ctx_sw:
+        type: integer
+      l3_migr:
+        type: integer
+      numa_migr:
+        type: integer
+      run_count:
+        type: integer
+      smt_migr:
+        type: integer
+      vol_ctx_sw:
+        type: integer
+      wait_time:
+        type: integer
     type: object
 externalDocs:
   description: OpenAPI
@@ -582,6 +1119,184 @@ paths:
       summary: User login
       tags:
       - Auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoke the provided refresh token.
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      summary: Logout current session
+      tags:
+      - Auth
+  /api/v1/auth/logout-all:
+    post:
+      description: Revoke all sessions for current user by incrementing token version.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Logout all sessions
+      tags:
+      - Auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchange a valid refresh token for a new token pair.
+      parameters:
+      - description: Refresh token payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /api/v1/auth/validate:
+    get:
+      description: Validate the bearer token and return current claims.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ValidateTokenResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Validate token
+      tags:
+      - Auth
+  /api/v1/classify:
+    get:
+      description: Lists all known pod classifications with optional filters.
+      parameters:
+      - description: namespace filter
+        in: query
+        name: namespace
+        type: string
+      - description: phase filter
+        in: query
+        name: phase
+        type: string
+      - description: classification type filter
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_listClassifyResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List adaptive classifications
+      tags:
+      - PodSchedulingMetrics
+  /api/v1/classify/{namespace}/{pod}:
+    get:
+      description: Returns current classification, drift status and recommendation
+        for a pod.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_classifyResponseItem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get adaptive classification for a pod
+      tags:
+      - PodSchedulingMetrics
   /api/v1/intents:
     delete:
       consumes:
@@ -659,6 +1374,283 @@ paths:
       summary: List self schedule intents
       tags:
       - Strategies
+  /api/v1/metrics:
+    post:
+      consumes:
+      - application/json
+      description: Accept periodic pod scheduling metrics and update adaptive clustering
+        state.
+      parameters:
+      - description: Pod metrics payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.ingestMetricsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_classifyResponseItem'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Ingest pod metrics for adaptive classification
+      tags:
+      - PodSchedulingMetrics
+  /api/v1/node-scheduling-intents:
+    delete:
+      consumes:
+      - application/json
+      description: Delete one or more node scheduling intents.
+      parameters:
+      - description: Intent IDs to delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.DeleteNodeSchedulingIntentsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete node scheduling intents
+      tags:
+      - NodePolicies
+  /api/v1/node-scheduling-intents/self:
+    get:
+      consumes:
+      - application/json
+      description: List node scheduling intents created by the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingIntentsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List self node scheduling intents
+      tags:
+      - NodePolicies
+  /api/v1/node-scheduling-policies:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a node scheduling policy and its associated intents.
+      parameters:
+      - description: Policy ID to delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.DeleteNodeSchedulingPolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete node scheduling policy
+      tags:
+      - NodePolicies
+    post:
+      consumes:
+      - application/json
+      description: Create a new node-level scheduling policy.
+      parameters:
+      - description: Node scheduling policy payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.CreateNodeSchedulingPolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create node scheduling policy
+      tags:
+      - NodePolicies
+    put:
+      consumes:
+      - application/json
+      description: Update an existing node-level scheduling policy.
+      parameters:
+      - description: Node scheduling policy payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.UpdateNodeSchedulingPolicyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update node scheduling policy
+      tags:
+      - NodePolicies
+  /api/v1/node-scheduling-policies/self:
+    get:
+      consumes:
+      - application/json
+      description: List node scheduling policies created by the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingPoliciesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List self node scheduling policies
+      tags:
+      - NodePolicies
   /api/v1/nodes:
     get:
       description: Returns all nodes in the Kubernetes cluster
@@ -751,6 +1743,186 @@ paths:
       summary: List permissions
       tags:
       - Roles
+  /api/v1/pod-scheduling-metrics:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a PodSchedulingMetrics resource.
+      parameters:
+      - description: PSM ID to delete
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.DeletePSMRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete PodSchedulingMetrics
+      tags:
+      - PodSchedulingMetrics
+    get:
+      description: List all PodSchedulingMetrics resources.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPSMResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List PodSchedulingMetrics
+      tags:
+      - PodSchedulingMetrics
+    post:
+      consumes:
+      - application/json
+      description: Create a new PodSchedulingMetrics resource.
+      parameters:
+      - description: PSM payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.CreatePSMRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create PodSchedulingMetrics
+      tags:
+      - PodSchedulingMetrics
+    put:
+      consumes:
+      - application/json
+      description: Update an existing PodSchedulingMetrics resource.
+      parameters:
+      - description: PSM payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.UpdatePSMRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update PodSchedulingMetrics
+      tags:
+      - PodSchedulingMetrics
+  /api/v1/pod-scheduling-metrics/runtime:
+    get:
+      description: List the latest pod-level eBPF scheduling metrics collected from
+        decision makers.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPodSchedulingMetricValuesResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List collected pod scheduling metrics
+      tags:
+      - PodSchedulingMetrics
   /api/v1/pods/pids:
     get:
       description: Returns all pods running on this node with their associated process
@@ -996,6 +2168,49 @@ paths:
       security:
       - BearerAuth: []
       summary: Create schedule strategy
+      tags:
+      - Strategies
+    put:
+      consumes:
+      - application/json
+      description: Update an existing schedule strategy.
+      parameters:
+      - description: Schedule strategy payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/rest.UpdateScheduleStrategyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update schedule strategy
       tags:
       - Strategies
   /api/v1/strategies/self:

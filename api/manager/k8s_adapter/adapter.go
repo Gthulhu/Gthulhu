@@ -13,7 +13,10 @@ import (
 	"github.com/Gthulhu/api/pkg/logger"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -30,6 +33,7 @@ type Options struct {
 
 type Adapter struct {
 	client         kubernetes.Interface
+	dynamicClient  dynamic.Interface
 	podCache       map[string]apiv1.Pod
 	podCacheMu     sync.RWMutex
 	stopCh         chan struct{}
@@ -53,10 +57,16 @@ func NewAdapter(opt Options) (*Adapter, error) {
 		return nil, fmt.Errorf("create kubernetes client: %w", err)
 	}
 
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("create kubernetes dynamic client: %w", err)
+	}
+
 	adapter := &Adapter{
-		client:   client,
-		podCache: make(map[string]apiv1.Pod),
-		stopCh:   make(chan struct{}),
+		client:        client,
+		dynamicClient: dynamicClient,
+		podCache:      make(map[string]apiv1.Pod),
+		stopCh:        make(chan struct{}),
 	}
 	adapter.startPodWatcher()
 
@@ -423,25 +433,198 @@ func (a *Adapter) ListNodes(ctx context.Context) ([]*domain.Node, error) {
 	}
 
 	results := make([]*domain.Node, 0, len(nodeList.Items))
-	for _, node := range nodeList.Items {
-		status := "Unknown"
-		for _, condition := range node.Status.Conditions {
-			if condition.Type == apiv1.NodeReady {
-				if condition.Status == apiv1.ConditionTrue {
-					status = "Ready"
-				} else {
-					status = "NotReady"
+	for i := range nodeList.Items {
+		results = append(results, nodeToDomain(&nodeList.Items[i]))
+	}
+
+	return results, nil
+}
+
+func nodeToDomain(node *apiv1.Node) *domain.Node {
+	status := "Unknown"
+	for _, condition := range node.Status.Conditions {
+		if condition.Type == apiv1.NodeReady {
+			if condition.Status == apiv1.ConditionTrue {
+				status = "Ready"
+			} else {
+				status = "NotReady"
+			}
+			break
+		}
+	}
+
+	return &domain.Node{
+		Name:   node.Name,
+		Labels: copyLabels(node.Labels),
+		Status: status,
+	}
+}
+
+// QueryNodesBySelectors returns nodes matching the given label selectors
+// AND (if non-empty) whose name is present in NodeNames. Either selector
+// type may be omitted to match on the other alone.
+func (a *Adapter) QueryNodesBySelectors(ctx context.Context, opt *domain.QueryNodesOptions) ([]*domain.Node, error) {
+	if opt == nil {
+		return nil, domain.ErrNilQueryInput
+	}
+	if a == nil || a.client == nil {
+		return nil, domain.ErrNoClient
+	}
+
+	labelSelector := buildLabelSelector(opt.NodeSelectors)
+	nodeList, err := a.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+
+	nameFilter := make(map[string]struct{}, len(opt.NodeNames))
+	for _, name := range opt.NodeNames {
+		nameFilter[name] = struct{}{}
+	}
+
+	results := make([]*domain.Node, 0, len(nodeList.Items))
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		if len(nameFilter) > 0 {
+			if _, ok := nameFilter[node.Name]; !ok {
+				continue
+			}
+		}
+		results = append(results, nodeToDomain(node))
+	}
+
+	return results, nil
+}
+
+// resourceSliceGVR is the DRA (Dynamic Resource Allocation) ResourceSlice
+// GroupVersionResource. ResourceSlices are published by DRA drivers and
+// advertise which devices are available on which node.
+var resourceSliceGVR = schema.GroupVersionResource{
+	Group:    "resource.k8s.io",
+	Version:  "v1alpha3",
+	Resource: "resourceslices",
+}
+
+// QueryNodesByDRA returns the set of nodes that expose a device matching at
+// least one of the given DRASelectors (device class + optional attribute
+// key/value pairs), as published via resource.k8s.io ResourceSlice objects.
+func (a *Adapter) QueryNodesByDRA(ctx context.Context, opt *domain.QueryNodesByDRAOptions) ([]*domain.Node, error) {
+	if opt == nil {
+		return nil, domain.ErrNilQueryInput
+	}
+	if a == nil || a.dynamicClient == nil {
+		return nil, domain.ErrNoClient
+	}
+	if len(opt.DRASelectors) == 0 {
+		return nil, nil
+	}
+
+	list, err := a.dynamicClient.Resource(resourceSliceGVR).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list resource slices: %w", err)
+	}
+
+	matchedNodeNames := make(map[string]struct{})
+	for i := range list.Items {
+		slice := &list.Items[i]
+		for _, selector := range opt.DRASelectors {
+			if resourceSliceMatchesSelector(slice, selector) {
+				if nodeName := getUnstructuredStr(slice.Object, "spec", "nodeName"); nodeName != "" {
+					matchedNodeNames[nodeName] = struct{}{}
 				}
 				break
 			}
 		}
-
-		results = append(results, &domain.Node{
-			Name:   node.Name,
-			Labels: copyLabels(node.Labels),
-			Status: status,
-		})
 	}
 
+	if len(matchedNodeNames) == 0 {
+		return nil, nil
+	}
+
+	nodeList, err := a.client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("list nodes: %w", err)
+	}
+	results := make([]*domain.Node, 0, len(matchedNodeNames))
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		if _, ok := matchedNodeNames[node.Name]; ok {
+			results = append(results, nodeToDomain(node))
+		}
+	}
 	return results, nil
+}
+
+// resourceSliceMatchesSelector reports whether the ResourceSlice matches the
+// given DRASelector's device class (spec.driver) and, if provided, every
+// requested attribute key/value pair on at least one device in the slice.
+func resourceSliceMatchesSelector(slice *unstructured.Unstructured, selector domain.DRASelector) bool {
+	if selector.DeviceClass != "" {
+		driver := getUnstructuredStr(slice.Object, "spec", "driver")
+		if driver != selector.DeviceClass {
+			return false
+		}
+	}
+	if len(selector.Attributes) == 0 {
+		return true
+	}
+
+	devices, found, err := unstructured.NestedSlice(slice.Object, "spec", "devices")
+	if err != nil || !found {
+		return false
+	}
+	for _, d := range devices {
+		device, ok := d.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		attrs, found, err := unstructured.NestedMap(device, "basic", "attributes")
+		if err != nil || !found {
+			continue
+		}
+		if deviceAttributesMatch(attrs, selector.Attributes) {
+			return true
+		}
+	}
+	return false
+}
+
+func deviceAttributesMatch(attrs map[string]interface{}, wanted []domain.LabelSelector) bool {
+	for _, sel := range wanted {
+		raw, ok := attrs[sel.Key]
+		if !ok {
+			return false
+		}
+		if sel.Value == "" {
+			continue
+		}
+		if attributeValueToString(raw) != sel.Value {
+			return false
+		}
+	}
+	return true
+}
+
+// attributeValueToString stringifies a DRA device attribute value. Attribute
+// values are encoded as a map with exactly one of "string"/"int"/"bool"/
+// "version" set, per the resource.k8s.io DeviceAttribute schema.
+func attributeValueToString(raw interface{}) string {
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return fmt.Sprintf("%v", raw)
+	}
+	for _, key := range []string{"string", "int", "bool", "version"} {
+		if v, ok := m[key]; ok {
+			return fmt.Sprintf("%v", v)
+		}
+	}
+	return ""
+}
+
+func getUnstructuredStr(obj map[string]interface{}, fields ...string) string {
+	v, found, err := unstructured.NestedString(obj, fields...)
+	if err != nil || !found {
+		return ""
+	}
+	return v
 }

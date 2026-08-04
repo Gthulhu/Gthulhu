@@ -76,6 +76,284 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/logout": {
+            "post": {
+                "description": "Revoke the provided refresh token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Logout current session",
+                "parameters": [
+                    {
+                        "description": "Refresh token payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.RefreshTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout-all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Revoke all sessions for current user by incrementing token version.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Logout all sessions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "description": "Exchange a valid refresh token for a new token pair.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Refresh access token",
+                "parameters": [
+                    {
+                        "description": "Refresh token payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.RefreshTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/validate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Validate the bearer token and return current claims.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Validate token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ValidateTokenResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/classify": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Lists all known pod classifications with optional filters.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "List adaptive classifications",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "namespace filter",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "phase filter",
+                        "name": "phase",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "classification type filter",
+                        "name": "type",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_listClassifyResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/classify/{namespace}/{pod}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns current classification, drift status and recommendation for a pod.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "Get adaptive classification for a pod",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_classifyResponseItem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/intents": {
             "delete": {
                 "security": [
@@ -168,6 +446,439 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListScheduleIntentsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/metrics": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Accept periodic pod scheduling metrics and update adaptive clustering state.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "Ingest pod metrics for adaptive classification",
+                "parameters": [
+                    {
+                        "description": "Pod metrics payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.ingestMetricsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_classifyResponseItem"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/node-scheduling-intents": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete one or more node scheduling intents.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NodePolicies"
+                ],
+                "summary": "Delete node scheduling intents",
+                "parameters": [
+                    {
+                        "description": "Intent IDs to delete",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.DeleteNodeSchedulingIntentsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/node-scheduling-intents/self": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List node scheduling intents created by the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NodePolicies"
+                ],
+                "summary": "List self node scheduling intents",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingIntentsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/node-scheduling-policies": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing node-level scheduling policy.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NodePolicies"
+                ],
+                "summary": "Update node scheduling policy",
+                "parameters": [
+                    {
+                        "description": "Node scheduling policy payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.UpdateNodeSchedulingPolicyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new node-level scheduling policy.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NodePolicies"
+                ],
+                "summary": "Create node scheduling policy",
+                "parameters": [
+                    {
+                        "description": "Node scheduling policy payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.CreateNodeSchedulingPolicyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a node scheduling policy and its associated intents.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NodePolicies"
+                ],
+                "summary": "Delete node scheduling policy",
+                "parameters": [
+                    {
+                        "description": "Policy ID to delete",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.DeleteNodeSchedulingPolicyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/node-scheduling-policies/self": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List node scheduling policies created by the authenticated user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "NodePolicies"
+                ],
+                "summary": "List self node scheduling policies",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingPoliciesResponse"
                         }
                     },
                     "400": {
@@ -328,6 +1039,287 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/pod-scheduling-metrics": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List all PodSchedulingMetrics resources.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "List PodSchedulingMetrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPSMResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing PodSchedulingMetrics resource.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "Update PodSchedulingMetrics",
+                "parameters": [
+                    {
+                        "description": "PSM payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.UpdatePSMRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new PodSchedulingMetrics resource.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "Create PodSchedulingMetrics",
+                "parameters": [
+                    {
+                        "description": "PSM payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.CreatePSMRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Delete a PodSchedulingMetrics resource.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "Delete PodSchedulingMetrics",
+                "parameters": [
+                    {
+                        "description": "PSM ID to delete",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.DeletePSMRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/pod-scheduling-metrics/runtime": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List the latest pod-level eBPF scheduling metrics collected from decision makers.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "PodSchedulingMetrics"
+                ],
+                "summary": "List collected pod scheduling metrics",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPodSchedulingMetricValuesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
                         }
@@ -599,6 +1591,73 @@ const docTemplate = `{
             }
         },
         "/api/v1/strategies": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update an existing schedule strategy.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Strategies"
+                ],
+                "summary": "Update schedule strategy",
+                "parameters": [
+                    {
+                        "description": "Schedule strategy payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/rest.UpdateScheduleStrategyRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.SuccessResponse-github_com_Gthulhu_api_manager_rest_EmptyResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -1161,6 +2220,7 @@ const docTemplate = `{
                 "user.read",
                 "user.permission.update",
                 "user.password.reset",
+                "user.password.change",
                 "role.create",
                 "role.read",
                 "role.update",
@@ -1168,16 +2228,30 @@ const docTemplate = `{
                 "permission.read",
                 "schedule_strategy.create",
                 "schedule_strategy.read",
+                "schedule_strategy.update",
                 "schedule_strategy.delete",
                 "schedule_intent.read",
                 "schedule_intent.delete",
-                "pod_pid_mapping.read"
+                "pod_pid_mapping.read",
+                "pod_scheduling_metrics.create",
+                "pod_scheduling_metrics.read",
+                "pod_scheduling_metrics.update",
+                "pod_scheduling_metrics.delete",
+                "scheduler_config.read",
+                "scheduler_config.update",
+                "node_scheduling_policy.create",
+                "node_scheduling_policy.read",
+                "node_scheduling_policy.update",
+                "node_scheduling_policy.delete",
+                "node_scheduling_intent.read",
+                "node_scheduling_intent.delete"
             ],
             "x-enum-varnames": [
                 "CreateUser",
                 "UserRead",
                 "ChangeUserPermission",
                 "ResetUserPassword",
+                "ChangeOwnPassword",
                 "RoleCrete",
                 "RoleRead",
                 "RoleUpdate",
@@ -1185,10 +2259,23 @@ const docTemplate = `{
                 "PermissionRead",
                 "ScheduleStrategyCreate",
                 "ScheduleStrategyRead",
+                "ScheduleStrategyUpdate",
                 "ScheduleStrategyDelete",
                 "ScheduleIntentRead",
                 "ScheduleIntentDelete",
-                "PodPIDMappingRead"
+                "PodPIDMappingRead",
+                "PSMCreate",
+                "PSMRead",
+                "PSMUpdate",
+                "PSMDelete",
+                "SchedulerConfigRead",
+                "SchedulerConfigUpdate",
+                "NodeSchedulingPolicyCreate",
+                "NodeSchedulingPolicyRead",
+                "NodeSchedulingPolicyUpdate",
+                "NodeSchedulingPolicyDelete",
+                "NodeSchedulingIntentRead",
+                "NodeSchedulingIntentDelete"
             ]
         },
         "domain.UserStatus": {
@@ -1339,6 +2426,34 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingIntentsResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.ListNodeSchedulingIntentsResponse"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodeSchedulingPoliciesResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.ListNodeSchedulingPoliciesResponse"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListNodesResponse": {
             "type": "object",
             "properties": {
@@ -1353,11 +2468,39 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPSMResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.ListPSMResponse"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPermissionsResponse": {
             "type": "object",
             "properties": {
                 "data": {
                     "$ref": "#/definitions/rest.ListPermissionsResponse"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ListPodSchedulingMetricValuesResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.ListPodSchedulingMetricValuesResponse"
                 },
                 "success": {
                     "type": "boolean"
@@ -1437,6 +2580,48 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_ValidateTokenResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.ValidateTokenResponse"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_classifyResponseItem": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.classifyResponseItem"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Gthulhu_api_manager_rest.SuccessResponse-rest_listClassifyResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/rest.listClassifyResponse"
+                },
+                "success": {
+                    "type": "boolean"
+                },
+                "timestamp": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_Gthulhu_api_manager_rest.VersionResponse": {
             "type": "object",
             "properties": {
@@ -1459,6 +2644,70 @@ const docTemplate = `{
                 },
                 "oldPassword": {
                     "type": "string"
+                }
+            }
+        },
+        "rest.CreateNodeSchedulingPolicyRequest": {
+            "type": "object",
+            "properties": {
+                "commandRegex": {
+                    "type": "string"
+                },
+                "draSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.DRASelectorPayload"
+                    }
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "nodeNames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "nodeSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector"
+                    }
+                },
+                "priority": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.CreatePSMRequest": {
+            "type": "object",
+            "properties": {
+                "collectionIntervalSeconds": {
+                    "type": "integer"
+                },
+                "commandRegex": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "k8sNamespaces": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "labelSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.PSMLabelSelector"
+                    }
+                },
+                "metrics": {
+                    "$ref": "#/definitions/rest.PSMMetricsDTO"
+                },
+                "scaling": {
+                    "$ref": "#/definitions/rest.PSMScalingDTO"
                 }
             }
         },
@@ -1515,6 +2764,47 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.DRASelectorPayload": {
+            "type": "object",
+            "properties": {
+                "attributes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector"
+                    }
+                },
+                "deviceClass": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.DeleteNodeSchedulingIntentsRequest": {
+            "type": "object",
+            "properties": {
+                "intentIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "rest.DeleteNodeSchedulingPolicyRequest": {
+            "type": "object",
+            "properties": {
+                "policyId": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.DeletePSMRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
                     "type": "string"
                 }
             }
@@ -1606,6 +2896,28 @@ const docTemplate = `{
                 }
             }
         },
+        "rest.ListNodeSchedulingIntentsResponse": {
+            "type": "object",
+            "properties": {
+                "intents": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.NodeSchedulingIntentResponse"
+                    }
+                }
+            }
+        },
+        "rest.ListNodeSchedulingPoliciesResponse": {
+            "type": "object",
+            "properties": {
+                "policies": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.NodeSchedulingPolicyResponse"
+                    }
+                }
+            }
+        },
         "rest.ListNodesResponse": {
             "type": "object",
             "properties": {
@@ -1613,6 +2925,17 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/rest.NodeInfo"
+                    }
+                }
+            }
+        },
+        "rest.ListPSMResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.PSMResponseItem"
                     }
                 }
             }
@@ -1632,6 +2955,23 @@ const docTemplate = `{
                                 "$ref": "#/definitions/domain.PermissionKey"
                             }
                         }
+                    }
+                }
+            }
+        },
+        "rest.ListPodSchedulingMetricValuesResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.PodSchedulingMetricValueItem"
+                    }
+                },
+                "warnings": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
                     }
                 }
             }
@@ -1728,6 +3068,12 @@ const docTemplate = `{
         "rest.LoginResponse": {
             "type": "object",
             "properties": {
+                "accessToken": {
+                    "type": "string"
+                },
+                "refreshToken": {
+                    "type": "string"
+                },
                 "token": {
                     "type": "string"
                 }
@@ -1740,6 +3086,182 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.NodeSchedulingIntentResponse": {
+            "type": "object",
+            "properties": {
+                "commandRegex": {
+                    "type": "string"
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nodeId": {
+                    "type": "string"
+                },
+                "policyId": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "state": {
+                    "$ref": "#/definitions/domain.IntentState"
+                }
+            }
+        },
+        "rest.NodeSchedulingPolicyResponse": {
+            "type": "object",
+            "properties": {
+                "commandRegex": {
+                    "type": "string"
+                },
+                "draSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.DRASelectorPayload"
+                    }
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nodeNames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "nodeSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector"
+                    }
+                },
+                "priority": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.PSMLabelSelector": {
+            "type": "object",
+            "properties": {
+                "key": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.PSMMetricsDTO": {
+            "type": "object",
+            "properties": {
+                "cpuMigrations": {
+                    "type": "boolean"
+                },
+                "cpuTimeNs": {
+                    "type": "boolean"
+                },
+                "involuntaryCtxSwitches": {
+                    "type": "boolean"
+                },
+                "runCount": {
+                    "type": "boolean"
+                },
+                "voluntaryCtxSwitches": {
+                    "type": "boolean"
+                },
+                "waitTimeNs": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rest.PSMResponseItem": {
+            "type": "object",
+            "properties": {
+                "collectionIntervalSeconds": {
+                    "type": "integer"
+                },
+                "commandRegex": {
+                    "type": "string"
+                },
+                "createdTime": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "k8sNamespaces": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "labelSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.PSMLabelSelector"
+                    }
+                },
+                "metrics": {
+                    "$ref": "#/definitions/rest.PSMMetricsDTO"
+                },
+                "scaling": {
+                    "$ref": "#/definitions/rest.PSMScalingDTO"
+                },
+                "updatedTime": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.PSMScaleTargetRefDTO": {
+            "type": "object",
+            "properties": {
+                "apiVersion": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.PSMScalingDTO": {
+            "type": "object",
+            "properties": {
+                "cooldownPeriod": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "maxReplicaCount": {
+                    "type": "integer"
+                },
+                "metricName": {
+                    "type": "string"
+                },
+                "minReplicaCount": {
+                    "type": "integer"
+                },
+                "scaleTargetRef": {
+                    "$ref": "#/definitions/rest.PSMScaleTargetRefDTO"
+                },
+                "targetValue": {
                     "type": "string"
                 }
             }
@@ -1795,6 +3317,23 @@ const docTemplate = `{
                 }
             }
         },
+        "rest.PodPhase": {
+            "type": "string",
+            "enum": [
+                "cold_start",
+                "warming_up",
+                "stable",
+                "drifting",
+                "transitioning"
+            ],
+            "x-enum-varnames": [
+                "PodPhaseColdStart",
+                "PodPhaseWarmingUp",
+                "PodPhaseStable",
+                "PodPhaseDrifting",
+                "PodPhaseTransitioning"
+            ]
+        },
         "rest.PodProcess": {
             "type": "object",
             "properties": {
@@ -1809,6 +3348,55 @@ const docTemplate = `{
                 },
                 "ppid": {
                     "type": "integer"
+                }
+            }
+        },
+        "rest.PodSchedulingMetricValueItem": {
+            "type": "object",
+            "properties": {
+                "cpuMigrations": {
+                    "type": "integer"
+                },
+                "cpuTimeNs": {
+                    "type": "integer"
+                },
+                "involuntaryCtxSwitches": {
+                    "type": "integer"
+                },
+                "l3Migrations": {
+                    "type": "integer"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "nodeID": {
+                    "type": "string"
+                },
+                "numaMigrations": {
+                    "type": "integer"
+                },
+                "podName": {
+                    "type": "string"
+                },
+                "runCount": {
+                    "type": "integer"
+                },
+                "smtMigrations": {
+                    "type": "integer"
+                },
+                "voluntaryCtxSwitches": {
+                    "type": "integer"
+                },
+                "waitTimeNs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.RefreshTokenRequest": {
+            "type": "object",
+            "properties": {
+                "refreshToken": {
+                    "type": "string"
                 }
             }
         },
@@ -1910,6 +3498,76 @@ const docTemplate = `{
                 }
             }
         },
+        "rest.UpdateNodeSchedulingPolicyRequest": {
+            "type": "object",
+            "properties": {
+                "commandRegex": {
+                    "type": "string"
+                },
+                "draSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.DRASelectorPayload"
+                    }
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "nodeNames": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "nodeSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector"
+                    }
+                },
+                "policyId": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.UpdatePSMRequest": {
+            "type": "object",
+            "properties": {
+                "collectionIntervalSeconds": {
+                    "type": "integer"
+                },
+                "commandRegex": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "k8sNamespaces": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "labelSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.PSMLabelSelector"
+                    }
+                },
+                "metrics": {
+                    "$ref": "#/definitions/rest.PSMMetricsDTO"
+                },
+                "scaling": {
+                    "$ref": "#/definitions/rest.PSMScalingDTO"
+                }
+            }
+        },
         "rest.UpdateRoleRequest": {
             "type": "object",
             "properties": {
@@ -1930,6 +3588,38 @@ const docTemplate = `{
                 }
             }
         },
+        "rest.UpdateScheduleStrategyRequest": {
+            "type": "object",
+            "properties": {
+                "commandRegex": {
+                    "type": "string"
+                },
+                "executionTime": {
+                    "type": "integer"
+                },
+                "k8sNamespace": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "labelSelectors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Gthulhu_api_manager_rest.LabelSelector"
+                    }
+                },
+                "priority": {
+                    "type": "integer"
+                },
+                "strategyId": {
+                    "type": "string"
+                },
+                "strategyNamespace": {
+                    "type": "string"
+                }
+            }
+        },
         "rest.UpdateUserPermissionsRequest": {
             "type": "object",
             "properties": {
@@ -1944,6 +3634,177 @@ const docTemplate = `{
                 },
                 "userID": {
                     "type": "string"
+                }
+            }
+        },
+        "rest.ValidateTokenResponse": {
+            "type": "object",
+            "properties": {
+                "needChangePassword": {
+                    "type": "boolean"
+                },
+                "uid": {
+                    "type": "string"
+                },
+                "valid": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "rest.classifyDrift": {
+            "type": "object",
+            "properties": {
+                "drift_confirmed_periods": {
+                    "type": "integer"
+                },
+                "drift_score": {
+                    "type": "number"
+                }
+            }
+        },
+        "rest.classifyProfile": {
+            "type": "object",
+            "properties": {
+                "long_term_baseline": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "short_term": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                }
+            }
+        },
+        "rest.classifyRecommendation": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string"
+                },
+                "priority_class": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "rest.classifyResponseItem": {
+            "type": "object",
+            "properties": {
+                "classification": {
+                    "$ref": "#/definitions/rest.classifyResult"
+                },
+                "drift": {
+                    "$ref": "#/definitions/rest.classifyDrift"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "node": {
+                    "type": "string"
+                },
+                "phase": {
+                    "$ref": "#/definitions/rest.PodPhase"
+                },
+                "pod": {
+                    "type": "string"
+                },
+                "profile": {
+                    "$ref": "#/definitions/rest.classifyProfile"
+                },
+                "recommendation": {
+                    "$ref": "#/definitions/rest.classifyRecommendation"
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.classifyResult": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "type": "number"
+                },
+                "current_type": {
+                    "description": "type clould be cpu_heavy, balanced, needs_higher_priority, interactive\ncache_unfriendly, numa_unfriendly, or scheduling_latency",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "previous_type": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "rest.ingestMetricsRequest": {
+            "type": "object",
+            "properties": {
+                "metrics": {
+                    "$ref": "#/definitions/rest.metricsPayload"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "node": {
+                    "type": "string"
+                },
+                "pod": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                }
+            }
+        },
+        "rest.listClassifyResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/rest.classifyResponseItem"
+                    }
+                }
+            }
+        },
+        "rest.metricsPayload": {
+            "type": "object",
+            "properties": {
+                "cpu_time": {
+                    "type": "integer"
+                },
+                "invol_ctx_sw": {
+                    "type": "integer"
+                },
+                "l3_migr": {
+                    "type": "integer"
+                },
+                "numa_migr": {
+                    "type": "integer"
+                },
+                "run_count": {
+                    "type": "integer"
+                },
+                "smt_migr": {
+                    "type": "integer"
+                },
+                "vol_ctx_sw": {
+                    "type": "integer"
+                },
+                "wait_time": {
+                    "type": "integer"
                 }
             }
         }

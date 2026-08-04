@@ -50,6 +50,14 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 		apiV1.GET("/intents/self", h.echoHandler(h.ListSelfScheduleIntents), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ScheduleIntentRead)))
 		apiV1.DELETE("/intents", h.echoHandler(h.DeleteScheduleIntents), echo.WrapMiddleware(h.GetAuthMiddleware(domain.ScheduleIntentDelete)))
 
+		// node scheduling policy routes
+		apiV1.POST("/node-scheduling-policies", h.echoHandler(h.CreateNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyCreate)))
+		apiV1.PUT("/node-scheduling-policies", h.echoHandler(h.UpdateNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyUpdate)))
+		apiV1.GET("/node-scheduling-policies/self", h.echoHandler(h.ListSelfNodeSchedulingPolicies), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyRead)))
+		apiV1.DELETE("/node-scheduling-policies", h.echoHandler(h.DeleteNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyDelete)))
+		apiV1.GET("/node-scheduling-intents/self", h.echoHandler(h.ListSelfNodeSchedulingIntents), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingIntentRead)))
+		apiV1.DELETE("/node-scheduling-intents", h.echoHandler(h.DeleteNodeSchedulingIntents), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingIntentDelete)))
+
 		// pod-pid mapping routes
 		apiV1.GET("/nodes", h.echoHandler(h.ListNodes), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PodPIDMappingRead)))
 		apiV1.GET("/nodes/:nodeID/pods/pids", h.echoHandlerWithParams(h.GetNodePodPIDMapping), echo.WrapMiddleware(h.GetAuthMiddleware(domain.PodPIDMappingRead)))

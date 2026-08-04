@@ -46,6 +46,7 @@ func NewService(params Params) (*Service, error) {
 		daemonHTTPClient: &http.Client{
 			Timeout: time.Duration(max(params.DaemonConfig.TimeoutSec, 5)) * time.Second,
 		},
+		processSource: NewProcScanSource(procDir),
 	}
 	if svc.daemonEndpoint == "" {
 		svc.daemonEndpoint = "http://127.0.0.1:18080"
@@ -76,6 +77,14 @@ type Service struct {
 	runtimeConfig        *domain.RuntimeSchedulerConfig
 	daemonEndpoint       string
 	daemonHTTPClient     *http.Client
+
+	// Node-level scheduling policies (target arbitrary processes on this
+	// node, not just Pod container processes). See node_policy_svc.go.
+	processSource            ProcessSource
+	nodePolicyCacheMu        sync.RWMutex
+	nodePolicyCache          []*domain.NodePolicy
+	nodePolicyMerkleRoot     *util.MerkleNode
+	nodePolicyMerkleRootHash string
 }
 
 const (
@@ -85,22 +94,35 @@ const (
 
 // ListAllSchedulingIntents re-scans /proc and recalculates scheduling intents
 // from the cached domain.Intent list, since pod processes may change over time.
+// It also merges in scheduling intents produced by node-level scheduling
+// policies (see node_policy_svc.go), which target arbitrary processes on the
+// node rather than Pod container processes.
 func (svc *Service) ListAllSchedulingIntents(ctx context.Context) ([]*domain.SchedulingIntents, error) {
 	svc.intentCacheMu.RLock()
 	cachedIntents := svc.intentCache
 	svc.intentCacheMu.RUnlock()
 
-	if len(cachedIntents) == 0 {
-		return []*domain.SchedulingIntents{}, nil
+	var podSchedulingIntents []*domain.SchedulingIntents
+	if len(cachedIntents) > 0 {
+		podInfos, err := svc.GetAllPodInfos(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		svc.podSchedCollector.UpdatePodTargets(cachedIntents, podInfos)
+		podSchedulingIntents = svc.resolveSchedulingIntents(ctx, cachedIntents, podInfos)
 	}
 
-	podInfos, err := svc.GetAllPodInfos(ctx)
+	nodeSchedulingIntents, err := svc.resolveNodeSchedulingIntents(ctx)
 	if err != nil {
-		return nil, err
+		logger.Logger(ctx).Warn().Err(err).Msg("failed to resolve node scheduling intents")
+		nodeSchedulingIntents = nil
 	}
 
-	svc.podSchedCollector.UpdatePodTargets(cachedIntents, podInfos)
-	return svc.resolveSchedulingIntents(ctx, cachedIntents, podInfos), nil
+	if len(nodeSchedulingIntents) == 0 {
+		return podSchedulingIntents, nil
+	}
+	return append(podSchedulingIntents, nodeSchedulingIntents...), nil
 }
 
 // ProcessIntents processes a list of scheduling intents and updates the internal map

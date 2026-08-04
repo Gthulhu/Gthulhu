@@ -26,6 +26,13 @@ const (
 	PSMDelete              PermissionKey = "pod_scheduling_metrics.delete"
 	SchedulerConfigRead    PermissionKey = "scheduler_config.read"
 	SchedulerConfigUpdate  PermissionKey = "scheduler_config.update"
+
+	NodeSchedulingPolicyCreate PermissionKey = "node_scheduling_policy.create"
+	NodeSchedulingPolicyRead   PermissionKey = "node_scheduling_policy.read"
+	NodeSchedulingPolicyUpdate PermissionKey = "node_scheduling_policy.update"
+	NodeSchedulingPolicyDelete PermissionKey = "node_scheduling_policy.delete"
+	NodeSchedulingIntentRead   PermissionKey = "node_scheduling_intent.read"
+	NodeSchedulingIntentDelete PermissionKey = "node_scheduling_intent.delete"
 )
 
 const (
