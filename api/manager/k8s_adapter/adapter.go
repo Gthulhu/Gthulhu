@@ -13,8 +13,8 @@ import (
 	"github.com/Gthulhu/api/pkg/logger"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
@@ -628,4 +628,3 @@ func getUnstructuredStr(obj map[string]interface{}, fields ...string) string {
 	}
 	return v
 }
-
