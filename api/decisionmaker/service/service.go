@@ -111,6 +111,9 @@ func (svc *Service) ListAllSchedulingIntents(ctx context.Context) ([]*domain.Sch
 
 		svc.podSchedCollector.UpdatePodTargets(cachedIntents, podInfos)
 		podSchedulingIntents = svc.resolveSchedulingIntents(ctx, cachedIntents, podInfos)
+	} else {
+		svc.podSchedCollector.UpdatePodTargets(nil, nil)
+		svc.schedulingIntentsMap.Clear()
 	}
 
 	nodeSchedulingIntents, err := svc.resolveNodeSchedulingIntents(ctx)
@@ -428,6 +431,17 @@ func (svc *Service) refreshIntentMerkleTreeIfNeeded() {
 
 // DeleteIntentByPodID deletes all scheduling intents for a specific pod ID
 func (svc *Service) DeleteIntentByPodID(ctx context.Context, podID string) error {
+	svc.intentCacheMu.Lock()
+	remaining := make([]*domain.Intent, 0, len(svc.intentCache))
+	for _, intent := range svc.intentCache {
+		if intent != nil && intent.PodID != podID {
+			remaining = append(remaining, intent)
+		}
+	}
+	svc.intentCache = remaining
+	svc.rebuildIntentMerkleTreeLocked()
+	svc.intentCacheMu.Unlock()
+
 	keysToDelete := []string{}
 	svc.schedulingIntentsMap.Range(func(key string, value []*domain.SchedulingIntents) bool {
 		if strings.HasPrefix(key, podID+"-") {
@@ -438,6 +452,7 @@ func (svc *Service) DeleteIntentByPodID(ctx context.Context, podID string) error
 	for _, key := range keysToDelete {
 		svc.schedulingIntentsMap.Delete(key)
 	}
+	svc.removePodMetricTarget(podID)
 	logger.Logger(ctx).Info().Msgf("Deleted %d scheduling intents for pod ID: %s", len(keysToDelete), podID)
 	return nil
 }
@@ -452,6 +467,11 @@ func (svc *Service) DeleteIntentByPID(ctx context.Context, podID string, pid int
 
 // DeleteAllIntents clears all scheduling intents
 func (svc *Service) DeleteAllIntents(ctx context.Context) error {
+	svc.intentCacheMu.Lock()
+	svc.intentCache = nil
+	svc.rebuildIntentMerkleTreeLocked()
+	svc.intentCacheMu.Unlock()
+
 	keysToDelete := []string{}
 	svc.schedulingIntentsMap.Range(func(key string, value []*domain.SchedulingIntents) bool {
 		keysToDelete = append(keysToDelete, key)
@@ -461,9 +481,36 @@ func (svc *Service) DeleteAllIntents(ctx context.Context) error {
 	for _, key := range keysToDelete {
 		svc.schedulingIntentsMap.Delete(key)
 	}
+	svc.podSchedCollector.UpdatePodTargets(nil, nil)
 
 	logger.Logger(ctx).Info().Msgf("Deleted all %d scheduling intents", len(keysToDelete))
 	return nil
+}
+
+func (svc *Service) rebuildIntentMerkleTreeLocked() {
+	sorted := sortIntentsByKey(normalizeIntentInputs(svc.intentCache))
+	leafHashes := make([]string, 0, len(sorted))
+	for _, intent := range sorted {
+		leafHashes = append(leafHashes, hashIntent(intent))
+	}
+	svc.intentMerkleRoot = util.BuildMerkleTree(leafHashes)
+	if svc.intentMerkleRoot == nil {
+		svc.intentMerkleRootHash = ""
+		return
+	}
+	svc.intentMerkleRootHash = svc.intentMerkleRoot.Hash
+}
+
+func (svc *Service) removePodMetricTarget(podID string) {
+	svc.podSchedCollector.mu.Lock()
+	defer svc.podSchedCollector.mu.Unlock()
+	targets := svc.podSchedCollector.intentPods[:0]
+	for _, target := range svc.podSchedCollector.intentPods {
+		if target.PodUID != podID {
+			targets = append(targets, target)
+		}
+	}
+	svc.podSchedCollector.intentPods = targets
 }
 
 func (svc *Service) ApplyRuntimeConfig(ctx context.Context, config domain.RuntimeSchedulerConfig) error {

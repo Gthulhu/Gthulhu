@@ -208,3 +208,49 @@ func TestTraverseIntentMerkleTreeConcurrentReadWrite(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+func TestDeleteIntentByPodIDClearsCachedIntentAndMetricTarget(t *testing.T) {
+	svc := &Service{
+		schedulingIntentsMap: util.NewGenericMap[string, []*domain.SchedulingIntents](),
+		podSchedCollector:    NewPodSchedMetricCollector("node-a"),
+		intentCache: []*domain.Intent{
+			{PodID: "pod-a"},
+			{PodID: "pod-b"},
+		},
+	}
+	svc.schedulingIntentsMap.Store("pod-a-101", []*domain.SchedulingIntents{{PID: 101}})
+	svc.schedulingIntentsMap.Store("pod-b-202", []*domain.SchedulingIntents{{PID: 202}})
+	svc.podSchedCollector.intentPods = []podTarget{
+		{PodUID: "pod-a", PIDs: []int{101}},
+		{PodUID: "pod-b", PIDs: []int{202}},
+	}
+
+	require.NoError(t, svc.DeleteIntentByPodID(context.Background(), "pod-a"))
+
+	require.Len(t, svc.intentCache, 1)
+	assert.Equal(t, "pod-b", svc.intentCache[0].PodID)
+	_, exists := svc.schedulingIntentsMap.Load("pod-a-101")
+	assert.False(t, exists)
+	_, exists = svc.schedulingIntentsMap.Load("pod-b-202")
+	assert.True(t, exists)
+	require.Len(t, svc.podSchedCollector.intentPods, 1)
+	assert.Equal(t, "pod-b", svc.podSchedCollector.intentPods[0].PodUID)
+}
+
+func TestDeleteAllIntentsClearsCachedIntentsAndMetricTargets(t *testing.T) {
+	svc := &Service{
+		schedulingIntentsMap: util.NewGenericMap[string, []*domain.SchedulingIntents](),
+		podSchedCollector:    NewPodSchedMetricCollector("node-a"),
+		intentCache:          []*domain.Intent{{PodID: "pod-a"}},
+	}
+	svc.schedulingIntentsMap.Store("pod-a-101", []*domain.SchedulingIntents{{PID: 101}})
+	svc.podSchedCollector.intentPods = []podTarget{{PodUID: "pod-a", PIDs: []int{101}}}
+
+	require.NoError(t, svc.DeleteAllIntents(context.Background()))
+
+	assert.Empty(t, svc.intentCache)
+	_, exists := svc.schedulingIntentsMap.Load("pod-a-101")
+	assert.False(t, exists)
+	assert.Empty(t, svc.podSchedCollector.intentPods)
+	assert.Equal(t, util.HashStringSHA256Hex(""), svc.intentMerkleRootHash)
+}

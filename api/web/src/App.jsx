@@ -7,6 +7,7 @@ import NodesPage from './pages/NodesPage';
 import NodeDetailPage from './pages/NodeDetailPage';
 import PodMetricsPage from './pages/PodMetricsPage';
 import StrategiesPage from './pages/StrategiesPage';
+import NodePoliciesPage from './pages/NodePoliciesPage';
 import UsersPage from './pages/UsersPage';
 import RolesPage from './pages/RolesPage';
 import SettingsPage from './pages/SettingsPage';
@@ -25,6 +26,7 @@ function App() {
             <Route path="/nodes/:nodeId" element={<NodeDetailPage />} />
             <Route path="/pod-metrics" element={<PodMetricsPage />} />
             <Route path="/strategies" element={<StrategiesPage />} />
+            <Route path="/node-policies" element={<NodePoliciesPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/roles" element={<RolesPage />} />
             <Route path="/settings" element={<SettingsPage />} />
