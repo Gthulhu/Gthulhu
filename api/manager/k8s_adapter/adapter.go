@@ -3,8 +3,6 @@ package k8sadapter
 import (
 	"context"
 	"fmt"
-	"path"
-	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -160,15 +158,6 @@ func (a *Adapter) QueryPods(ctx context.Context, opt *domain.QueryPodsOptions) (
 		namespaces = []string{metav1.NamespaceAll}
 	}
 
-	var cmdRegex *regexp.Regexp
-	if opt.CommandRegex != "" {
-		re, err := regexp.Compile(opt.CommandRegex)
-		if err != nil {
-			return nil, fmt.Errorf("compile command regex: %w", err)
-		}
-		cmdRegex = re
-	}
-
 	pods, err := a.listPods(ctx, namespaces, labelSelector)
 	if err != nil {
 		return nil, err
@@ -176,11 +165,6 @@ func (a *Adapter) QueryPods(ctx context.Context, opt *domain.QueryPodsOptions) (
 	results := make([]*domain.Pod, 0, len(pods))
 
 	for _, pod := range pods {
-		containers := buildContainers(pod, cmdRegex)
-		if cmdRegex != nil && len(containers) == 0 {
-			continue
-		}
-
 		podLabels := copyLabels(pod.Labels)
 		result := &domain.Pod{
 			Name:         pod.Name,
@@ -188,7 +172,7 @@ func (a *Adapter) QueryPods(ctx context.Context, opt *domain.QueryPodsOptions) (
 			Labels:       podLabels,
 			PodID:        string(pod.UID),
 			NodeID:       pod.Spec.NodeName,
-			Containers:   containers,
+			Containers:   buildContainers(pod),
 		}
 		results = append(results, result)
 	}
@@ -326,7 +310,7 @@ func buildLabelSelector(selectors []domain.LabelSelector) string {
 	return strings.Join(labels, ",")
 }
 
-func buildContainers(pod apiv1.Pod, cmdRegex *regexp.Regexp) []domain.Container {
+func buildContainers(pod apiv1.Pod) []domain.Container {
 	statusByName := make(map[string]string, len(pod.Status.ContainerStatuses))
 	for _, status := range pod.Status.ContainerStatuses {
 		statusByName[status.Name] = status.ContainerID
@@ -336,12 +320,6 @@ func buildContainers(pod apiv1.Pod, cmdRegex *regexp.Regexp) []domain.Container 
 	for _, container := range pod.Spec.Containers {
 		command := append([]string{}, container.Command...)
 		command = append(command, container.Args...)
-
-		if cmdRegex != nil {
-			if len(container.Command) == 0 || !cmdRegex.MatchString(path.Base(container.Command[0])) {
-				continue
-			}
-		}
 
 		result = append(result, domain.Container{
 			ContainerID: statusByName[container.Name],

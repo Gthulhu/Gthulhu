@@ -114,7 +114,6 @@ func (svc *Service) refreshStaleIntents(ctx context.Context) error {
 		queryOpt := &domain.QueryPodsOptions{
 			K8SNamespace:   strategy.K8sNamespace,
 			LabelSelectors: strategy.LabelSelectors,
-			CommandRegex:   strategy.CommandRegex,
 		}
 		currentPods, err := svc.K8SAdapter.QueryPods(ctx, queryOpt)
 		if err != nil {
