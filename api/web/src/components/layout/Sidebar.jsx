@@ -5,6 +5,7 @@ import {
   Server,
   BarChart3,
   Target,
+  Cpu,
   Users,
   Shield,
   LogOut,
@@ -18,6 +19,7 @@ const navSections = [
       { to: '/nodes', icon: Server, label: 'Nodes & Health' },
       { to: '/pod-metrics', icon: BarChart3, label: 'Pod Metrics' },
       { to: '/strategies', icon: Target, label: 'Strategies', badge: 'Advanced' },
+      { to: '/node-policies', icon: Cpu, label: 'Node Policies' },
     ],
   },
   {

@@ -3,6 +3,7 @@ package k8sadapter
 import (
 	"context"
 	"fmt"
+	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -336,8 +337,10 @@ func buildContainers(pod apiv1.Pod, cmdRegex *regexp.Regexp) []domain.Container 
 		command := append([]string{}, container.Command...)
 		command = append(command, container.Args...)
 
-		if cmdRegex != nil && !cmdRegex.MatchString(strings.Join(command, " ")) {
-			continue
+		if cmdRegex != nil {
+			if len(container.Command) == 0 || !cmdRegex.MatchString(path.Base(container.Command[0])) {
+				continue
+			}
 		}
 
 		result = append(result, domain.Container{
