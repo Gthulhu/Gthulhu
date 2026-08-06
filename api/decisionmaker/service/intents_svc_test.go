@@ -162,6 +162,46 @@ func TestHashIntentLabelOrderIndependent(t *testing.T) {
 	assert.Equal(t, util.HashStringSHA256Hex("podName=pod|podID=pod-id|nodeID=node-id|k8sNamespace=default|commandRegex=nginx|priority=1|executionTime=42|podLabels=a=1,b=2"), hashA)
 }
 
+func TestResolveSchedulingIntentsEnforcesCommandRegex(t *testing.T) {
+	svc := &Service{
+		schedulingIntentsMap: util.NewGenericMap[string, []*domain.SchedulingIntents](),
+	}
+	intents := []*domain.Intent{{
+		PodID:        "pod-id",
+		CommandRegex: `^python3$`,
+	}}
+	podInfos := map[string]*domain.PodInfo{
+		"pod-id": {
+			Processes: []domain.PodProcess{
+				{PID: 101, Command: "python3"},
+				{PID: 102, Command: "sh"},
+			},
+		},
+	}
+
+	got := svc.resolveSchedulingIntents(context.Background(), intents, podInfos)
+
+	require.Len(t, got, 1)
+	assert.Equal(t, 101, got[0].PID)
+}
+
+func TestResolveSchedulingIntentsRejectsInvalidCommandRegex(t *testing.T) {
+	svc := &Service{
+		schedulingIntentsMap: util.NewGenericMap[string, []*domain.SchedulingIntents](),
+	}
+	intents := []*domain.Intent{{
+		PodID:        "pod-id",
+		CommandRegex: "(",
+	}}
+	podInfos := map[string]*domain.PodInfo{
+		"pod-id": {
+			Processes: []domain.PodProcess{{PID: 101, Command: "python3"}},
+		},
+	}
+
+	assert.Empty(t, svc.resolveSchedulingIntents(context.Background(), intents, podInfos))
+}
+
 func TestTraverseIntentMerkleTreeConcurrentReadWrite(t *testing.T) {
 	svc := &Service{
 		intentMerkleRoot: util.BuildMerkleTree([]string{util.HashStringSHA256Hex("initial")}),

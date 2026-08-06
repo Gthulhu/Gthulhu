@@ -1,13 +1,12 @@
 package k8sadapter
 
 import (
-	"regexp"
 	"testing"
 
 	apiv1 "k8s.io/api/core/v1"
 )
 
-func TestBuildContainersMatchesExecutableCommName(t *testing.T) {
+func TestBuildContainersPreservesCommandAndArgs(t *testing.T) {
 	pod := apiv1.Pod{
 		Spec: apiv1.PodSpec{
 			Containers: []apiv1.Container{{
@@ -18,15 +17,16 @@ func TestBuildContainersMatchesExecutableCommName(t *testing.T) {
 		},
 	}
 
-	if got := buildContainers(pod, regexp.MustCompile(`^python3$`)); len(got) != 1 {
-		t.Fatalf("expected executable name to match, got %d containers", len(got))
+	got := buildContainers(pod)
+	if len(got) != 1 {
+		t.Fatalf("expected one container, got %d", len(got))
 	}
-	if got := buildContainers(pod, regexp.MustCompile(`main\.py`)); len(got) != 0 {
-		t.Fatalf("expected arguments not to participate in commandRegex matching, got %d containers", len(got))
+	if len(got[0].Command) != 3 {
+		t.Fatalf("expected command and arguments to be preserved, got %v", got[0].Command)
 	}
 }
 
-func TestBuildContainersCannotValidateImageDefaultCommand(t *testing.T) {
+func TestBuildContainersPreservesImageEntrypointOnlyContainer(t *testing.T) {
 	pod := apiv1.Pod{
 		Spec: apiv1.PodSpec{
 			Containers: []apiv1.Container{{
@@ -36,7 +36,7 @@ func TestBuildContainersCannotValidateImageDefaultCommand(t *testing.T) {
 		},
 	}
 
-	if got := buildContainers(pod, regexp.MustCompile(`.*`)); len(got) != 0 {
-		t.Fatalf("expected container without an explicit command not to match, got %d containers", len(got))
+	if got := buildContainers(pod); len(got) != 1 {
+		t.Fatalf("expected ENTRYPOINT-only container to be preserved, got %d containers", len(got))
 	}
 }

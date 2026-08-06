@@ -166,6 +166,11 @@ func (svc *Service) resolveSchedulingIntents(ctx context.Context, intents []*dom
 	for _, intent := range intents {
 		podInfo := podInfos[intent.PodID]
 		logger.Logger(ctx).Info().Msgf("Processing intent for PodName:%s PodID: %s on NodeID: %s, Process:%+v", intent.PodName, intent.PodID, intent.NodeID, podInfo)
+		commandRegex, err := regexp.Compile(intent.CommandRegex)
+		if err != nil {
+			logger.Logger(ctx).Warn().Err(err).Msgf("invalid commandRegex %q for pod %s", intent.CommandRegex, intent.PodID)
+			continue
+		}
 		labels := []domain.LabelSelector{}
 		for key, value := range intent.PodLabels {
 			labels = append(labels, domain.LabelSelector{
@@ -178,7 +183,7 @@ func (svc *Service) resolveSchedulingIntents(ctx context.Context, intents []*dom
 				if process.Command == pauseCommand {
 					continue
 				}
-				if !regexp.MustCompile(intent.CommandRegex).MatchString(process.Command) {
+				if !commandRegex.MatchString(process.Command) {
 					continue
 				}
 				schedulingIntent := &domain.SchedulingIntents{

@@ -21,7 +21,6 @@ func (svc *Service) CreateScheduleStrategy(ctx context.Context, operator *domain
 	queryOpt := &domain.QueryPodsOptions{
 		K8SNamespace:   strategy.K8sNamespace,
 		LabelSelectors: strategy.LabelSelectors,
-		CommandRegex:   strategy.CommandRegex,
 	}
 	pods, err := svc.K8SAdapter.QueryPods(ctx, queryOpt)
 	if err != nil {
@@ -135,7 +134,6 @@ func (svc *Service) UpdateScheduleStrategy(ctx context.Context, operator *domain
 	queryPodsOpt := &domain.QueryPodsOptions{
 		K8SNamespace:   strategy.K8sNamespace,
 		LabelSelectors: strategy.LabelSelectors,
-		CommandRegex:   strategy.CommandRegex,
 	}
 	pods, err := svc.K8SAdapter.QueryPods(ctx, queryPodsOpt)
 	if err != nil {

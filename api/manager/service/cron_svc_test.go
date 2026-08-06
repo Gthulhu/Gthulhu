@@ -513,7 +513,6 @@ func TestReconcileIntentsRefreshStaleIntents(t *testing.T) {
 		QueryPods(mock.Anything, mock.Anything).
 		Run(func(_ context.Context, opt *domain.QueryPodsOptions) {
 			assert.Equal(t, []string{"default"}, opt.K8SNamespace)
-			assert.Equal(t, "nginx", opt.CommandRegex)
 		}).
 		Return([]*domain.Pod{newPod}, nil).Once()
 	mockRepo.EXPECT().

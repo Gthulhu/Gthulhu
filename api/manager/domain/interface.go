@@ -149,7 +149,6 @@ type Service interface {
 type QueryPodsOptions struct {
 	K8SNamespace   []string
 	LabelSelectors []LabelSelector
-	CommandRegex   string
 }
 
 type QueryDecisionMakerPodsOptions struct {
