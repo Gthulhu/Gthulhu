@@ -95,9 +95,8 @@ export default function NodePoliciesPage() {
           }))
         : [{ deviceClass: '', attributes: [emptyPair()] }],
       commandRegex: policy.commandRegex || '',
-      priority: policy.priority ?? 0,
-      executionTime: policy.executionTime ?? 0,
-    });
+      priority: policy.priority ?? 10,
+      executionTime: policy.executionTime ?? 20000000,
     setEditing(true);
     setPanelOpen(true);
   };
