@@ -97,6 +97,7 @@ export default function NodePoliciesPage() {
       commandRegex: policy.commandRegex || '',
       priority: policy.priority ?? 10,
       executionTime: policy.executionTime ?? 20000000,
+    });
     setEditing(true);
     setPanelOpen(true);
   };
