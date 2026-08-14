@@ -46,7 +46,7 @@ func NewService(params Params) (*Service, error) {
 		daemonHTTPClient: &http.Client{
 			Timeout: time.Duration(max(params.DaemonConfig.TimeoutSec, 5)) * time.Second,
 		},
-		processSource: NewProcScanSource(procDir),
+		taskSource: NewProcTaskSource(procDir),
 	}
 	if svc.daemonEndpoint == "" {
 		svc.daemonEndpoint = "http://127.0.0.1:18080"
@@ -80,7 +80,7 @@ type Service struct {
 
 	// Node-level scheduling policies (target arbitrary processes on this
 	// node, not just Pod container processes). See node_policy_svc.go.
-	processSource            ProcessSource
+	taskSource               TaskSource
 	nodePolicyCacheMu        sync.RWMutex
 	nodePolicyCache          []*domain.NodePolicy
 	nodePolicyMerkleRoot     *util.MerkleNode

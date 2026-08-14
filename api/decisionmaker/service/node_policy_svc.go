@@ -41,12 +41,11 @@ func (svc *Service) ProcessNodePolicies(ctx context.Context, policies []*domain.
 	return nil
 }
 
-// resolveNodeSchedulingIntents takes a snapshot of every running process on
-// the node (via svc.processSource, normally /proc, or the eBPF process
-// monitor when available) and matches each process' comm name against every
-// active node policy's CommandRegex. Matches are converted into the same
-// domain.SchedulingIntents struct already consumed by the scheduler daemon,
-// so no changes are required downstream of GET /api/v1/scheduling/strategies.
+// resolveNodeSchedulingIntents snapshots every thread on the node (via
+// svc.taskSource, normally /proc) and matches each thread's comm name against
+// every active node policy's CommandRegex. Matches become domain.SchedulingIntents
+// keyed by TID - the entity the scheduler actually runs - so nothing downstream
+// of GET /api/v1/scheduling/strategies changes.
 func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain.SchedulingIntents, error) {
 	svc.nodePolicyCacheMu.RLock()
 	policies := svc.nodePolicyCache
@@ -55,13 +54,13 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 	if len(policies) == 0 {
 		return nil, nil
 	}
-	if svc.processSource == nil {
+	if svc.taskSource == nil {
 		return nil, nil
 	}
 
-	processes, err := svc.processSource.Snapshot(ctx)
+	tasks, err := svc.taskSource.Snapshot(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("snapshot processes: %w", err)
+		return nil, fmt.Errorf("snapshot tasks: %w", err)
 	}
 
 	var results []*domain.SchedulingIntents
@@ -74,17 +73,17 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 			logger.Logger(ctx).Warn().Err(err).Msgf("invalid commandRegex %q in node policy %s", policy.CommandRegex, policy.PolicyID)
 			continue
 		}
-		for pid, comm := range processes {
-			if comm == pauseCommand {
+		for _, task := range tasks {
+			if task.Comm == pauseCommand {
 				continue
 			}
-			if !re.MatchString(comm) {
+			if !re.MatchString(task.Comm) {
 				continue
 			}
 			results = append(results, &domain.SchedulingIntents{
 				Priority:      policy.Priority,
 				ExecutionTime: uint64(policy.ExecutionTime),
-				PID:           pid,
+				PID:           task.TID,
 				CommandRegex:  policy.CommandRegex,
 			})
 		}

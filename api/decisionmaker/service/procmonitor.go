@@ -3,64 +3,86 @@ package service
 import (
 	"context"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/Gthulhu/api/decisionmaker/domain"
 )
 
-// ProcessSource enumerates currently running processes on the node, keyed by
-// PID with their executable/comm name (as read from /proc/<pid>/comm).
-//
-// The default implementation (procScanSource) polls /proc directly, which
-// works everywhere without special privileges beyond what the Decision Maker
-// already requires. On kernels where the sched_ext scheduler eBPF stack is
-// available, the same information can instead be produced by
-// bpf/proc_monitor.bpf.c, which hooks tp_btf/sched_process_exec and
-// tp_btf/sched_process_exit to notify user-space of process start/exit in
-// real time (see docs/node-scheduling-policy.md). Since regex matching
-// cannot run inside the BPF program, both implementations feed the same
-// PID -> comm snapshot into resolveNodeSchedulingIntents, which performs the
-// CommandRegex matching in user-space.
-type ProcessSource interface {
-	// Snapshot returns the set of processes currently running on the node.
-	Snapshot(ctx context.Context) (map[int]string, error)
+// TaskSource enumerates the node's kernel scheduling entities. The Linux
+// scheduler runs threads, not processes, so a node policy must see every
+// thread (TID), not just the thread-group leader that /proc lists at top level.
+type TaskSource interface {
+	Snapshot(ctx context.Context) ([]domain.TaskInfo, error)
 }
 
-// procScanSource implements ProcessSource by scanning /proc.
-type procScanSource struct {
+// procTaskSource implements TaskSource by walking /proc/<tgid>/task/<tid>.
+type procTaskSource struct {
 	rootDir string
 }
 
-// NewProcScanSource creates a ProcessSource backed by /proc scanning. Passing
-// an empty rootDir defaults to "/proc".
-func NewProcScanSource(rootDir string) ProcessSource {
+// NewProcTaskSource creates a TaskSource backed by /proc scanning. An empty
+// rootDir defaults to "/proc".
+func NewProcTaskSource(rootDir string) TaskSource {
 	if rootDir == "" {
 		rootDir = "/proc"
 	}
-	return &procScanSource{rootDir: rootDir}
+	return &procTaskSource{rootDir: rootDir}
 }
 
-func (p *procScanSource) Snapshot(_ context.Context) (map[int]string, error) {
-	entries, err := os.ReadDir(p.rootDir)
+// Snapshot walks every thread of every process. The top level of /proc lists
+// only thread-group leaders (TGIDs); the threads live under
+// /proc/<tgid>/task/<tid>, so a single-level scan misses every non-leader
+// thread. A task can vanish or be unreadable mid-scan, so per-entry read
+// errors just skip that entry - only an unreadable /proc root is fatal. Paths
+// are built from parsed integers, not raw directory names. Tasks are sorted by
+// TID for deterministic output.
+func (p *procTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error) {
+	tgidEntries, err := os.ReadDir(p.rootDir)
 	if err != nil {
 		return nil, err
 	}
 
-	procs := make(map[int]string)
-	for _, entry := range entries {
-		if !entry.IsDir() {
+	var tasks []domain.TaskInfo
+	for _, tgidEntry := range tgidEntries {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if !tgidEntry.IsDir() {
 			continue
 		}
-		pid, err := strconv.Atoi(entry.Name())
+		tgid, err := strconv.Atoi(tgidEntry.Name())
 		if err != nil {
-			continue
+			continue // non-numeric entries such as "acpi" or "bus"
 		}
-		commPath := p.rootDir + "/" + entry.Name() + "/comm"
-		data, err := os.ReadFile(commPath)
+
+		taskDir := p.rootDir + "/" + strconv.Itoa(tgid) + "/task"
+		tidEntries, err := os.ReadDir(taskDir)
 		if err != nil {
-			// Process may have exited between ReadDir and ReadFile.
-			continue
+			continue // the process exited, or its task dir is unreadable
 		}
-		procs[pid] = strings.TrimSpace(string(data))
+
+		for _, tidEntry := range tidEntries {
+			tid, err := strconv.Atoi(tidEntry.Name())
+			if err != nil {
+				continue
+			}
+			commPath := p.rootDir + "/" + strconv.Itoa(tgid) + "/task/" + strconv.Itoa(tid) + "/comm"
+			data, err := os.ReadFile(commPath)
+			if err != nil {
+				continue // the thread exited, or its comm is unreadable
+			}
+			tasks = append(tasks, domain.TaskInfo{
+				TGID: tgid,
+				TID:  tid,
+				Comm: strings.TrimSpace(string(data)),
+			})
+		}
 	}
-	return procs, nil
+
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].TID < tasks[j].TID
+	})
+	return tasks, nil
 }
