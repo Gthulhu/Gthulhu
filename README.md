@@ -245,7 +245,7 @@ See [Contributing guide](https://gthulhu.org/contributing/).
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Gthulhu/Gthulhu&type=Date)](https://www.star-history.com/#Gthulhu/Gthulhu&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=Gthulhu/Gthulhu&type=Date)](https://star-history.dera.page/#Gthulhu/Gthulhu&Date)
 
 ## Special Thanks
 
