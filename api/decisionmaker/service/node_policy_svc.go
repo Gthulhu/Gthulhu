@@ -44,8 +44,10 @@ func (svc *Service) ProcessNodePolicies(ctx context.Context, policies []*domain.
 // resolveNodeSchedulingIntents snapshots every thread on the node (via
 // svc.taskSource, normally /proc) and matches each thread's comm name against
 // every active node policy's CommandRegex. Matches become domain.SchedulingIntents
-// keyed by TID - the entity the scheduler actually runs - so nothing downstream
-// of GET /api/v1/scheduling/strategies changes.
+// keyed by TID - the entity the scheduler actually runs. Policies are evaluated
+// in the same canonical order used for the merkle root, and at most one intent
+// is emitted per TID, so two decision makers holding the same policy set (hence
+// the same root) resolve to the same result regardless of push order.
 func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain.SchedulingIntents, error) {
 	svc.nodePolicyCacheMu.RLock()
 	policies := svc.nodePolicyCache
@@ -63,9 +65,9 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 		return nil, fmt.Errorf("snapshot tasks: %w", err)
 	}
 
-	var results []*domain.SchedulingIntents
-	for _, policy := range policies {
-		if policy == nil || policy.CommandRegex == "" {
+	byTID := make(map[int]*domain.SchedulingIntents)
+	for _, policy := range sortNodePoliciesByKey(normalizeNodePolicyInputs(policies)) {
+		if policy.CommandRegex == "" {
 			continue
 		}
 		re, err := regexp.Compile(policy.CommandRegex)
@@ -80,13 +82,29 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 			if !re.MatchString(task.Comm) {
 				continue
 			}
-			results = append(results, &domain.SchedulingIntents{
+			if _, ok := byTID[task.TID]; ok {
+				logger.Logger(ctx).Warn().Msgf("overlapping node policies match tid %d (comm %q); policy %s wins (last in canonical order)", task.TID, task.Comm, policy.PolicyID)
+			}
+			byTID[task.TID] = &domain.SchedulingIntents{
 				Priority:      policy.Priority,
 				ExecutionTime: uint64(policy.ExecutionTime),
 				PID:           task.TID,
 				CommandRegex:  policy.CommandRegex,
-			})
+			}
 		}
+	}
+
+	if len(byTID) == 0 {
+		return nil, nil
+	}
+	tids := make([]int, 0, len(byTID))
+	for tid := range byTID {
+		tids = append(tids, tid)
+	}
+	sort.Ints(tids)
+	results := make([]*domain.SchedulingIntents, 0, len(byTID))
+	for _, tid := range tids {
+		results = append(results, byTID[tid])
 	}
 	return results, nil
 }

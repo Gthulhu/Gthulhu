@@ -90,6 +90,32 @@ func TestResolveNodeSchedulingIntentsMatchesCommRegex(t *testing.T) {
 	assert.False(t, pids[300], "pause command must always be excluded")
 }
 
+// TestResolveNodeSchedulingIntentsDeterministicOverlap verifies that two
+// policies matching the same TID resolve to one intent per TID, and to the same
+// winner regardless of the order the policies were pushed, so two decision
+// makers with the same policy set do not diverge.
+func TestResolveNodeSchedulingIntentsDeterministicOverlap(t *testing.T) {
+	tasks := []domain.TaskInfo{{TGID: 100, TID: 100, Comm: "engine"}}
+	pA := &domain.NodePolicy{PolicyID: "a", NodeID: "n", CommandRegex: "^engine$", Priority: 1, ExecutionTime: 100}
+	pB := &domain.NodePolicy{PolicyID: "b", NodeID: "n", CommandRegex: "engine.*", Priority: 2, ExecutionTime: 200}
+
+	resolve := func(order ...*domain.NodePolicy) []*domain.SchedulingIntents {
+		svc := &Service{taskSource: &fakeTaskSource{tasks: tasks}}
+		require.NoError(t, svc.ProcessNodePolicies(context.Background(), order))
+		got, err := svc.resolveNodeSchedulingIntents(context.Background())
+		require.NoError(t, err)
+		return got
+	}
+	ab := resolve(pA, pB)
+	ba := resolve(pB, pA)
+
+	require.Len(t, ab, 1, "one intent per TID")
+	require.Len(t, ba, 1)
+	assert.Equal(t, 100, ab[0].PID)
+	assert.Equal(t, ab[0].CommandRegex, ba[0].CommandRegex, "overlap winner must not depend on push order")
+	assert.Equal(t, ab[0].Priority, ba[0].Priority)
+}
+
 func TestResolveNodeSchedulingIntentsInvalidRegexSkipped(t *testing.T) {
 	svc := &Service{
 		taskSource: &fakeTaskSource{tasks: []domain.TaskInfo{{TGID: 100, TID: 100, Comm: "sshd"}}},
