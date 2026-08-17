@@ -64,6 +64,12 @@ func (p *procTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error
 		}
 
 		for _, tidEntry := range tidEntries {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			if !tidEntry.IsDir() {
+				continue
+			}
 			tid, err := strconv.Atoi(tidEntry.Name())
 			if err != nil {
 				continue
