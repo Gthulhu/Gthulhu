@@ -13,12 +13,11 @@ type NodePolicy struct {
 	ExecutionTime int64  `json:"executionTime,omitempty"`
 }
 
-// ProcessInfo describes a running process discovered on the node, keyed by
-// PID with its executable/comm name. It is populated either by polling
-// /proc (default, portable implementation) or by the eBPF process monitor
-// (bpf/proc_monitor.bpf.c) which observes sched_process_exec/exit
-// tracepoints in real time.
-type ProcessInfo struct {
-	PID  int
+// TaskInfo identifies one kernel scheduling entity - a thread, not a process.
+// The Linux scheduler acts on threads (TID); TGID ties a thread back to its
+// group, and Comm is the thread's own /proc/<tgid>/task/<tid>/comm.
+type TaskInfo struct {
+	TGID int
+	TID  int
 	Comm string
 }

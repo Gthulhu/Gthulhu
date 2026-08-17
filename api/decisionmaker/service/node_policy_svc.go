@@ -41,12 +41,13 @@ func (svc *Service) ProcessNodePolicies(ctx context.Context, policies []*domain.
 	return nil
 }
 
-// resolveNodeSchedulingIntents takes a snapshot of every running process on
-// the node (via svc.processSource, normally /proc, or the eBPF process
-// monitor when available) and matches each process' comm name against every
-// active node policy's CommandRegex. Matches are converted into the same
-// domain.SchedulingIntents struct already consumed by the scheduler daemon,
-// so no changes are required downstream of GET /api/v1/scheduling/strategies.
+// resolveNodeSchedulingIntents snapshots every thread on the node (via
+// svc.taskSource, normally /proc) and matches each thread's comm name against
+// every active node policy's CommandRegex. Matches become domain.SchedulingIntents
+// keyed by TID - the entity the scheduler actually runs. Policies are evaluated
+// in the same canonical order used for the merkle root, and at most one intent
+// is emitted per TID, so two decision makers holding the same policy set (hence
+// the same root) resolve to the same result regardless of push order.
 func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain.SchedulingIntents, error) {
 	svc.nodePolicyCacheMu.RLock()
 	policies := svc.nodePolicyCache
@@ -55,18 +56,18 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 	if len(policies) == 0 {
 		return nil, nil
 	}
-	if svc.processSource == nil {
+	if svc.taskSource == nil {
 		return nil, nil
 	}
 
-	processes, err := svc.processSource.Snapshot(ctx)
+	tasks, err := svc.taskSource.Snapshot(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("snapshot processes: %w", err)
+		return nil, fmt.Errorf("snapshot tasks: %w", err)
 	}
 
-	var results []*domain.SchedulingIntents
-	for _, policy := range policies {
-		if policy == nil || policy.CommandRegex == "" {
+	byTID := make(map[int]*domain.SchedulingIntents)
+	for _, policy := range sortNodePoliciesByKey(normalizeNodePolicyInputs(policies)) {
+		if policy.CommandRegex == "" {
 			continue
 		}
 		re, err := regexp.Compile(policy.CommandRegex)
@@ -74,20 +75,36 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 			logger.Logger(ctx).Warn().Err(err).Msgf("invalid commandRegex %q in node policy %s", policy.CommandRegex, policy.PolicyID)
 			continue
 		}
-		for pid, comm := range processes {
-			if comm == pauseCommand {
+		for _, task := range tasks {
+			if task.Comm == pauseCommand {
 				continue
 			}
-			if !re.MatchString(comm) {
+			if !re.MatchString(task.Comm) {
 				continue
 			}
-			results = append(results, &domain.SchedulingIntents{
+			if _, ok := byTID[task.TID]; ok {
+				logger.Logger(ctx).Warn().Msgf("overlapping node policies match tid %d (comm %q); policy %s wins (last in canonical order)", task.TID, task.Comm, policy.PolicyID)
+			}
+			byTID[task.TID] = &domain.SchedulingIntents{
 				Priority:      policy.Priority,
 				ExecutionTime: uint64(policy.ExecutionTime),
-				PID:           pid,
+				PID:           task.TID,
 				CommandRegex:  policy.CommandRegex,
-			})
+			}
 		}
+	}
+
+	if len(byTID) == 0 {
+		return nil, nil
+	}
+	tids := make([]int, 0, len(byTID))
+	for tid := range byTID {
+		tids = append(tids, tid)
+	}
+	sort.Ints(tids)
+	results := make([]*domain.SchedulingIntents, 0, len(byTID))
+	for _, tid := range tids {
+		results = append(results, byTID[tid])
 	}
 	return results, nil
 }
