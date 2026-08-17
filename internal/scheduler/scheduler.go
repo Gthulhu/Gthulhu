@@ -243,6 +243,16 @@ func Run(args []string) error {
 			changed, removed := p.GetChangedStrategies()
 			if len(changed) > 0 || len(removed) > 0 {
 				for _, strategy := range changed {
+					if strategy.Priority <= 0 {
+						// qumun treats priority 0 as the highest, preemptive level
+						// and has no slice-only state, so a non-boosting rule must
+						// not be inserted (that would promote the task, the opposite
+						// of user-space). Drop any stale entry instead.
+						if rmErr := bpfModule.RemovePriorityTask(uint32(strategy.PID)); rmErr != nil {
+							slog.Warn("RemovePriorityTask (non-positive priority) failed", "error", rmErr, "pid", strategy.PID)
+						}
+						continue
+					}
 					err = bpfModule.UpdatePriorityTaskWithPrio(uint32(strategy.PID), strategy.ExecutionTime, uint32(strategy.Priority))
 					if err != nil {
 						slog.Warn("UpdatePriorityTaskWithPrio failed", "error", err, "pid", strategy.PID)
