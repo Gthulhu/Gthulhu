@@ -118,8 +118,10 @@ func (svc *Service) ListAllSchedulingIntents(ctx context.Context) ([]*domain.Sch
 
 	nodeSchedulingIntents, err := svc.resolveNodeSchedulingIntents(ctx)
 	if err != nil {
-		logger.Logger(ctx).Warn().Err(err).Msg("failed to resolve node scheduling intents")
-		nodeSchedulingIntents = nil
+		// An incomplete node scan must not be published as the full desired
+		// state, or the scheduler would drop strategies for the tasks that
+		// could not be read. Fail the cycle so the consumer keeps its last set.
+		return nil, fmt.Errorf("resolve node scheduling intents: %w", err)
 	}
 
 	if len(nodeSchedulingIntents) == 0 {

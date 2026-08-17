@@ -2,9 +2,12 @@ package service
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,4 +116,16 @@ func TestProcTaskSourceContextCancelled(t *testing.T) {
 	cancel()
 	_, err := NewProcTaskSource(root).Snapshot(ctx)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestIsTransientProcError(t *testing.T) {
+	// A task vanishing mid-scan is transient and skipped.
+	assert.True(t, isTransientProcError(fs.ErrNotExist))
+	assert.True(t, isTransientProcError(&os.PathError{Err: syscall.ENOENT}))
+	assert.True(t, isTransientProcError(&os.PathError{Err: syscall.ESRCH}))
+	// Permission and I/O errors are NOT transient: an incomplete scan must
+	// surface so it is not mistaken for the full desired state.
+	assert.False(t, isTransientProcError(&os.PathError{Err: syscall.EACCES}))
+	assert.False(t, isTransientProcError(&os.PathError{Err: syscall.EIO}))
+	assert.False(t, isTransientProcError(errors.New("boom")))
 }
