@@ -30,7 +30,7 @@ type Intent struct {
 type SchedulingIntents struct {
 	Priority      int             `json:"priority"`                // Priority value; higher value means higher priority
 	ExecutionTime uint64          `json:"execution_time"`          // Time slice for this process in nanoseconds
-	PID           int             `json:"pid,omitempty"`           // Process ID to apply this strategy to
+	PID           int             `json:"pid,omitempty"`           // Linux task ID (TID); named PID for wire compatibility
 	Selectors     []LabelSelector `json:"selectors,omitempty"`     // Label selectors to match pods
 	CommandRegex  string          `json:"command_regex,omitempty"` // Regex to match process command
 }

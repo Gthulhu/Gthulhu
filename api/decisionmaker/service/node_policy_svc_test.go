@@ -10,18 +10,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// fakeProcessSource is a test double for ProcessSource returning a fixed
-// pid->comm snapshot (or an error).
-type fakeProcessSource struct {
-	snapshot map[int]string
-	err      error
+// fakeTaskSource is a test double for TaskSource returning a fixed task list
+// (or an error).
+type fakeTaskSource struct {
+	tasks []domain.TaskInfo
+	err   error
 }
 
-func (f *fakeProcessSource) Snapshot(ctx context.Context) (map[int]string, error) {
+func (f *fakeTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
-	return f.snapshot, nil
+	return f.tasks, nil
 }
 
 func TestProcessNodePoliciesBuildsMerkleRoot(t *testing.T) {
@@ -41,13 +41,13 @@ func TestProcessNodePoliciesBuildsMerkleRoot(t *testing.T) {
 }
 
 func TestResolveNodeSchedulingIntentsNoPolicies(t *testing.T) {
-	svc := &Service{processSource: &fakeProcessSource{snapshot: map[int]string{1: "init"}}}
+	svc := &Service{taskSource: &fakeTaskSource{tasks: []domain.TaskInfo{{TGID: 1, TID: 1, Comm: "init"}}}}
 	intents, err := svc.resolveNodeSchedulingIntents(context.Background())
 	require.NoError(t, err)
 	assert.Nil(t, intents)
 }
 
-func TestResolveNodeSchedulingIntentsNoProcessSource(t *testing.T) {
+func TestResolveNodeSchedulingIntentsNoTaskSource(t *testing.T) {
 	svc := &Service{}
 	require.NoError(t, svc.ProcessNodePolicies(context.Background(), []*domain.NodePolicy{
 		{PolicyID: "p1", NodeID: "node-a", CommandRegex: ".*", Priority: 1, ExecutionTime: 1000},
@@ -59,11 +59,14 @@ func TestResolveNodeSchedulingIntentsNoProcessSource(t *testing.T) {
 
 func TestResolveNodeSchedulingIntentsMatchesCommRegex(t *testing.T) {
 	svc := &Service{
-		processSource: &fakeProcessSource{snapshot: map[int]string{
-			100: "kthreadd",
-			200: "sshd",
-			300: "pause",
-			400: "kworker/0:1",
+		taskSource: &fakeTaskSource{tasks: []domain.TaskInfo{
+			{TGID: 100, TID: 100, Comm: "kthreadd"},
+			{TGID: 200, TID: 200, Comm: "sshd"},
+			{TGID: 300, TID: 300, Comm: "pause"},
+			{TGID: 400, TID: 400, Comm: "kworker/0:1"},
+			// A non-leader thread (TID != TGID) whose comm matches: the case
+			// the old top-level-only scan could never reach.
+			{TGID: 500, TID: 501, Comm: "kthreadd"},
 		}},
 	}
 	require.NoError(t, svc.ProcessNodePolicies(context.Background(), []*domain.NodePolicy{
@@ -72,7 +75,7 @@ func TestResolveNodeSchedulingIntentsMatchesCommRegex(t *testing.T) {
 
 	intents, err := svc.resolveNodeSchedulingIntents(context.Background())
 	require.NoError(t, err)
-	require.Len(t, intents, 2)
+	require.Len(t, intents, 3)
 
 	pids := map[int]bool{}
 	for _, intent := range intents {
@@ -82,13 +85,40 @@ func TestResolveNodeSchedulingIntentsMatchesCommRegex(t *testing.T) {
 	}
 	assert.True(t, pids[100])
 	assert.True(t, pids[400])
+	assert.True(t, pids[501], "non-leader thread must be matched by its TID")
 	assert.False(t, pids[200])
 	assert.False(t, pids[300], "pause command must always be excluded")
 }
 
+// TestResolveNodeSchedulingIntentsDeterministicOverlap verifies that two
+// policies matching the same TID resolve to one intent per TID, and to the same
+// winner regardless of the order the policies were pushed, so two decision
+// makers with the same policy set do not diverge.
+func TestResolveNodeSchedulingIntentsDeterministicOverlap(t *testing.T) {
+	tasks := []domain.TaskInfo{{TGID: 100, TID: 100, Comm: "engine"}}
+	pA := &domain.NodePolicy{PolicyID: "a", NodeID: "n", CommandRegex: "^engine$", Priority: 1, ExecutionTime: 100}
+	pB := &domain.NodePolicy{PolicyID: "b", NodeID: "n", CommandRegex: "engine.*", Priority: 2, ExecutionTime: 200}
+
+	resolve := func(order ...*domain.NodePolicy) []*domain.SchedulingIntents {
+		svc := &Service{taskSource: &fakeTaskSource{tasks: tasks}}
+		require.NoError(t, svc.ProcessNodePolicies(context.Background(), order))
+		got, err := svc.resolveNodeSchedulingIntents(context.Background())
+		require.NoError(t, err)
+		return got
+	}
+	ab := resolve(pA, pB)
+	ba := resolve(pB, pA)
+
+	require.Len(t, ab, 1, "one intent per TID")
+	require.Len(t, ba, 1)
+	assert.Equal(t, 100, ab[0].PID)
+	assert.Equal(t, ab[0].CommandRegex, ba[0].CommandRegex, "overlap winner must not depend on push order")
+	assert.Equal(t, ab[0].Priority, ba[0].Priority)
+}
+
 func TestResolveNodeSchedulingIntentsInvalidRegexSkipped(t *testing.T) {
 	svc := &Service{
-		processSource: &fakeProcessSource{snapshot: map[int]string{100: "sshd"}},
+		taskSource: &fakeTaskSource{tasks: []domain.TaskInfo{{TGID: 100, TID: 100, Comm: "sshd"}}},
 	}
 	require.NoError(t, svc.ProcessNodePolicies(context.Background(), []*domain.NodePolicy{
 		{PolicyID: "p1", NodeID: "node-a", CommandRegex: "(", Priority: 1, ExecutionTime: 1000},
@@ -100,7 +130,7 @@ func TestResolveNodeSchedulingIntentsInvalidRegexSkipped(t *testing.T) {
 
 func TestResolveNodeSchedulingIntentsSnapshotError(t *testing.T) {
 	svc := &Service{
-		processSource: &fakeProcessSource{err: errors.New("boom")},
+		taskSource: &fakeTaskSource{err: errors.New("boom")},
 	}
 	require.NoError(t, svc.ProcessNodePolicies(context.Background(), []*domain.NodePolicy{
 		{PolicyID: "p1", NodeID: "node-a", CommandRegex: ".*", Priority: 1, ExecutionTime: 1000},

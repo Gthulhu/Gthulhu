@@ -46,7 +46,7 @@ func NewService(params Params) (*Service, error) {
 		daemonHTTPClient: &http.Client{
 			Timeout: time.Duration(max(params.DaemonConfig.TimeoutSec, 5)) * time.Second,
 		},
-		processSource: NewProcScanSource(procDir),
+		taskSource: NewProcTaskSource(procDir),
 	}
 	if svc.daemonEndpoint == "" {
 		svc.daemonEndpoint = "http://127.0.0.1:18080"
@@ -80,7 +80,7 @@ type Service struct {
 
 	// Node-level scheduling policies (target arbitrary processes on this
 	// node, not just Pod container processes). See node_policy_svc.go.
-	processSource            ProcessSource
+	taskSource               TaskSource
 	nodePolicyCacheMu        sync.RWMutex
 	nodePolicyCache          []*domain.NodePolicy
 	nodePolicyMerkleRoot     *util.MerkleNode
@@ -118,8 +118,10 @@ func (svc *Service) ListAllSchedulingIntents(ctx context.Context) ([]*domain.Sch
 
 	nodeSchedulingIntents, err := svc.resolveNodeSchedulingIntents(ctx)
 	if err != nil {
-		logger.Logger(ctx).Warn().Err(err).Msg("failed to resolve node scheduling intents")
-		nodeSchedulingIntents = nil
+		// An incomplete node scan must not be published as the full desired
+		// state, or the scheduler would drop strategies for the tasks that
+		// could not be read. Fail the cycle so the consumer keeps its last set.
+		return nil, fmt.Errorf("resolve node scheduling intents: %w", err)
 	}
 
 	if len(nodeSchedulingIntents) == 0 {
