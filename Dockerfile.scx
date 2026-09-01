@@ -53,7 +53,7 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 WORKDIR /build
 COPY . .
 
-RUN set -e; \
+RUN . "$HOME/.cargo/env" && set -e; \
     case "$TARGETARCH" in \
         "arm64") \
             export RUST_TARGET=aarch64-unknown-linux-gnu; \
