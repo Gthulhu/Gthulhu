@@ -1,0 +1,29 @@
+name: Good first issue proposal
+description: Propose a newcomer-friendly task that does not require deep scheduler internals
+labels:
+  - good first issue
+  - help wanted
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A good first issue should be independently testable, narrowly scoped, and avoid requiring prior knowledge of the sched_ext/BPF hot path.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete gap should this task close?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List observable completion criteria and tests.
+    validations:
+      required: true
+  - type: input
+    id: parent
+    attributes:
+      label: Parent roadmap/issue
+      description: Optional parent issue such as #141, #144, #145, or #146.
