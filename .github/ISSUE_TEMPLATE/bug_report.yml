@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a reproducible problem in Gthulhu
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Gthulhu. Please include enough environment information for maintainers to reproduce the issue.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and its impact.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      description: Include the smallest reliable set of steps, manifests, or commands.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Gthulhu version or commit
+      placeholder: vX.Y.Z or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: kubernetes
+    attributes:
+      label: Kubernetes version
+      placeholder: v1.xx.x
+  - type: input
+    id: kernel
+    attributes:
+      label: Linux kernel version
+      description: Required for sched_ext or eBPF-related problems.
+      placeholder: 6.12.x
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Deployment method, distro, container runtime, node topology, and other relevant details.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Remove credentials, tokens, private addresses, and other sensitive data before posting.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed secrets and sensitive information from logs and manifests.
+          required: true
