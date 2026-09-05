@@ -1,0 +1,27 @@
+name: Claim2Core task
+description: Claim or propose scoped work from the Claim2Core roadmap
+title: "[Claim2Core] "
+labels:
+  - enhancement
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      placeholder: "#141"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Define the smallest reviewable piece you want to own.
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Validation
+      description: Describe how the change will be tested or verified.
+    validations:
+      required: true
