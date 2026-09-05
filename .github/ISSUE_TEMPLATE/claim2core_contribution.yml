@@ -1,0 +1,43 @@
+name: Claim2Core contribution
+description: Propose or claim a scoped task from the Claim2Core roadmap
+title: "[Claim2Core] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing to Claim2Core. Please keep the scope small and link the parent roadmap/issue.
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      description: Link the parent Claim2Core issue (for example #133, #134, #144, #145, or #146).
+      placeholder: "#145"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope you want to own
+      description: Describe the smallest reviewable piece you want to implement.
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Proposed approach
+      description: Briefly describe files/components you expect to touch and how you will test it.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Claim2Core boundaries
+      options:
+        - label: I will not claim unimplemented roadmap behavior as already supported.
+          required: true
+        - label: I will preserve Kubernetes/DRA/cgroup ownership boundaries.
+          required: true
+        - label: I will keep Kubernetes API access out of the microsecond scheduler hot path.
+          required: true
