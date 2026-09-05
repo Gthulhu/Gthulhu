@@ -1,0 +1,37 @@
+name: Claim2Core newcomer task
+description: Propose a narrowly scoped newcomer-friendly Claim2Core task
+title: "[Claim2Core/GFI] "
+labels:
+  - good first issue
+  - help wanted
+body:
+  - type: input
+    id: parent
+    attributes:
+      label: Parent issue
+      placeholder: "#145"
+    validations:
+      required: true
+  - type: textarea
+    id: task
+    attributes:
+      label: Task
+      description: Describe one independently reviewable piece of work.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define exact completion and test criteria.
+    validations:
+      required: true
+  - type: checkboxes
+    id: newcomer
+    attributes:
+      label: Newcomer fit
+      options:
+        - label: This task does not require changes to the sched_ext/BPF hot path.
+          required: true
+        - label: This task can be tested independently.
+          required: true
