@@ -1,7 +1,6 @@
-# Gthulhu: Cloud-Native Workload Orchestration with eBPF and Custom Scheduling
+# Gthulhu: From Kubernetes Resource Allocation to Linux Task Scheduling
 
 <a href="https://landscape.cncf.io/?item=provisioning--automation-configuration--gthulhu" target="_blank"><img src="https://img.shields.io/badge/CNCF%20Landscape-5699C6?style=for-the-badge&logo=cncf&label=cncf" alt="cncf landscape" /></a>
-
 <a href="https://ebpf.io/applications/" target="_blank"><img src="https://img.shields.io/badge/eBPF%20Application%20Landscape-5699C6?style=for-the-badge&logo=ebpf&label=ebpf" alt="ebpf landscape" /></a>
 
 [![LFX Contributors](https://insights.linuxfoundation.org/api/badge/contributors?project=gthulhu)](https://insights.linuxfoundation.org/project/gthulhu)
@@ -11,110 +10,175 @@
 
 <img src="./assets/logo.svg" alt="logo" width="300"/>
 
-## Overview
+> **DRA chooses what and where; Gthulhu controls how it actually runs.**
 
-Gthulhu is a cloud-native workload orchestration platform that provides granular, pod-level scheduling observability and automated scaling for Kubernetes workloads. Through an intuitive web GUI, users can select workloads running on Kubernetes, monitor fine-grained scheduling metrics collected via eBPF, and configure automatic scaling policies powered by KEDA — all without modifying the kernel or application code. For clusters running Linux 6.12+ with `sched_ext`, Gthulhu further supports defining scheduling strategies and distributing scheduling intents to each node, enabling kernel-level custom CPU scheduling across the cluster.
+Gthulhu is a cloud-native runtime scheduling platform built around Kubernetes, eBPF, and Linux `sched_ext`.
+
+Kubernetes can decide **whether a workload may run**, **which node it runs on**, and increasingly **which GPU, NIC, CPU set, NUMA domain, or other device it receives**. But those allocation decisions do not by themselves guarantee that the workload's critical Linux threads receive the CPU service, locality, responsiveness, or isolation needed to meet an SLO.
+
+Gthulhu focuses on that execution gap.
+
+```text
+Kueue / Workload API
+  admission, quota, fair sharing
+            │
+            ▼
+kube-scheduler / DRA
+  Node + device + topology allocation
+            │
+            ▼
+Gthulhu Runtime Plane
+  workload / claim → Pod/cgroup → TGID/TID
+            │
+            ▼
+sched_ext + eBPF
+  runtime policy + verification
+            │
+            ▼
+Delivered workload SLO
+  latency / throughput / jitter / utilization
+```
+
+The long-term direction is **Claim2Core**: connect actual Kubernetes allocation to Linux task scheduling without reimplementing kube-scheduler, DRA, or Kueue. See the [2026 Claim2Core roadmap](https://github.com/Gthulhu/Gthulhu/issues/141).
 
 ![](./assets/demo.gif)
 
-> Please visit https://youtu.be/Cyjrh9cW1a8 for a demo video showcasing Gthulhu's capabilities.
+> Demo video: https://youtu.be/Cyjrh9cW1a8
 
-### Key Capabilities
+## What Gthulhu Does Today
 
-- **Pod-Level Scheduling Metrics** — Gthulhu uses eBPF to hook into kernel scheduling events (`fentry`/`fexit`), collecting per-process metrics such as voluntary/involuntary context switches, CPU time, wait time, run count, and CPU migrations. These metrics are aggregated at the pod level and exposed via REST APIs.
-- **Declarative Configuration** — Users define which workloads to monitor using Kubernetes label selectors and namespaces, either through the web GUI or the `PodSchedulingMetrics` CRD.
-- **KEDA Auto-Scaling Integration** — Gthulhu provides out-of-the-box integration with [KEDA](https://keda.sh/), enabling auto-scaling decisions driven by real scheduling behavior rather than generic resource utilization.
-- **Advanced: Scheduling Strategies & Intents** *(requires Linux 6.12+ with `sched_ext`)* — Users can define scheduling strategies (priority, time-slice, CPU affinity) for specific workloads via the web GUI or REST API. The Manager converts strategies into scheduling intents and distributes them to Decision Makers on each node, enabling cross-node coordinated scheduling policy enforcement.
-- **Advanced: Custom CPU Scheduling** *(requires Linux 6.12+ with `sched_ext`)* — On nodes running a supported kernel, Gthulhu attaches a custom eBPF-based CPU scheduler through the `sched_ext` mechanism, applying the scheduling intents at the kernel level — including priority-based dispatching, dynamic time-slice tuning, and preemption control — without modifying the kernel itself.
+### Scheduling observability
 
-### Why Gthulhu?
+Gthulhu uses eBPF to collect scheduler behavior at process/task level and aggregate it into Kubernetes-aware metrics, including:
 
-The default Linux kernel scheduler emphasizes fairness and cannot be optimized for the specific needs of individual applications. Cloud-native workloads — trading systems, big data analytics, ML training — all have different scheduling requirements. Gthulhu bridges this gap by:
+- CPU runtime and scheduler wait time;
+- voluntary / involuntary context switches;
+- run count and scheduling frequency;
+- CPU migrations;
+- workload-level scheduling pressure.
 
-1. **Making scheduling visible** — exposing kernel-level scheduling behavior as actionable metrics
-2. **Making scaling smarter** — driving auto-scaling from actual scheduling pressure, not just CPU/memory averages
-3. **Making scheduling tunable** (advanced) — allowing per-workload CPU scheduling policies on supported kernels
+These metrics can be exported to Prometheus/Grafana and used by KEDA for autoscaling.
 
-### Architecture
+### Distributed scheduling intent
 
+A central **Manager** resolves workload-level policy and distributes intent to a per-node **Decision Maker**. Each Decision Maker resolves local processes/tasks and exposes node-local strategies to the Gthulhu daemon.
+
+### Custom CPU scheduling with `sched_ext`
+
+On Linux 6.12+ with `sched_ext`, Gthulhu can apply workload-aware CPU scheduling policy without patching the kernel.
+
+Current policy primitives include:
+
+- priority treatment;
+- custom time slices;
+- CPU locality / affinity hints;
+- preemption-oriented behavior where supported by the scheduler path.
+
+### TID-aware node policies
+
+Linux schedules tasks/threads, not only process leaders. Node policies therefore scan `/proc/<tgid>/task/<tid>` and can match non-leader worker threads by `comm`.
+
+This matters for workloads where the critical work happens in named worker threads, such as:
+
+- LLM engine/decode workers;
+- NCCL/RDMA progress threads;
+- DPDK or packet-processing workers;
+- host-side helper threads.
+
+A node policy resolved to a worker thread is keyed by **TID**, so the scheduler can target the entity Linux actually dispatches.
+
+### Priority semantics across scheduler modes
+
+A strategy with `Priority > 0` is a boost. `Priority == 0` is non-boosting.
+
+- In **user-space mode**, a TID-specific strategy is preferred, with TGID fallback for group-wide Pod policy behavior. A slice-only rule can still carry a custom time slice without jumping the queue.
+- In **kernel mode**, non-boosting strategies are not inserted into the priority BPF map. This avoids interpreting priority `0` as the highest preemptive level. Kernel mode does not yet provide full slice-only parity with user-space mode.
+
+These semantics reflect the merged TID-aware scheduler work in the main repository and `Gthulhu/plugin`.
+
+## Claim2Core Direction
+
+The next architecture step is not "use ResourceSlice as another selector". The intended boundary is:
+
+- `ResourceSlice` = device **inventory**;
+- `ResourceClaim.status.allocation` = workload's **actual allocation**;
+- Gthulhu = runtime execution plane after allocation.
+
+The target lineage is:
+
+```text
+Workload / PodGroup UID
+  → Pod UID
+  → ResourceClaim UID + generation
+  → allocated driver / pool / device
+  → NUMA / PCIe / network topology
+  → Pod cgroup
+  → TGID / TID / starttime
+  → sched_ext DSQ / BPF-map entry
+  → observed runtime metrics
+  → workload SLO
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                             Gthulhu Architecture                                 │
-├──────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                  │
-│   ┌──────────────┐        ┌──────────────────────┐        ┌─────────────────┐    │
-│   │    User      │──────▶ │      Manager         │──────▶ │    MongoDB      │    │
-│   │  (Web GUI)   │        │ (Central Management) │        │  (Persistence)  │    │
-│   └──────────────┘        └──────────┬───────────┘        └─────────────────┘    │
-│                                      │                                           │
-│                      ┌───────────────┼───────────────┐                           │
-│                      │               │               │                           │
-│                      ▼               ▼               ▼                           │
-│           ┌──────────────┐ ┌──────────────┐ ┌──────────────┐                     │
-│           │Decision Maker│ │Decision Maker│ │Decision Maker│  (DaemonSet)        │
-│           │   (Node 1)   │ │   (Node 2)   │ │   (Node N)   │                     │
-│           └──────┬───────┘ └──────┬───────┘ └──────┬───────┘                     │
-│                  │                │                │                              │
-│          ┌───────┴───────┐ ┌──────┴───────┐ ┌─────┴────────┐                     │
-│          ▼               ▼ ▼              ▼ ▼              ▼                      │
-│   ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐                    │
-│   │eBPF Metrics│ │ sched_ext  │ │eBPF Metrics│ │ sched_ext  │                    │
-│   │ Collector  │ │ Scheduler* │ │ Collector  │ │ Scheduler* │                    │
-│   └──────┬─────┘ └────────────┘ └──────┬─────┘ └────────────┘                    │
-│          │                              │                                        │
-│          ▼                              ▼               ┌─────────────────┐       │
-│   ┌────────────────────────────────────────────┐        │      KEDA       │       │
-│   │       Prometheus / Grafana Dashboards      │───────▶│  (Auto-Scaler)  │       │
-│   └────────────────────────────────────────────┘        └─────────────────┘       │
-│                                                                                  │
-│   * sched_ext scheduler requires Linux 6.12+ (advanced feature)                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
+
+Near-term implementation order:
+
+1. correct DRA / ResourceSlice semantics;
+2. add a read-only ResourceClaim observer;
+3. add Claim-to-Task preview / provenance;
+4. introduce a bounded static `DRAExecutionPolicy`;
+5. validate one workload adapter (free5GC/UPF or LLM serving);
+6. add closed-loop runtime control only after static policy and provenance are trustworthy.
+
+### Hard boundaries
+
+Gthulhu is **not a GPU scheduler**. `sched_ext` schedules Linux CPU tasks; Gthulhu does not directly schedule CUDA kernels, GPU SMs, MIG, or NIC hardware queues.
+
+Gthulhu can improve host-side execution for GPU feeder/launch threads, tokenizers, NCCL/RDMA progress threads, DPDK pollers, packet-processing workers, data loaders, checkpoint workers, and similar tasks.
+
+CPU DRA, cgroups, kubelet, and other resource managers remain authoritative for the CPU/resource envelope. Gthulhu must optimize **inside** that envelope, never outside it.
+
+## Architecture
+
+```text
+┌────────────────────────────────────────────────────────────────────┐
+│                         Gthulhu Control Plane                       │
+│                                                                    │
+│  User / Web UI / CRD ──▶ Manager ──▶ MongoDB / Kubernetes API     │
+└──────────────────────────────┬─────────────────────────────────────┘
+                               │ scheduling intent / runtime config
+                  ┌────────────┴────────────┐
+                  ▼                         ▼
+         Decision Maker              Decision Maker
+            (Node 1)                    (Node N)
+             │   │                        │   │
+             │   ├── eBPF metrics        │   ├── eBPF metrics
+             │   └── task resolution     │   └── task resolution
+             ▼                            ▼
+        Gthulhu daemon               Gthulhu daemon
+             │                            │
+             └──────▶ sched_ext / BPF ◀───┘
+                         │
+                         ▼
+                   Linux scheduler
 ```
-
-**How it works:**
-
-1. Users select Kubernetes workloads through the **Web GUI** (or `PodSchedulingMetrics` CRD) and define monitoring/scheduling policies.
-2. The **Manager** persists configurations, queries pods via the Kubernetes API (Informer), and distributes intents to Decision Makers.
-3. Each **Decision Maker** (deployed as a DaemonSet) runs on every node and attaches eBPF programs to kernel scheduling hooks to collect per-process metrics in real time.
-4. Metrics are aggregated at the pod level and exported to **Prometheus**, enabling Grafana dashboards and **KEDA**-driven auto-scaling.
-5. On nodes with Linux 6.12+ and `sched_ext` support, the advanced **custom scheduler** can be activated for priority-based dispatching and time-slice tuning.
-
-**Key links:**
-- Core scheduling framework: [qumun](https://github.com/Gthulhu/qumun) — build custom Linux schedulers in Go using eBPF/sched_ext, without modifying the kernel
-- Deployment: [Helm chart](https://github.com/Gthulhu/chart/tree/main/gthulhu) for Kubernetes clusters
-- Real-world use case: [Improving Network Performance with Custom eBPF-based Schedulers](https://free5gc.org/blog/20250726/index.en/)
-
-
-### Meaning of the Name
-
-The name Gthulhu is inspired by Cthulhu, a mythical creature known for its many tentacles. Just as tentacles can grasp and steer, Gthulhu symbolizes the ability to take the helm and navigate the complex world of modern distributed systems — much like how Kubernetes uses a ship’s wheel as its emblem.
-
-The prefix “G” comes from Golang, the language at the core of this project, highlighting both its technical foundation and its developer-friendly design.
-
-Underneath, Gthulhu runs on the qumun framework (qumun means “heart” in the Bunun language, an Indigenous people of Taiwan), reflecting the role of a scheduler as the beating heart of the operating system. This not only emphasizes its central importance in orchestrating workloads but also shares a piece of Taiwan’s Indigenous culture with the global open-source community.
 
 ## Prerequisites
 
-To build and run Gthulhu, ensure you have the following prerequisites installed on your system:
+### Metrics / monitoring
 
-**Core (Metrics Collection & Monitoring):**
 - Go 1.22+
 - LLVM/Clang 17+
 - libbpf
-- Linux kernel with eBPF support (5.x+)
+- Linux kernel with eBPF/BTF support
 
-**Advanced (Custom CPU Scheduling):**
-- Linux kernel 6.12+ with `sched_ext` support (`CONFIG_SCHED_CLASS_EXT`)
+### Custom CPU scheduling
 
-> **Note:** The eBPF metrics collection feature works on a wide range of kernels and does not require `sched_ext`. The custom CPU scheduling feature requires Linux 6.12+ which may not be available on all managed Kubernetes platforms (e.g., GKE currently does not support it).
+- Linux 6.12+ with `sched_ext` / `CONFIG_SCHED_CLASS_EXT`
 
-See [Installation guide](https://gthulhu.org/installation/) for detailed installation instructions.
+The eBPF monitor does not require `sched_ext`. Custom CPU scheduling does.
 
-## Usage
+See the [installation guide](https://gthulhu.org/installation/) for deployment details.
 
-### Setting Up Dependencies
-
-First, clone the required dependencies:
+## Build
 
 ```bash
 make dep
@@ -123,131 +187,98 @@ git submodule sync
 git submodule update
 cd scx
 cargo build --release -p scx_rustland
-```
-
-This will clone libbpf and the custom libbpfgo fork needed for the project.
-
-### Linting the Code
-To ensure code quality, run the linter:
-
-```bash
-make lint
-```
-
-### Building the Scheduler
-
-Build the scheduler with:
-
-```bash
+cd ..
 make build
 ```
 
-This compiles the BPF program, builds libbpf, generates the skeleton, and builds the Go application.
-
-Cross-compilation for arm64 is supported by setting the `ARCH` variable:
+Cross-build for arm64:
 
 ```bash
 make build ARCH=arm64
 ```
 
-### Testing the Scheduler
+Lint:
 
-To test the scheduler in a virtual environment using kernel v6.12:
+```bash
+make lint
+```
+
+## Test
 
 ```bash
 make test
 ```
 
-This uses `vng` (virtual kernel playground) to run the scheduler with the appropriate kernel version.
-
-You can also test with a specific kernel version:
+Or select a kernel version:
 
 ```bash
 make test KERNEL_VERSION=6.12
 ```
 
-#### Portability Testing
+Gthulhu runs daily portability tests across supported Linux 6.12+ kernels.
 
-Gthulhu is automatically tested for portability across multiple Linux kernel versions (6.12+) through a daily scheduled GitHub Actions workflow. This ensures that the released packages remain compatible with newer kernel versions. The portability tests run against kernel versions 6.12, 6.13, 6.14, 6.15, 6.16, and 6.17.
+## Run with schedkit
 
-### Launching Gthulhu by using schedkit
+Install `schedctl` from [schedkit](https://github.com/schedkit/schedctl), then run:
 
-First, install `schedctl` from [schedkit](https://github.com/schedkit/schedctl) (created by @dottorblaster):
-```sh
-$ git clone https://github.com/schedkit/schedctl.git
-$ cd schedctl
-$ make install
+```bash
+sudo schedctl run gthulhu
 ```
 
-Then, you can launch Gthulhu with:
+## Run with Docker
 
-```sh
-$ sudo ./schedctl run gthulhu
-Trying to pull ghcr.io/schedkit/gthulhu:latest...
-Getting image source signatures
-Copying blob sha256:a517a5a43837a7785dad62f579950a8abe4d1bd2ae5a096bda78150a1cc70c64
-Copying blob sha256:2d35ebdb57d9971fea0cac1582aa78935adf8058b2cc32db163c98822e5dfa1b
-Copying config sha256:85fb26cbfed25f79e321ef4e0a3e4e6fc7f01a957dbcee6aed815bdb93458136
-Writing manifest to image destination
-Storing signatures
-Container ghcr.io/schedkit/gthulhu:latest started successfully
-$ sudo podman ps -a
-CONTAINER ID  IMAGE                            COMMAND     CREATED        STATUS            PORTS       NAMES
-015d1b5fbe96  ghcr.io/schedkit/gthulhu:latest  /main       6 seconds ago  Up 6 seconds ago              gthulhu
-```
-
-### Running with Docker
-To run the scheduler in a Docker container, you can either build locally or use the pre-built image from GitHub Container Registry:
-
-**Using the pre-built image from GitHub Packages:**
 ```bash
 docker run --privileged=true --pid host --rm ghcr.io/gthulhu/gthulhu:latest /gthulhu/main
 ```
 
-**Building locally:**
-```bash
-make image
-docker run --privileged=true --pid host --rm  127.0.0.1:25000/gthulhu:latest /gthulhu/main
-```
-
-### Debugging
-
-If you need to inspect the BPF components, you can use:
+## Debugging
 
 ```bash
-sudo bpftool prog list            # List loaded BPF programs
-sudo bpftool map list             # List BPF maps
-sudo cat /sys/kernel/debug/tracing/trace_pipe # View BPF trace output
+sudo bpftool prog list
+sudo bpftool map list
+sudo cat /sys/kernel/debug/tracing/trace_pipe
 ```
 
-### Stress Testing by using `stress-ng`
+## Related repositories
 
-```
-stress-ng -c 20 --timeout 20s --metrics-brief
-```
+- [qumun](https://github.com/Gthulhu/qumun) — Go framework for building custom Linux schedulers with eBPF / `sched_ext`.
+- [plugin](https://github.com/Gthulhu/plugin) — user-space scheduling strategy implementation.
+- [docs](https://github.com/Gthulhu/docs) — official documentation published at [gthulhu.org](https://gthulhu.org/).
+- [gtp5g-operator](https://github.com/Gthulhu/gtp5g-operator) — telecom / GTP5G integration work.
 
-## Troubleshooting
+## Research / workload directions
 
-See [Installation guide](https://gthulhu.org/installation/#troubleshooting).
+Two immediate validation paths are especially useful:
 
-## License
+- **CPU DRA × Gthulhu × free5GC/UPF** — fastest path to a credible end-to-end runtime scheduling demo with p99/p99.9 latency and jitter.
+- **GPU + RDMA + CPU DRA × phase-aware LLM scheduling** — higher research upside around TTFT, ITL, GPU idle gaps, and NCCL/RDMA progress.
 
-This software is distributed under the terms of the Apache License 2.0.
+Longer term, Gthulhu is also exploring device-local execution domains, scheduling provenance/replay, shared-device interference control, device-health-aware degradation, and cooperative resource reclamation.
+
+## Meaning of the Name
+
+The name Gthulhu is inspired by Cthulhu and Golang. The many tentacles represent coordinating complex distributed runtime behavior.
+
+The underlying framework **qumun** is named after the Bunun word for "heart", reflecting the scheduler's role at the heart of the operating system.
 
 ## Contributing
 
-See [Contributing guide](https://gthulhu.org/contributing/).
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [official contribution guide](https://gthulhu.org/contributing/).
 
-## Community Resources
+Useful contributor areas include Kubernetes/DRA, eBPF, `sched_ext`, NUMA/topology, scheduling provenance, testing, free5GC/UPF, and accelerator workloads.
 
-- [NotebookLM](https://notebooklm.google.com/notebook/89a6a260-3d54-4760-93a2-dcc06c6d8043): includes all of materials used in the project, including the pptx, design documents, and more.
-- [GitHub Discussion](https://github.com/Gthulhu/Gthulhu/discussions): a place for community discussions, questions, and feature requests.
+## Community
 
-## Star History
+- [2026 Claim2Core roadmap](https://github.com/Gthulhu/Gthulhu/issues/141)
+- [GitHub Discussions](https://github.com/Gthulhu/Gthulhu/discussions)
+- [Official documentation](https://gthulhu.org/)
+- [LFX project insights](https://insights.linuxfoundation.org/project/gthulhu)
 
-[![Star History Chart](https://star-history.dera.page/svg?repos=Gthulhu/Gthulhu&type=Date)](https://star-history.dera.page/#Gthulhu/Gthulhu&Date)
+## License
+
+Apache License 2.0.
 
 ## Special Thanks
 
-- [scx](https://github.com/sched-ext/scx)
+- [sched-ext/scx](https://github.com/sched-ext/scx)
 - [libbpfgo](https://github.com/aquasecurity/libbpfgo)
