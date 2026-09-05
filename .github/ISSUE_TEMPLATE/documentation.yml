@@ -1,0 +1,25 @@
+name: Documentation improvement
+description: Report stale, missing, or unclear Gthulhu documentation
+labels:
+  - documentation
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Link the page or repository path that needs updating.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is stale or unclear?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected update
+      description: Describe the behavior or architecture the docs should reflect.
+    validations:
+      required: true
