@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Claim2Core roadmap
+    url: https://github.com/Gthulhu/Gthulhu/issues/141
+    about: Read the roadmap and implementation sequence before proposing larger Claim2Core work.
+  - name: GitHub Discussions
+    url: https://github.com/Gthulhu/Gthulhu/discussions
+    about: Ask design and usage questions before opening an implementation issue.
