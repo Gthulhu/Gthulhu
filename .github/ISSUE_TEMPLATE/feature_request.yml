@@ -1,0 +1,61 @@
+name: Feature request
+description: Propose a new capability or improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gthulhu is use-case driven. Start with the workload or operational problem rather than a proposed implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What workload, scheduling, observability, or scaling problem are you trying to solve?
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current approach
+      description: How do you solve this today, and what is missing?
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the behavior or outcome you want without prescribing an implementation when possible.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Kubernetes integration
+        - eBPF observability
+        - Linux sched_ext / CPU scheduling
+        - Autoscaling / KEDA
+        - Scheduling policy or intent
+        - CLI / UX
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Possible approach
+      description: Optional. Share implementation ideas, trade-offs, references, or prior art.
+  - type: textarea
+    id: contribution
+    attributes:
+      label: Contribution
+      description: Let us know if you are interested in implementing or testing this feature.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and roadmap discussions for similar requests.
+          required: true
