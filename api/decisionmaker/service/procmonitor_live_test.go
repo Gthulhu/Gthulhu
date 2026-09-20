@@ -1,10 +1,11 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -25,7 +26,7 @@ func TestLiveEngineCoreOnRealProc(t *testing.T) {
 
 	// 1) Real scanner over the real /proc: find the EngineCore worker threads.
 	var engine []domain.TaskInfo
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		tasks, err := src.Snapshot(ctx)
 		if err != nil {
 			t.Fatalf("Snapshot(real /proc) failed: %v", err)
@@ -45,7 +46,7 @@ func TestLiveEngineCoreOnRealProc(t *testing.T) {
 		t.Fatalf("no EngineCore worker threads found on real /proc (is the workload running?)")
 	}
 
-	sort.Slice(engine, func(i, j int) bool { return engine[i].TID < engine[j].TID })
+	slices.SortFunc(engine, func(a, b domain.TaskInfo) int { return cmp.Compare(a.TID, b.TID) })
 	t.Log("real /proc scan found the worker threads the old top-level scan could not:")
 	for _, task := range engine {
 		leader := "?"

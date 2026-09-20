@@ -1,12 +1,13 @@
 package service
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -39,10 +40,8 @@ func NewProcTaskSource(rootDir string) TaskSource {
 // only thread-group leaders (TGIDs); the threads live under
 // /proc/<tgid>/task/<tid>, so a single-level scan misses every non-leader
 // thread. A task that vanishes mid-scan (ENOENT/ESRCH) is skipped, but a real
-// error (permission, I/O) is returned rather than silently dropping tasks - an
-// incomplete snapshot must not be mistaken for the full desired state. Paths
-// are built from parsed integers, not raw directory names. Tasks are sorted by
-// TID for deterministic output.
+// error such as EACCES or EIO is surfaced: an incomplete snapshot must not be
+// mistaken for the full desired state.
 func (p *procTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error) {
 	tgidEntries, err := os.ReadDir(p.rootDir)
 	if err != nil {
@@ -98,17 +97,14 @@ func (p *procTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error
 		}
 	}
 
-	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].TID < tasks[j].TID
+	slices.SortFunc(tasks, func(a, b domain.TaskInfo) int {
+		return cmp.Compare(a.TID, b.TID)
 	})
 	return tasks, nil
 }
 
-// isTransientProcError reports whether err is just a task vanishing mid-scan
-// (ENOENT/ESRCH). Permission and I/O errors are not transient: they mean the
-// snapshot is incomplete, and surfacing them stops an incomplete scan being
-// mistaken for the full desired state (which would delete strategies for the
-// tasks that could not be read).
+// isTransientProcError reports whether err is a task that vanished mid-scan
+// (ENOENT/ESRCH); a permission or I/O error is not transient and must surface.
 func isTransientProcError(err error) bool {
 	return errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ESRCH)
 }
