@@ -1,5 +1,5 @@
-github.com/Gthulhu/plugin v1.1.1-0.20260223021833-8f174def9e15 h1:ReHm46ITdI93afS2WrKd5b8xz52j/5Okk0KmGBkks4M=
-github.com/Gthulhu/plugin v1.1.1-0.20260223021833-8f174def9e15/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
+github.com/Gthulhu/plugin v1.2.1-0.20260824115345-9561b774aa8f h1:j63By8J4m+0YGB8Tid7aKI7Zp6ctZcUZHfKaMYrsrNQ=
+github.com/Gthulhu/plugin v1.2.1-0.20260824115345-9561b774aa8f/go.mod h1:PJn7yc+XAtSD8peMRyyNN/kznESJSnfQaaTX68yKBDo=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/Gthulhu/api v0.0.0
-	github.com/Gthulhu/plugin v1.1.1-0.20260223021833-8f174def9e15
+	github.com/Gthulhu/plugin v1.2.1-0.20260824115345-9561b774aa8f
 	github.com/Gthulhu/qumun v0.0.0
 	github.com/aquasecurity/libbpfgo v0.8.0-libbpf-1.5
 	github.com/prometheus/client_golang v1.23.2
