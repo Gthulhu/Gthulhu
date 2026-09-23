@@ -103,9 +103,20 @@ func (r *WorkloadAdapterRegistry) MatchAll(ctx context.Context, tasks []domain.T
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		found, err := adapters[name].Match(ctx, tasks)
+		// Each adapter gets its own copy of the snapshot: an adapter that
+		// sorts or otherwise mutates its input in place must not corrupt
+		// what the next adapter (or the caller) sees.
+		snapshot := make([]domain.TaskIdentity, len(tasks))
+		copy(snapshot, tasks)
+		found, err := adapters[name].Match(ctx, snapshot)
 		if err != nil {
 			return nil, fmt.Errorf("workload adapter %q: %w", name, err)
+		}
+		// Adapter provenance comes from the registry's own key, not the
+		// value an adapter self-reports - a mistyped or empty RoleMatch.Adapter
+		// from a buggy adapter must not corrupt sorting or provenance.
+		for i := range found {
+			found[i].Adapter = name
 		}
 		matches = append(matches, found...)
 	}

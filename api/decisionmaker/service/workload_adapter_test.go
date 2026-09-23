@@ -116,6 +116,41 @@ func TestWorkloadAdapterRegistryMatchAllContextCancelled(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+// TestWorkloadAdapterRegistryMatchAllIsolatesEachAdapterInput guards against
+// one adapter's in-place mutation of its input corrupting what the next
+// adapter (or the caller) sees, since every adapter is handed the same
+// underlying task snapshot.
+func TestWorkloadAdapterRegistryMatchAllIsolatesEachAdapterInput(t *testing.T) {
+	reg := NewWorkloadAdapterRegistry()
+	require.NoError(t, reg.Register(&mutatingAdapter{name: "a-mutator"}))
+	require.NoError(t, reg.Register(NewFixtureWorkloadAdapter("z-fixture", []CommRule{{Comm: "upf", Role: "upf-control"}})))
+
+	tasks := []domain.TaskIdentity{{TGID: 1, TID: 1, Comm: "upf"}}
+	matches, err := reg.MatchAll(context.Background(), tasks)
+	require.NoError(t, err)
+
+	// The fixture adapter, which runs after the mutator, must still see the
+	// original comm "upf" - not whatever the mutator overwrote its copy with.
+	require.Len(t, matches, 1)
+	assert.Equal(t, "z-fixture", matches[0].Adapter)
+	assert.Equal(t, "upf-control", matches[0].Role)
+	// The caller's own slice must be untouched too.
+	assert.Equal(t, "upf", tasks[0].Comm)
+}
+
+// TestWorkloadAdapterRegistryMatchAllStampsRegisteredAdapterName verifies
+// that provenance (RoleMatch.Adapter) comes from the registry's own key, not
+// whatever value a buggy or careless adapter self-reports.
+func TestWorkloadAdapterRegistryMatchAllStampsRegisteredAdapterName(t *testing.T) {
+	reg := NewWorkloadAdapterRegistry()
+	require.NoError(t, reg.Register(&misreportingAdapter{name: "real-name"}))
+
+	matches, err := reg.MatchAll(context.Background(), []domain.TaskIdentity{{TGID: 1, TID: 1, Comm: "x"}})
+	require.NoError(t, err)
+	require.Len(t, matches, 1)
+	assert.Equal(t, "real-name", matches[0].Adapter)
+}
+
 // erroringAdapter is a WorkloadAdapter test double that always fails, used
 // to verify MatchAll surfaces (rather than swallows) an adapter error.
 type erroringAdapter struct{ name string }
@@ -123,4 +158,31 @@ type erroringAdapter struct{ name string }
 func (a *erroringAdapter) Name() string { return a.name }
 func (a *erroringAdapter) Match(ctx context.Context, tasks []domain.TaskIdentity) ([]domain.RoleMatch, error) {
 	return nil, errors.New("boom")
+}
+
+// mutatingAdapter is a WorkloadAdapter test double that mutates its input
+// slice in place, used to verify MatchAll isolates each adapter's view of
+// the task snapshot.
+type mutatingAdapter struct{ name string }
+
+func (a *mutatingAdapter) Name() string { return a.name }
+func (a *mutatingAdapter) Match(ctx context.Context, tasks []domain.TaskIdentity) ([]domain.RoleMatch, error) {
+	for i := range tasks {
+		tasks[i].Comm = "mutated"
+	}
+	return nil, nil
+}
+
+// misreportingAdapter is a WorkloadAdapter test double that returns a
+// RoleMatch.Adapter value different from its own registered Name(), used to
+// verify MatchAll does not trust that self-reported value for provenance.
+type misreportingAdapter struct{ name string }
+
+func (a *misreportingAdapter) Name() string { return a.name }
+func (a *misreportingAdapter) Match(ctx context.Context, tasks []domain.TaskIdentity) ([]domain.RoleMatch, error) {
+	matches := make([]domain.RoleMatch, len(tasks))
+	for i, task := range tasks {
+		matches[i] = domain.RoleMatch{Identity: task, Role: "some-role", Adapter: "wrong-name"}
+	}
+	return matches, nil
 }
