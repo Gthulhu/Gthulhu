@@ -14,7 +14,7 @@
 >
 > 等到原本的 C 呼叫結束、執行 `exitsyscall` 準備回到 Go 時，如果拿不到 `P`，排程器 goroutine 就會被迫停下來等、甚至在不同 `M` 之間被換手。這會造成一個對 kernel scheduler 非常致命的現象：**明明只是單次排程迴圈（Drain -> SelectCPU -> Dispatch），卻在每次跨 C 呼叫時不斷交出 `P`、喚醒其他 `M` 與 goroutine 穿插執行，整趟排程被切得支離破碎**。
 >
-> 因此，我們的最佳化核心思路是：
+> 因此，我們的最佳化核心脈絡是：
 > 1. **在排程主迴圈加上 `runtime.LockOSThread()`**（[`internal/scheduler/dispatch_loop.go`](./internal/scheduler/dispatch_loop.go)）：將負責排程決策的 goroutine 死死綁在同一個固定的 OS thread（`M`）上，避免它在阻塞與恢復之間漂移到別的執行緒。
 > 2. **移除 `main.go` 裡的 `runtime.GOMAXPROCS(1)`**（[`main.go`](./main.go)）：不再把整個 Go 行程硬鎖在單一 `P` 上，讓監控、API、GC 等其他 goroutine 有自己的 `P` 可以跑，不必跟核心排程迴圈搶同一個 `P`。
 > 3. **熱路徑改用 `runtime.asmcgocall`**（[`qumun/internal/schedbridge/bridge.go`](./qumun/internal/schedbridge/bridge.go)）：直接切換到當前 `M` 的 `g0` stack 執行短平快的 C 函式，**完全不經過 `entersyscall` / `exitsyscall`，也不會把當前的 `P` 讓給新的 `M`**，確保從取任務、選 CPU 到派發的整趟排程 loop 都在同一個 goroutine、同一個 `M` 與同一個 `P` 上一氣呵成。
@@ -131,7 +131,7 @@ FAILED (Failed to achieve target: got 9.66, expected 0.50)
 3. **派發完成與空佇列時呼叫 `SYS_SCHED_YIELD`**（[`qumun/goland_core/task.go`](./qumun/goland_core/task.go)、[`internal/scheduler/dispatch_loop.go`](./internal/scheduler/dispatch_loop.go)）：
    當 Go 迴圈把 task pool 清空並呼叫 `NotifyComplete(0)` 後，或是佇列暫時沒有新任務時，直接執行 `unix.Syscall(unix.SYS_SCHED_YIELD, 0, 0, 0)`（注意不能用只讓出 Go goroutine 的 `runtime.Gosched()`，必須是讓出 Linux OS thread 的 `sched_yield`），把 CPU 立刻交還給 kernel 去跑剛放進 DSQ 的應用任務。
 4. **分離 User-space 預算與 BPF Backend Slice**（[`internal/scheduler/scheduler.go`](./internal/scheduler/scheduler.go)）：
-   Go 端依然使用 `slice_ns_default`（20 ms）來計算 vruntime credit 與 deadline，但透過 `bpfModule.SetDefaultSlice(sliceNsMin)` 將 BPF 端的 `default_slice` 設為 `slice_ns_min`（1 ms）。
+   原本 BPF 端的 `rodata.default_slice` 固定維持 20 ms，導致 BPF 直接派發、空佇列續命（replenish slice）與排程器執行緒自身都拿到 20 ms 的粗時間片。修改後，我們對齊 `scx_rustland` 的做法：讓 Go 端繼續使用 `slice_ns_default`（20 ms）計算 vruntime credit 與 deadline，並在啟動時呼叫 `bpfModule.SetDefaultSlice(sliceNsMin)`，將 BPF 端的 `default_slice` 改設為 `slice_ns_min`（1 ms）。
 5. **改為 User-space 模式預設行為**：
    移除臨時的 `-adaptive-wakeup` CLI 旗標，只要啟動 Go user-space 排程模式就會預設啟用上述完整路徑；Kernel mode 的行為則完全維持不變。
 
