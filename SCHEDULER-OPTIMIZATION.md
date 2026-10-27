@@ -132,8 +132,6 @@ FAILED (Failed to achieve target: got 9.66, expected 0.50)
    當 Go 迴圈把 task pool 清空並呼叫 `NotifyComplete(0)` 後，或是佇列暫時沒有新任務時，直接執行 `unix.Syscall(unix.SYS_SCHED_YIELD, 0, 0, 0)`（注意不能用只讓出 Go goroutine 的 `runtime.Gosched()`，必須是讓出 Linux OS thread 的 `sched_yield`），把 CPU 立刻交還給 kernel 去跑剛放進 DSQ 的應用任務。
 4. **分離 User-space 預算與 BPF Backend Slice**（[`internal/scheduler/scheduler.go`](./internal/scheduler/scheduler.go)）：
    原本 BPF 端的 `rodata.default_slice` 固定維持 20 ms，導致 BPF 直接派發、空佇列續命（replenish slice）與排程器執行緒自身都拿到 20 ms 的粗時間片。修改後，我們對齊 `scx_rustland` 的做法：讓 Go 端繼續使用 `slice_ns_default`（20 ms）計算 vruntime credit 與 deadline，並在啟動時呼叫 `bpfModule.SetDefaultSlice(sliceNsMin)`，將 BPF 端的 `default_slice` 改設為 `slice_ns_min`（1 ms）。
-5. **改為 User-space 模式預設行為**：
-   移除臨時的 `-adaptive-wakeup` CLI 旗標，只要啟動 Go user-space 排程模式就會預設啟用上述完整路徑；Kernel mode 的行為則完全維持不變。
 
 ---
 
@@ -145,17 +143,54 @@ FAILED (Failed to achieve target: got 9.66, expected 0.50)
 
 | 測試配置 / 演進階段 | `adaptive_priority` 最終 Metric（需 `< 0.50`） | 測試結果 | 關鍵原因分析 |
 | :--- | :---: | :---: | :--- |
-| 初始版本（未調整前） | `9.66` | FAILED | 無喚醒搶佔、channel 中轉延遲、10ms Slow worker 長時間霸佔單核 |
+| **修改前：Gthulhu 原始版本** | **`5.70` – `9.66`** | **FAILED** | 無喚醒搶佔、channel 中轉延遲、Fast 喚醒中心值高達 ~275 µs（Slow ~195 µs） |
 | 加入短任務分類 + 100 µs 保護門檻 | `10.18` – `12.82` | FAILED | 100 µs 門檻拒絕了 267 次 Fast worker 搶佔且無重試，p90 高達 1.8 ms |
 | 移除 100 µs 門檻（仍走舊 channel 與舊 dispatch 順序） | `0.88`、`0.92`、`1.00` | FAILED | 毫秒級卡頓消失（Fast 與 Slow 均約 99 µs），但轉手延遲使兩者拉不開差距 |
 | 單獨換上 Direct Ringbuffer + `sched_yield`（BPF 未先 drain） | `24.48` | FAILED | Go `sched_yield` 讓出 CPU 後，BPF 還沒 drain 決策又把 Go 排回來空轉 |
-| **完整修正（預設開啟，`builtin_idle=false`）** | **`0.22`、`0.19`、`0.21`** | **PASS** | 直接讀取 + BPF 先 drain + `sched_yield` + 1ms backend slice 完整配合 |
-| **完整修正（預設開啟，`builtin_idle=true`）** | **`0.20`**（5s batch 為 `0.22`） | **PASS** | 與 `scx_rustland` 條件對齊，Fast 喚醒中心值壓到 **~13.4 µs** |
+| **修改後：Gthulhu 完整修正（預設開啟，`builtin_idle=false`）** | **`0.22`、`0.19`、`0.21`** | **PASS** | 直接讀取 + BPF 先 drain + `sched_yield` + 1ms backend slice 完整配合 |
+| **修改後：Gthulhu 完整修正（預設開啟，`builtin_idle=true`）** | **`0.20`**（5s batch 為 `0.22`） | **PASS** | 與 `scx_rustland` 條件對齊，Fast 喚醒中心值壓到 **~13.4 µs** |
 | **對照組：`scx_rustland`（預設 `builtin_idle=true`）** | **`0.16`**（5s batch 為 `0.16`） | **PASS** | Rust user-space 排程基準線，Fast 喚醒中心值約 **~11.2 µs** |
 
 > 補充：在開啟預設最佳化後，我們也執行了 `schtest --filter fairness`，Gthulhu 以 **0.98** 的成績穩定通過（門檻為 `>= 0.60`），確認提升短任務喚醒優先順序並未犧牲多執行緒間的 CPU 公平性。
 
-### 2. `scx_rustland` 實測輸出（Baseline）
+### 2. 修改前的 Gthulhu 實測輸出（Before Optimization）
+
+在尚未導入本次最佳化前，執行 `sudo schtest/target/debug/schtest --filter adaptive_priority` 的輸出如下（Fast 喚醒延遲中心值高達 `274.843 µs`，最差甚至到 `8.12 ms`，反而比 Slow 的 `195.443 µs` 還慢，最終以 `metric=5.70` 失敗）：
+
+```text
+running 1 test
+test adaptive_priority ... 
+converge: min_time=5.00, max_time=10.00, threshold=0.50
+Fast semaphore wake estimates:
+0ns | 0ns ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 0ns
+Slow semaphore wake estimates:
+259.118µs | 259.118µs ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 259.118µs
+converge: iters=1, elapsed=0.01, metric=0.00
+Fast semaphore wake estimates:
+76.423µs |▁▅▆▇ 208.272µs █████████████▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▅▅▅▄▄▄▃▂▁| 2.093504ms
+Slow semaphore wake estimates:
+70.741µs |▁▅▆▆▆▆▆▆▆▇▇▇▇▇▇▇▇████ 250.269µs ███▇▇▇▇▇▆▆▆▆▆▆▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▂▂▂▂▁▁▁| 659.967µs
+converge: iters=100, elapsed=1.37, metric=5.20
+Fast semaphore wake estimates:
+64.307µs |▁▇ 274.843µs ███▇▇▇▇▇▇▆▆▆▆▆▅▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁| 8.125281ms
+Slow semaphore wake estimates:
+66.592µs |▁▅▆▇█ 195.443µs █▇▇▆▆▆▆▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁| 1.952516ms
+converge: iters=366, elapsed=5.07, metric=5.70
+FAILED
+
+failures:
+
+---- adaptive_priority ----
+Failed to achieve target: got 5.70, expected 0.50
+
+
+failures:
+    adaptive_priority
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 6.45s
+```
+
+### 3. `scx_rustland` 實測輸出（Baseline）
 
 執行 `sudo schtest/target/debug/schtest --filter adaptive_priority`：
 
@@ -188,7 +223,7 @@ ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 16.27s
 ```
 
-### 3. Gthulhu（User Mode + `builtin_idle=true`）實測輸出
+### 4. 修改後的 Gthulhu（User Mode + `builtin_idle=true`）實測輸出
 
 在同樣開啟 `builtin_idle: true` 的設定下，Gthulhu 的實測表現如下：
 
