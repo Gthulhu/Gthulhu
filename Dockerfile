@@ -47,7 +47,7 @@ RUN if [ "$TARGETARCH" = "arm64" ]; then \
 
 # Install Go for the BUILD platform (runs natively, cross-compiles via GOARCH)
 ARG BUILDARCH
-ARG GO_VERSION=1.22.10
+ARG GO_VERSION=1.26.0
 RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-${BUILDARCH}.tar.gz && \
     tar -C /usr/local -xzf go${GO_VERSION}.linux-${BUILDARCH}.tar.gz && \
     rm go${GO_VERSION}.linux-${BUILDARCH}.tar.gz
