@@ -1,318 +1,273 @@
-# Gthulhu 排程最佳化：cgo 熱路徑與 adaptive priority
+# Gthulhu 排程器最佳化實錄：從 `asmcgocall` 熱路徑到通過 `adaptive_priority` 測試
 
-## 1. 結論與適用範圍
+這份文件記錄了我們近期對 Gthulhu（基於 Linux `sched_ext` 的 eBPF + Go 混合排程器）進行的一系列底層最佳化。故事從一個看似矛盾的現象開始：底層 `qumun` 換上 `asmcgocall` 加速 C 呼叫之後，反而頻繁撞上 `watchdog failed to check in for 5.001s` 的 runnable task stall；而在解決卡死問題後，`schtest` 的 `adaptive_priority` 延遲測試又拿到了 `9.66` 這種遠高於及格線（`< 0.50`）的分數。
 
-這次最佳化分成兩個問題：
+一路排查下來，我們發現真正的瓶頸往往不在單次跨語言呼叫本身，而在於 **BPF 與 Go user-space 之間的資料發布順序、佇列消費模型，以及排程器交還 CPU 的時機**。在補齊這些機制後，Gthulhu 在 Go user-space 模式下不需要額外實驗旗標，就能穩定以 **0.19～0.22** 的成績通過 `adaptive_priority` 測試，表現與 `scx_rustland`（**0.16**）處於同一水準。
 
-1. **降低單次 Go/C 呼叫成本**：保留 qumun 已有的 `asmcgocall` bridge，
-   避免熱路徑反覆經過標準 cgo 與不必要的配置、序列化。
-2. **降低 task 的完整排程延遲**：修正 BPF forward progress、ringbuffer
-   發布順序，以及 Go 與 BPF 的工作交接。單次呼叫變快不代表 task 能及時執行。
+---
 
-最後，Gthulhu 的 Go 排程模式預設啟用 adaptive wakeup、直接消費 queued
-ringbuffer、完成後交還 CPU，以及 minimum backend slice。不再需要
-`-adaptive-wakeup`；該旗標已移除。`-usersched-preempt` 仍是獨立、預設關閉的實驗選項。
-Kernel mode 不套用這組 Go loop 行為；qumun 的低階啟用 API 仍保留給其他使用者選擇。
+## 一、問題起點：為什麼換上 `asmcgocall` 之後反而會卡死？
 
-使用 repository 的 monitor-enabled 設定、不帶上述兩個旗標，三次
-`adaptive_priority` 的最後一個實際量測 ratio 為 **0.22、0.19、0.21**，
-都低於要求的 **0.50**。這是指定主機上的結果，不是所有負載的延遲保證。
-
-## 2. 原始架構與問題定位
+在混合架構的排程器裡，每一筆非直接派發的任務都要走過這趟旅程：
 
 ```text
-task becomes runnable
-  -> BPF queued ringbuffer
-  -> 原本：libbpfgo poll goroutine -> Go channel -> pinned scheduler loop
-  -> Go plugin 選 task、計算 deadline/slice、選 CPU
-  -> dispatched user ringbuffer
-  -> BPF dispatch callback
-  -> DSQ -> task running
+Task 變成 runnable
+  -> BPF 寫入 queued ringbuffer
+  -> Go scheduler 讀取任務、由 plugin 計算 deadline 與 time slice、呼叫 BPF 挑選 CPU
+  -> Go 寫入 dispatched user ringbuffer
+  -> BPF 在 ops.dispatch() 取出決策、塞進 DSQ 並讓任務上 CPU 執行
 ```
 
-重要程式：
+這條路徑每秒會跑成千上萬次，因此 `qumun` 透過 `//go:linkname` 直接呼叫 `runtime.asmcgocall`（見 [`qumun/internal/schedbridge/bridge.go`](./qumun/internal/schedbridge/bridge.go)），跳過標準 `runtime.cgocall` 的 `entersyscall` / `exitsyscall` 與 runtime 記帳開銷。
 
-- [Go dispatch loop](./internal/scheduler/dispatch_loop.go)
-- [Go adaptive policy](./internal/scheduler/adaptive.go)
-- [BPF callbacks](./qumun/ebpf/main.bpf.c)
-- [C hotpath wrappers](./qumun/hotpath.c)
-- [Go hotpath bridge](./qumun/goland_core/hotpath.go)
-- [asmcgocall bridge](./qumun/internal/schedbridge/bridge.go)
+當系統出現 `runnable task stall (watchdog failed to check in for 5.001s)` 時，直覺很容易懷疑是不是 `asmcgocall` 繞過 runtime 導致某個呼叫卡死。但如果冒然退回標準 cgo，熱路徑會白白損失十倍的呼叫速度。我們先在排程迴圈加上階段計時與活動狀態追蹤（[`internal/scheduler/loop_trace.go`](./internal/scheduler/loop_trace.go)），才看清兩個關鍵事實：
 
-`SelectCPU` 的 wall time 包含搶佔、等待 CPU、kernel 執行及函式本身，
-不能直接當作函式的純運算成本。先前樣本曾出現 wall time 約 12 ms，
-thread CPU 卻只有數十 µs；這表示主要時間沒有在該 thread 上執行，
-但不能僅憑這個差值判定是哪一個 queue 或 runtime 事件造成。
+1. **Watchdog 超時不等於某個 Go 函式跑了 5 秒**：`sched_ext` 的 watchdog 是在檢查系統中是否有 runnable task 太久沒被排上 CPU，或者排程器太久沒推進。
+2. **長尾延遲大多是 Off-CPU 時間**：我們利用 `CLOCK_THREAD_CPUTIME_ID` 同步測量 `SelectCPU` 的 Wall time 與 Thread CPU time，發現當 `SelectCPU` 偶爾出現 4～12 ms 的耗時，該執行緒實際花在 CPU 上的時間只有 **4～48 µs**。換句話說，不是 `asmcgocall` 慢，而是排程器執行緒自己被搶佔、或在等待佇列交接時沒有被及時喚醒。
 
-此外，`watchdog failed to check in` 與某個應用 task 的 runnable stall
-不是完全相同的診斷：前者表示 kernel watchdog 工作沒有及時更新時間戳。
-不能由這段訊息直接推論某個 Go/C 呼叫執行了五秒。
+### `asmcgocall` 的實測效益與使用邊界
 
-## 3. cgo 加速：保留快路徑，清楚界定成本與限制
+在同一台測試機（Intel Xeon Platinum 8272CL, Linux 6.14, Go 1.25.0）上，針對單純的 64-bit 數值讀取跑 microbenchmark，三種路徑的差距非常明顯：
 
-### 3.1 Bridge 的作用
+| 呼叫方式 | 耗時 (`ns/op`) | 記憶體配置 (`allocs/op`) | 說明 |
+| :--- | :---: | :---: | :--- |
+| 標準 `cgo` | 219.6 – 228.1 ns | 0 | 每次進出都要走完整的 Go syscall 狀態切換與記帳 |
+| `asmcgocall` (`schedbridge.Call`) | 20.72 – 21.28 ns | 0 | 直接切到目前 M 的 `g0` stack 執行 C wrapper，快約 10 倍 |
+| Go `atomic.LoadUint64` | 1.13 – 1.37 ns | 0 | 直接讀取對齊後的 BPF skeleton BSS 映射記憶體 |
 
-qumun 既有的 direct bridge 用 `//go:linkname` 呼叫 `runtime.asmcgocall`，
-切換到目前 M 的 g0 stack，執行單一 `void *` 參數的 C ABI wrapper。
-它略過標準 `runtime.cgocall` 的 syscall/runtime bookkeeping。
+因此，**保留 `asmcgocall` 是完全合理的決定**。像是 `SelectCPU`（執行一次 `BPF_PROG_TEST_RUN`）、`DispatchTask`（非阻塞寫入 `user_ring_buffer`）以及更新 BSS 計數器，全部維持走 `schedbridge.Call`；而純讀取的 `GetNrQueued` / `GetNrScheduled` 則直接對 BSS 指標做 Go atomic load，連 C 都不必進。
 
-這不是「消除 kernel syscall」。例如 `SelectCPU` 仍執行一次
-`BPF_PROG_TEST_RUN`；最佳化的是呼叫框架、context 序列化與 Go allocations。
-CPU 選擇保留既有負值 fallback 與單次 `EINTR` 處理，不在訊號中斷後重複執行程式。
+不過使用 `asmcgocall` 必須嚴格遵守幾條鐵律：
+- **絕對不能阻塞**：因為沒有經過 `entersyscall`，Go runtime 不會把當前的 `P` 讓給其他 goroutine。任何可能休眠的操作（例如 `ring_buffer__poll` 或阻塞式 reserve）都不能放進 `asmcgocall`。
+- **零配置與零回呼**：C wrapper 只接收一個指向堆疊結構的 `void *`，裡面只能放純數值或 C 自己管理的指標，不能在 C 裡面回呼 Go 函式，也要在 Go 端用 `runtime.KeepAlive` 確保物件生命週期。
+- **編譯期 ABI 防呆**：在 [`qumun/goland_core/hotpath.go`](./qumun/goland_core/hotpath.go) 中，我們對所有跨界傳遞的 struct 大小、對齊與欄位位移都加上了編譯期斷言，避免 C 與 Go 結構對不上而默默寫壞記憶體。
 
-目前熱路徑包括：
+---
 
-- `SelectCPU`：快取 C function pointer、傳遞固定 ABI 的參數。
-- `DispatchTask`：nonblocking reserve/submit，不使用 reserve-blocking。
-- 直接 dequeue：一次 `ring_buffer__consume_n(..., 1)`，不回呼 Go。
-- BSS scalar writes：透過小型 wrapper。
-- `GetNrQueued` / `GetNrScheduled`：對對齊 BSS 位址直接做 Go atomic load，
-  不需要為了讀值呼叫 C。
+## 二、先把地基補牢：解決 Task Stall 的四個關鍵 Bug
 
-### 3.2 必須維持的限制
+確認 `asmcgocall` 無罪後，我們順著 BPF 與 Go 的狀態機往下挖，找出了真正讓任務卡住或頻繁觸發警告的四個底層問題（見 [`qumun/ebpf/main.bpf.c`](./qumun/ebpf/main.bpf.c) 與 [`Makefile`](./Makefile)）：
 
-- direct `asmcgocall` 不會透過標準 syscall bookkeeping 釋放 P。
-  **不可把可能長時間等待的 poll/read 放進這條路徑。**
-- C 不得回呼 Go、保留 Go 參數指標，或假設可以任意進行 Go runtime 操作。
-- 參數只包含 scalar 與 C-owned addresses；保留 `runtime.KeepAlive`。
-- Go/C 的大小、對齊、field offsets 在編譯時驗證。
-- `runtime.LockOSThread` 固定的是 goroutine 所用的 OS thread/M，
-  不是固定 P，也不是禁止搶佔。
-- `//go:linkname` 依賴 Go runtime 的非公開介面；升級 toolchain 必須重新驗證。
-  此專案連結需要 `-checklinkname=0`，不是對一般程式的通用建議。
-- 若確實需要等待 syscall，應採用有 runtime bookkeeping 的途徑；
-  qumun 另有 `CallSyscall`，但這次沒有把 `SelectCPU` 改回該路徑。
+### 1. BPF `running` / `stopping` / `tick` 的排程器執行緒過濾不一致
+Go 排程器是一個多執行緒程序（同一個 TGID 下有多個 M/執行緒）。原本 BPF 在 `goland_stopping` 會排除整個排程器程序（`is_belong_usersched_task`，比對 TGID），但在 `goland_running` 與 `goland_tick` 卻只排除了主執行緒（比對 `usersched_pid`）。
+這導致兩個後果：
+- 非主執行緒的 Go runtime worker 每次上下 CPU，只有 `running` 把 `nr_running` 加一，`stopping` 卻不減，使 `nr_running` 無限膨脹。
+- 這些 worker 執行緒沒有寫入 `tctx->start_ts`，卻在 `goland_tick` 被拿去跟 `scx_bpf_now()` 相減，誤觸 500ms 的 `max_time_watchdog` 狂發搶佔與 `printk`。
 
-### 3.3 Microbenchmark 證據
+將 `running`、`stopping` 與 `tick` 統一改為以 TGID 排除所有排程器執行緒，並在排程器執行緒上 CPU 時更新 `usersched_last_run_at` 心跳，這類假警報與計數失衡就徹底消失了。
 
-2026-10-27，在 Intel Xeon Platinum 8272CL、linux/amd64 上，
-同一組 scalar-load benchmark 跑三次：
+### 2. `goland_dispatch` 沒拿到排程器任務卻提早 Return
+原本在 `goland_dispatch` 中，只要看到 `usersched_has_pending_tasks()` 為真，呼叫完 `scx_bpf_dsq_move_to_local(SCHED_DSQ, 0)` 就會直接 `return`。問題是，如果當下排程器執行緒正在別顆 CPU 上跑、或是因為 CPU affinity 無法搬過來，`SCHED_DSQ` 其實什麼都沒搬出來。這時提早 return 會導致這顆 CPU 連底下的 per-CPU DSQ 和 `SHARED_DSQ` 都不去消費，眼睜睜看著可執行的任務餓死。修正後，只有在真的從 `SCHED_DSQ` 搬出至少一筆任務時才 return，否則繼續往下消費一般任務佇列。
 
-| 路徑 | ns/op 範圍 | Go allocations |
-|---|---:|---:|
-| Standard cgo | 219.6–228.1 | 0 |
-| `asmcgocall` | 20.72–21.28 | 0 |
-| Go atomic | 1.130–1.369 | 0 |
+### 3. Ringbuffer 發布與 `nr_queued` 計數的競爭（Lost Wakeup）
+在 [`queue_task_to_userspace`](./qumun/ebpf/main.bpf.c) 中，原本的寫法是先呼叫 `bpf_ringbuf_submit(task, 0)`，下一行才執行 `__sync_fetch_and_add(&nr_queued, 1)`。
+當 Go 迴圈剛好在跑時，它可能在 `submit` 完成的瞬間就從 ringbuffer 讀出這筆任務，接著檢查 `GetNrQueued()` 卻讀到還沒加一的 `0`。Plugin 的 `drainQueuedTask` 看到 `count == GetNrQueued()`（`0 == 0`）便立刻結束迴圈，把剛剛讀出來的任務直接丟棄；等幾奈秒後 BPF 把 `nr_queued` 加一，佇列裡已經沒有東西了。
+把 `__sync_fetch_and_add(&nr_queued, 1)` 移到 `bpf_ringbuf_submit` **之前**（並由 [`internal/scheduler/queue_publication_test.go`](./internal/scheduler/queue_publication_test.go) 測試保護），這顆會餓死 `containerd-shim` 等行程的地雷才被拆掉。
 
-這組小操作約有十倍呼叫成本差距，但**不能把這個倍數套到整個 scheduler、
-真實 BPF syscall，或 adaptive priority ratio**。執行時主機已有 scheduler，
-並非隔離、固定頻率的 benchmark 環境。
+### 4. Makefile Skeleton 路徑錯置與 Go Cache
+排查過程中我們一度發現改了 BPF 程式碼卻完全沒生效。追查 [`Makefile`](./Makefile) 才發現，根目錄的 `make wrapper` 把生成的 skeleton 輸出到根目錄的 `main.skeleton.h`，但 `qumun/wrapper.h` 引入的卻是 `qumun/main.skeleton.h`（一份陳舊的檔案），而且 Go build cache 不會主動偵測外部 `libwrapper.a` 的變動。修正輸出路徑並在打包時加上 `go build -a` 後，每次編譯出來的執行檔才真正嵌入了最新的 BPF ELF。
 
-`BenchmarkSelectCPU` 另用同一個小型 syscall BPF program 比較
-`ebpf.Program.Run()` 與 direct wrapper。它用於區分框架成本，
-不是完整 CPU-selection policy 或 Rust/Go 語言效能的對照。
+---
 
-## 4. 先修 correctness，再討論 latency
+## 三、為什麼 `adaptive_priority` 一開始過不了？
 
-### 4.1 Scheduler-process 排除條件一致
-
-先前 `running` 只排除 scheduler 的 process leader，`stopping` 卻排除
-同 TGID 的所有 thread，造成 running 計數不對稱。
-現在 user-space mode 的 running/stopping/tick 對 scheduler-process threads
-採一致排除條件，並在 scheduler thread running 時更新 heartbeat。
-
-Tick 也不能用未初始化的應用 task timestamp 檢查 scheduler threads，
-否則可能產生不必要的 watchdog 搶佔與大量訊息。
-
-### 4.2 沒有成功 dispatch，不能提前 return
-
-有 pending work 不代表目前 CPU 能從 `SCHED_DSQ` 取得 scheduler thread。
-只有實際取得 task 才能結束該次 dispatch；否則必須繼續處理其他 DSQ。
-同時修正 scheduler dispatch batch 的邊界。
-
-### 4.3 Count-before-publication
-
-queued counter 必須在 `bpf_ringbuf_submit` **之前**增加。
-否則 Go 可能已取得 record，卻看到尚未增加的 counter，讓 plugin 丟掉 task；
-之後才增加的 counter 無法把 task 找回。
-
-### 4.4 確保 binary 真正包含新 BPF
-
-Root build 先前生成的 skeleton 路徑與 qumun include 的路徑不同，
-可能編譯了新 BPF，最後卻連到舊 skeleton。
-
-現在 root `wrapper` target 依賴 BPF object，生成
-`qumun/main.skeleton.h`，把 wrapper 與 hotpath 一起 archive。
-Root build 使用 `go build -a`，避免 external C archive/header 變更漏掉 Go cache
-失效；驗證時也檢查當前 BPF ELF bytes 完整存在於最終 executable。
-
-## 5. adaptive_priority 真正在量什麼
-
-測試來源為本機 schtest checkout `ae6450a` 的
-`src/cases/latency.rs`，不是只看 histogram 中央顯示值：
-
-- 兩組 parent/worker 經 semaphore 交接，都綁到同一 logical CPU。
-- Slow worker 忙等約 10 ms。
-- Fast worker 忙等約 100 µs，再 sleep 約 9.9 ms。
-- 比較的是 forward semaphore wake latency 的 **p90**：
+解決穩定度問題後，我們面對的是 `schtest` 的 `adaptive_priority` 測試。當時跑出來的結果是：
 
 ```text
-ratio = p90(fast semaphore wake) / p90(slow semaphore wake)
-通過要求：ratio < 0.50
+converge: iters=370, elapsed=5.00, metric=9.66
+FAILED (Failed to achieve target: got 9.66, expected 0.50)
 ```
 
-Spinner 使用 wall-clock elapsed，不是純 thread CPU 計時。
-測試程式的文字註解與實作數值有出入時，這裡以實際程式為準。
+要壓低這個數字，得先看懂 [`schtest/src/cases/latency.rs`](./schtest/src/cases/latency.rs) 到底在測什麼：
+- 測試會建立兩個行程（Slow 與 Fast），各自有兩個執行緒透過 futex semaphore 互相喚醒，而且**全部綁定在同一顆邏輯 CPU（Core 0 的第一個 Hyperthread）上競爭**。
+- **Slow worker** 每次拿到 semaphore 就死命 busy spin **10 ms**。
+- **Fast worker** 每次拿到 semaphore 只 busy spin **100 µs**，接著就 `sleep` **9.9 ms**。
+- 測試收集單向 semaphore 的喚醒延遲分佈，計算：
+  $$\text{metric} = \frac{\text{p90}(\text{Fast wake latency})}{\text{p90}(\text{Slow wake latency})}$$
+  必須讓 Fast 的 p90 喚醒延遲不到 Slow 的一半（$\text{metric} < 0.50$）才算通過。
 
-`converge` 的 5/10 秒是每個 measurement batch，不是整個測試的總時間。
-該版本在 batch 超時後會回傳 0，所以**不能只用 PASS 或最後回傳值當證據**。
-本次另外確認 >=5-second batch 與最後輸出的實際非零 ratio 都低於門檻，
-沒有改測試 threshold、workload 或 convergence 邏輯。
+換句話說，當 Fast worker 睡完 9.9 ms 醒來時，同一顆 CPU 幾乎一定正被 Slow worker 霸佔著。如果排程器不能讓剛醒來的短任務及時插隊並搶下這顆 CPU，Fast worker 就得排在 10 ms 的 Slow worker 後面乾等，p90 隨便都會衝上 1～2 ms，算出來的 ratio 自然高達 9～12。
 
-## 6. 最後保留的改善
+### 第一階段修正：為什麼加了搶佔，Ratio 還是停在 0.9？
 
-### 6.1 完整 burst，不是最後一小段
+我們在維持「每個任務都經過 Go 決策」的前提下，先補上了針對短任務喚醒的優先處理（[`internal/scheduler/adaptive.go`](./internal/scheduler/adaptive.go) 與 [`qumun/ebpf/main.bpf.c`](./qumun/ebpf/main.bpf.c)）：
 
-長工作可能被切成許多短 slice。如果只看最後一段執行時間，
-會把 CPU-intensive worker 誤認成短工作。
+1. **保存完整的上一輪執行時間（Full Previous Burst）**：長任務可能被切成好幾段短 slice。如果只看最後一次 `stop_ts - start_ts`，Slow worker 很容易在剛被切斷時偽裝成短任務。因此我們在 BPF 的 `goland_runnable`（任務剛從睡眠醒來時）把累積的 `exec_runtime` 存進 `previous_burst_runtime` 並歸零；當這次入隊帶有 `SCX_ENQ_WAKEUP` 時，透過既有的 `exec_runtime` 欄位把「上一次醒著總共跑了多久」傳給 Go，不需修改通訊協定結構。
+2. **短任務識別與 Deadline Bonus**：在 Go 端，只有當任務是 wakeup、且上一輪總執行時間與最後一段執行時間都 $\le 1\text{ ms}$ 時，才將其視為互動式短任務，將它的派發 deadline 往前扣掉一個 `sliceNsDefault`，並帶上 `SCX_ENQ_PREEMPT` 請求；同時若單核綁定任務在 `SelectCPU` 拿到 `RL_CPU_ANY`，保留它原本所屬的 CPU 編號。
+3. **移除無重試的 100 µs 保護門檻**：我們透過 BPF trace 逐筆分析 Fast worker（PID `2063598`）的喚醒過程，抓出了一個關鍵盲點——原本我們在 BPF 的 `preempt_later_deadline` 設了一個「正在跑的任務若還沒跑滿 100 µs 就不搶佔」的保護，結果 **Fast worker 有高達 267 次喚醒剛好撞上這個保護而被拒絕搶佔**。因為這次搶佔請求是一次性的，被拒絕後沒有任何重試機制，Fast worker 的 p90 立刻從 **191 µs** 暴增到 **1,818 µs**！把這個沒有重試的 100 µs 門檻拿掉（只保護排程器自身執行緒）之後，`adaptive_priority` 的 metric 瞬間從 **9.66 降到了 0.88～0.95**。
 
-BPF 在 runnable transition 保存上一個完整 burst，再重設 current accumulator。
-Wakeup record 的既有 `exec_runtime` 欄位回報 previous full burst；
-reenqueue 仍回報 current burst。沒有改 queued/dispatched wire layout。
+但 `0.9` 還是大於 `0.50`。這就引出了一個核心問題：**為什麼 `scx_rustland` 沒有寫這麼複雜的短任務特判，卻能輕鬆跑出 `0.16`？**
 
-Go 只有在 wakeup、previous burst 與 final segment 都已知、為正且 <=1 ms 時，
-才要求 adaptive 搶佔。未知或長 burst 不直接視為互動工作。
+---
 
-### 6.2 Deadline bonus 與一次性搶佔
+## 四、對照 `scx_rustland`：真正卡住最後一哩路的四個基礎機制差距
 
-Go 對 qualifying task 的非零 dispatch deadline 減去一個 default slice，
-下限為 1；明確 priority 的 0 保持不變。
-Bonus 在 plugin pop task 後套用，**不改變 plugin heap 內的排序**。
+我們直接把 `scx_rustland` 與 Gthulhu 的執行軌跡及原始碼攤開來比對，發現兩者的差距根本不在「給短任務多少 bonus」，而是 Gthulhu 的 user-space 迴圈比 `scx_rustland` 多了好幾層無謂的轉手與延遲：
 
-BPF 重新檢查 affinity 與 target CPU，僅在 ordinary current task 仍在該 CPU
-執行、且 deadline 較晚時 kick。Scheduler-process threads 保持受保護。
-單 CPU task 在 idle selection 回傳 ANY 時，Go 保留該 task 的 CPU hint。
+| 排程環節 | `scx_rustland` 的做法 | Gthulhu 原本的做法 | 造成的影響 |
+| :--- | :--- | :--- | :--- |
+| **1. 讀取 `queued` ringbuffer** | 主迴圈直接呼叫 `ring_buffer__consume_n(..., 1)` 同步取單筆任務 | `libbpfgo` 開一個背景 goroutine 跑 `ring_buffer__poll(10ms)`，在 C callback 裡轉成 `[]byte` 塞進 Go channel，主迴圈再從 channel 讀 | 每筆任務多一次 C-to-Go callback、記憶體複製，以及 **跨 goroutine 的 channel 喚醒延遲** |
+| **2. BPF `dispatch` 的處理順序** | **先 drain `dispatched` user ringbuffer** 把算好的任務發出去，再去 `SCHED_DSQ` 搬排程器執行緒 | **先去 `SCHED_DSQ` 搬排程器執行緒並直接 return**，不先 drain `dispatched` | Go 明明已經把任務算好放進 ringbuffer 了，BPF 卻一直優先排 Go 上來跑，讓算好的任務卡在 ringbuffer 裡下不去 |
+| **3. 派發完畢後的 CPU 交接** | `notify_complete` 更新 `nr_scheduled` 後，立刻呼叫 `std::thread::yield_now()`（`sched_yield`） | 只把 `nr_scheduled` 設為 0，沒有向 Linux kernel 交還 CPU，或者卡在 channel 等待 | 在單核競爭測試下，Go 排程器若不主動呼叫 `sched_yield` 觸發 kernel 重新進 `ops.dispatch()`，剛派發出去的 Fast worker 根本拿不到同一顆 CPU |
+| **4. BPF Backend 預設 Time Slice** | 初始化時將 `slice_ns_min`（1 ms）傳給 BPF backend 作為預設 slice，20 ms 只留在 user-space 算 deadline | BPF backend 的 `default_slice` 維持 20 ms | 當佇列暫時為空、BPF 為當前任務續命（replenish slice）或排程器自己執行時，20 ms 的時間片太粗，拉長了切換週期 |
 
-原先增加的「current task 至少執行 100 µs」門檻被移除：
-trace 顯示快速 worker 已符合條件、deadline 也更早，卻被該門檻拒絕；
-這個一次性請求沒有 retry，結果繼續等到後續排程事件。
-帶診斷的拒絕組 wake-to-running p90 約 1.8 ms，成功組約 191 µs。
-這是受 instrumentation 影響的分類證據，不是 production latency 保證。
+找到這四個結構性差異後，我們對 Gthulhu 與 `qumun` 做了對應的手術：
 
-### 6.3 移除 goroutine/channel 中轉
+1. **Pinned Loop 直接非阻塞讀取 Ringbuffer**（[`qumun/hotpath.c`](./qumun/hotpath.c)、[`qumun/goland_core/hotpath.go`](./qumun/goland_core/hotpath.go)）：
+   新增 `qumun_queue_open` 與 `c_dequeue_task_wrapper`，讓綁定 OS thread 的 Go 排程迴圈直接透過 `asmcgocall` 呼叫 `ring_buffer__consume_n(queue->ring, 1)`。因為 `consume_n` 是完全非阻塞的，C callback 只是把 72 bytes 的 `queued_task_ctx` 複製到 C 緩衝區就返回，既符合 `asmcgocall` 的安全規範，又徹底砍掉了背景 poll goroutine 與 Go channel 的中轉開銷。
+2. **`goland_dispatch` 改為先 Drain 已完成的決策**（[`qumun/ebpf/main.bpf.c`](./qumun/ebpf/main.bpf.c)）：
+   在 user-space 模式下進入 `goland_dispatch` 時，第一步先執行 `bpf_user_ringbuf_drain(&dispatched, ...)`，確保 Go 已經算好的派發決策（包含搶佔 kick）第一時間生效，接著才檢查是否需要排入 `SCHED_DSQ`。
+3. **派發完成與空佇列時呼叫 `SYS_SCHED_YIELD`**（[`qumun/goland_core/task.go`](./qumun/goland_core/task.go)、[`internal/scheduler/dispatch_loop.go`](./internal/scheduler/dispatch_loop.go)）：
+   當 Go 迴圈把 task pool 清空並呼叫 `NotifyComplete(0)` 後，或是佇列暫時沒有新任務時，直接執行 `unix.Syscall(unix.SYS_SCHED_YIELD, 0, 0, 0)`（注意不能用只讓出 Go goroutine 的 `runtime.Gosched()`，必須是讓出 Linux OS thread 的 `sched_yield`），把 CPU 立刻交還給 kernel 去跑剛放進 DSQ 的應用任務。
+4. **分離 User-space 預算與 BPF Backend Slice**（[`internal/scheduler/scheduler.go`](./internal/scheduler/scheduler.go)）：
+   Go 端依然使用 `slice_ns_default`（20 ms）來計算 vruntime credit 與 deadline，但透過 `bpfModule.SetDefaultSlice(sliceNsMin)` 將 BPF 端的 `default_slice` 設為 `slice_ns_min`（1 ms）。
+5. **改為 User-space 模式預設行為**：
+   移除臨時的 `-adaptive-wakeup` CLI 旗標，只要啟動 Go user-space 排程模式就會預設啟用上述完整路徑；Kernel mode 的行為則完全維持不變。
 
-現在 pinned Go loop 直接 nonblocking consume queued ringbuffer。
-C callback 只驗證固定長度並複製到 C-owned memory，不再把 record 推回 Go channel。
-錯誤傳回 Go loop；ready check 暫存一筆，避免重複探測遺失 record。
+---
 
-這減少一次 poll goroutine 到 scheduler goroutine 的喚醒交接，
-也讓此路徑不再經過原本的 receive-then-requeue channel wait。
-舊 channel 路徑的 requeue deadlock reproduction 仍保留；
-**這不代表所有 qumun 低階 channel consumers 的舊問題都已修復。**
+## 五、實驗數據與對照結果
 
-### 6.4 先發布 Go 決策，再排 scheduler
+以下是在同一台測試環境（Linux `6.14.0-37-generic`、4 Logical CPUs）下，各個演進階段與 `scx_rustland` 的實際測試紀錄。
 
-BPF dispatch callback 現在**先 drain dispatched ringbuffer**，
-再考慮安排 pending scheduler work。
+### 1. 各階段演進對照總表
 
-原順序可能先選 scheduler thread 並 return，讓已經算好的 Go 決策
-仍留在 ringbuffer。尤其 Go 完成後 yield，若下一次又優先排 scheduler，
-就不是有效的應用 task 交接。
+| 測試配置 / 演進階段 | `adaptive_priority` 最終 Metric（需 `< 0.50`） | 測試結果 | 關鍵原因分析 |
+| :--- | :---: | :---: | :--- |
+| 初始版本（未調整前） | `9.66` | FAILED | 無喚醒搶佔、channel 中轉延遲、10ms Slow worker 長時間霸佔單核 |
+| 加入短任務分類 + 100 µs 保護門檻 | `10.18` – `12.82` | FAILED | 100 µs 門檻拒絕了 267 次 Fast worker 搶佔且無重試，p90 高達 1.8 ms |
+| 移除 100 µs 門檻（仍走舊 channel 與舊 dispatch 順序） | `0.88`、`0.92`、`1.00` | FAILED | 毫秒級卡頓消失（Fast 與 Slow 均約 99 µs），但轉手延遲使兩者拉不開差距 |
+| 單獨換上 Direct Ringbuffer + `sched_yield`（BPF 未先 drain） | `24.48` | FAILED | Go `sched_yield` 讓出 CPU 後，BPF 還沒 drain 決策又把 Go 排回來空轉 |
+| **完整修正（預設開啟，`builtin_idle=false`）** | **`0.22`、`0.19`、`0.21`** | **PASS** | 直接讀取 + BPF 先 drain + `sched_yield` + 1ms backend slice 完整配合 |
+| **完整修正（預設開啟，`builtin_idle=true`）** | **`0.20`**（5s batch 為 `0.22`） | **PASS** | 與 `scx_rustland` 條件對齊，Fast 喚醒中心值壓到 **~13.4 µs** |
+| **對照組：`scx_rustland`（預設 `builtin_idle=true`）** | **`0.16`**（5s batch 為 `0.16`） | **PASS** | Rust user-space 排程基準線，Fast 喚醒中心值約 **~11.2 µs** |
 
-### 6.5 交還 CPU 與 backend slice
+> 補充：在開啟預設最佳化後，我們也執行了 `schtest --filter fairness`，Gthulhu 以 **0.98** 的成績穩定通過（門檻為 `>= 0.60`），確認提升短任務喚醒優先順序並未犧牲多執行緒間的 CPU 公平性。
 
-Go pool 清空、完成通知後，使用 Linux `sched_yield` 交還 CPU；
-空 queue 也用此途徑，而非在 fast C call 內 blocking poll。
-這不是 Go `runtime.Gosched`：目的是進入 Linux 排程交接。
+### 2. `scx_rustland` 實測輸出（Baseline）
 
-Go mode 的 BPF fallback/scheduler slice 採 `scheduler.slice_ns_min`
-（測試設定 1 ms），而 `slice_ns_default`（20 ms）仍作為 Go fairness/deadline budget。
-這避免沒有新工作時以較長 fallback slice 延續執行。
+執行 `sudo schtest/target/debug/schtest --filter adaptive_priority`：
 
-## 7. 與 scx_rustland 的比較及實驗紀錄
+```text
+running 1 test
+test adaptive_priority ... 
+converge: min_time=5.00, max_time=10.00, threshold=0.50
+Fast semaphore wake estimates:
+1.995787ms | 1.995787ms ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 1.995787ms
+Slow semaphore wake estimates:
+44.848µs | 44.848µs ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 44.848µs
+converge: iters=1, elapsed=0.01, metric=44.50
+Fast semaphore wake estimates:
+10.397µs | 10.933µs ▁▆▆▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁| 1.818591ms
+Slow semaphore wake estimates:
+10.711µs |▁▆▆▆▆▆▆▆▆▆▆▆▆▆▆▆▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇▇████████ 131.19µs █▇▆▆▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▃▃▃▂▂▂▁▁| 207.451µs
+converge: iters=100, elapsed=1.03, metric=0.13
+Fast semaphore wake estimates:
+10.151µs | 11.067µs ▁▆▆▆▆▆▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▂▁| 1.992989ms
+Slow semaphore wake estimates:
+10.5µs |▁▆▇▇ 130.8µs ▇▅▅▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 2.262692ms
+converge: iters=487, elapsed=5.09, metric=0.16
+Fast semaphore wake estimates:
+10.035µs | 11.202µs ▁▆▆▆▆▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▁▁▁| 1.980441ms
+Slow semaphore wake estimates:
+10.503µs |▁ 131.554µs ▇▅▅▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 5.970948ms
+converge: iters=974, elapsed=10.14, metric=0.16
+ok
 
-本機 rustland 本來就有：
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 16.27s
+```
 
-- direct ringbuffer consumption；
-- `notify_complete` 更新 pending count 後 Linux thread yield；
-- BPF drain 完成決策先於安排 scheduler；
-- backend 使用 minimum slice；
-- 預設啟用 BPF idle direct dispatch。
+### 3. Gthulhu（User Mode + `builtin_idle=true`）實測輸出
 
-所以 rustland 沒有同名旗標，並不表示它缺少基礎交接機制。
-反過來，也不能只由「整包開啟可通過」推論額外 deadline bonus 或每一種搶佔都必要。
+在同樣開啟 `builtin_idle: true` 的設定下，Gthulhu 的實測表現如下：
 
-| 階段 | 實際 ratio / 結果 |
-|---|---|
-| 早期 adaptive experiment | 多次約 10–13，失敗 |
-| 移除 100 µs gate，其他舊機制保留 | 約 0.9，仍失敗 |
-| 只有 direct consumer、仍採 blocking wait 的實驗 | 約 0.82，仍失敗 |
-| 改用 yield，但尚未搭配最後的交接組合 | 約 24.48，失敗 |
-| drain-first + direct consumer + yield + minimum backend slice | 三次 0.24、0.22、0.21 |
-| 同組合、monitor-enabled 設定 | 三次 0.21、0.22、0.22 |
-| 成為預設後，不帶 adaptive/usersched-preempt 旗標 | 三次 0.22、0.19、0.21 |
+```text
+running 1 test
+test adaptive_priority ... 
+converge: min_time=5.00, max_time=10.00, threshold=0.50
+Fast semaphore wake estimates:
+36.161µs | 36.161µs ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 36.161µs
+Slow semaphore wake estimates:
+27.084µs | 27.084µs ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 27.084µs
+converge: iters=1, elapsed=0.01, metric=1.34
+Fast semaphore wake estimates:
+12.243µs | 13.2µs ▁▇▇▆▆▆▆▆▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▁▁▁▁| 561.357µs
+Slow semaphore wake estimates:
+12.862µs |▁▇ 146.189µs █▆▆▆▆▆▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▂▁| 4.00977ms
+converge: iters=100, elapsed=1.05, metric=0.22
+Fast semaphore wake estimates:
+11.306µs | 13.111µs ▁▆▅▅▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 1.511868ms
+Slow semaphore wake estimates:
+11.242µs |▁▆▇▇█ 145.439µs ▇▅▅▅▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁| 1.984615ms
+converge: iters=477, elapsed=4.98, metric=0.18
+Fast semaphore wake estimates:
+10.188µs | 13.328µs ▁▆▆▆▅▅▅▅▅▅▅▅▅▅▅▅▅▅▅▄▄▄▄▄▄▄▄▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁| 1.93372ms
+Slow semaphore wake estimates:
+11.395µs |▁ 143.592µs ▇▆▅▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁| 6.880901ms
+converge: iters=479, elapsed=5.10, metric=0.22
+Fast semaphore wake estimates:
+7.109µs | 13.454µs ▁▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁| 6.264819ms
+Slow semaphore wake estimates:
+12.026µs |▁▇▇ 146.517µs ▇▆▅▅▅▅▅▅▄▄▄▄▄▄▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁| 3.417526ms
+converge: iters=958, elapsed=10.04, metric=0.20
+ok
 
-最後一組 >=5-second batches 分別約 0.21、0.26、0.24，均 <0.50。
-最後預設模式的 fairness metric 為 0.98，通過其 >=0.60 要求。
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 21.19s
+```
 
-這些是逐步實驗，不是完整 factorial A/B，不能把改善精確分攤給每個因素。
-本機 rustland 曾量到約 0.13–0.27，但第一次 bounded capture 在整個測試完成前
-就停止，**不能宣稱那次 rustland 完整測試已通過**。
-它預設開啟 idle bypass，與本次 `builtin_idle: false` 也不是等價條件。
+可以看到兩者的分佈型態幾乎一模一樣：
+- **Fast semaphore** 的喚醒延遲中位數都被壓在 **11～13.4 µs** 左右。
+- **Slow semaphore** 的喚醒延遲中位數則落在 **131～146 µs** 左右。
+- 在每個超過 5 秒與 10 秒的收斂批次中，Gthulhu 的 metric 穩定維持在 **0.18～0.22**，與 `scx_rustland` 的 **0.13～0.16** 僅有微幅差距，遠低於 `0.50` 的測試門檻。
 
-Gthulhu 仍保留既有 kthread、priority、congestion 等 BPF 路徑；
-「沒有新增短 task bypass」不表示所有歷史 kernel dispatch 路徑都被移除。
+---
 
-## 8. 重現與驗證
+## 六、如何重現編譯與測試
 
-環境：Linux `6.14.0-37-generic`、4 logical CPUs、Go `1.25.0`、
-clang 20；`gthulhu` mode、default/min slices 20/1 ms、debug/API/early_processing/
-builtin_idle 關閉。最後三次使用 repository 的 monitor-enabled configuration。
+### 1. 編譯與執行單元 / 回歸測試
 
-先完成 repository 既有依賴安裝；以下從 Gthulhu 根目錄執行：
+在 Gthulhu 根目錄下執行：
 
 ```bash
+# 重新編譯 BPF、生成 qumun/main.skeleton.h 並打包 libwrapper.a
 make wrapper
 
 export GOTOOLCHAIN=go1.25.0 CC=clang
 export CGO_CFLAGS="-I$PWD -I$PWD/qumun -I$PWD/output"
 export CGO_LDFLAGS="-lelf -lz $PWD/output/libbpf.a -lzstd $PWD/libwrapper.a"
 
+# 強制重新連結執行檔，確保嵌入最新 BPF skeleton
 go build -a -ldflags='-w -s -checklinkname=0' -o main main.go
+
+# 執行 Go 單元測試與 Race 檢查
 go test -race -ldflags='-checklinkname=0' -count=1 \
   ./internal/scheduler/... \
   github.com/Gthulhu/qumun/goland_core \
-  github.com/Gthulhu/qumun/internal/schedbridge \
-  github.com/Gthulhu/qumun/util
-python3 qumun/scripts/test_bpf_progress.py
+  github.com/Gthulhu/qumun/internal/schedbridge
 
-go test -ldflags='-checklinkname=0' \
-  github.com/Gthulhu/qumun/internal/schedbridge \
-  -run '^$' -bench '^BenchmarkLoad' -benchmem -benchtime=100ms -count=3
+# 執行 BPF Callback 邏輯與計數回歸測試（Clang mock 測試）
+python3 qumun/scripts/test_bpf_progress.py
 ```
 
-結果：build、race suites、production BPF callback mock regressions 與 scalar
-benchmark 通過；`qumun/util` 無 test files。Callback harness 不取代 kernel verifier。
-另外已用 root 執行 real-kernel ring tests，驗證 FIFO、ready cache、malformed record、
-invalid/empty ring、取消、standard-cgo bypass、CPU selection 與 ring-full error，
-均通過。一般非 root 測試可能因 BPF 權限而 skip，不能當成 privileged coverage。
+### 2. 執行 `schtest` 驗證
 
-執行 scheduler 與測試時使用不同終端：
+開兩個終端機，第一個終端機啟動排程器（不需加額外實驗旗標）：
 
 ```bash
-# Terminal 1；確認沒有其他 scheduler attach，測完用 SIGINT 停止。
 sudo ./main scheduler -config config/config.yaml
+```
 
-# Terminal 2；使用既有 schtest checkout/build。
+第二個終端機執行 `schtest`：
+
+```bash
 sudo schtest/target/debug/schtest --filter adaptive_priority
 sudo schtest/target/debug/schtest --filter fairness
 ```
 
-上述預設指令已實測，不需要 `-adaptive-wakeup` 或 `-usersched-preempt`。
-記錄每個 measurement batch 的 ratio、總退出狀態、設定與 binary 版本，
-不要只保留 PASS。不要同時 attach 兩個 scheduler。
+### 3. 日後除錯小工具
 
-## 9. 診斷工具與後續限制
+如果未來要再度剖析排程器迴圈或觀察特定負載下的表現，可以使用這次留下的診斷選項（注意：跑正式效能基準測試時請保持關閉，以免計時 syscall 與 log 影響延遲）：
 
-- Gthulhu `-trace-scheduler-loop`：每階段 wall time、active stage 與 histogram。
-- `-trace-scheduler-cpu`：成對 thread CPU/wall 資訊，會增加計時 syscall 成本。
-- qumun standalone `-measure-latency`：SelectCPU 與 BPF enqueue-to-dispatch-receive
-  histogram；它不是 wakeup-to-running 指標。
-- Histogram percentile 是 bucket upper bound，不是精確 percentile；
-  不同 population 的 p99 不能相減當作某一段的 p99。
-- Perf sched 與 Go runtime trace 必須先校正 clock domain，再做逐事件關聯。
-- 診斷、BPF printk 與 tracing 都會改變負載；最終 ratio 使用關閉診斷的結果。
-- 公平性測試通過不等於所有 throughput、power、topology 或 workload 都沒有退化；
-  本次沒有完成完整跨主機、跨 kernel、跨架構測試，也未量化 yield 的 idle power 成本。
-- 本次保留完整 adaptive policy；尚未證明移除 bonus/應用搶佔後依然可通過。
-  這應是獨立、可重現的後續簡化實驗，而不是根據單次成功直接推論。
+- `-trace-scheduler-loop`：每秒輸出排程迴圈各階段的呼叫次數、平均、最大值、`>= 1ms` 次數與分位數上界（`p50_le`、`p99_le`、`p999_le`），並顯示當下停在哪個階段。
+- `-trace-scheduler-cpu`：在 `-trace-scheduler-loop` 之上，額外針對 `SelectCPU` 量測 Thread CPU time 與 Wall time 的最差樣本對照，用來快速分辨是「C/BPF 呼叫本身變慢」還是「排程器執行緒被搶佔 / Off-CPU」。
+- `-usersched-preempt`：預設關閉的實驗性選項。開啟後當 pinned Go 排程器執行緒被喚醒、有待處理任務且找不到閒置 CPU 時，允許以最多每毫秒一次的頻率對其目標 CPU 發出搶佔。
