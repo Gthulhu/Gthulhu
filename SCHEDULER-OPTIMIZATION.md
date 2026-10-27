@@ -6,7 +6,18 @@
 
 ---
 
-## 一、問題起點：為什麼換上 `asmcgocall` 之後反而會卡死？
+## 一、問題起點：為什麼要改用 `asmcgocall`？又為什麼之後會撞上卡死？
+
+> **設計初衷補充：為什麼我們最初決定在熱路徑換上 `asmcgocall`、`runtime.LockOSThread()`，並拿掉 `runtime.GOMAXPROCS(1)`？**
+>
+> 在 Go 的 GMP 排程模型下，標準的 `cgo` 呼叫（`runtime.cgocall`）每次進入 C 之前都會呼叫 `entersyscall`。如果系統判定這個呼叫稍微花了一點時間，或者在 `GOMAXPROCS(1)` 的限制下只有唯一一個 `P`，Go runtime 很容易把這個 `P` 從正在執行 cgo 的 `M`（OS thread）手上剝奪，轉交給另一個新的或閒置的 `M` 去跑其他 goroutine（例如 ringbuffer polling、metrics 或 GC 背景工作）。
+>
+> 等到原本的 C 呼叫結束、執行 `exitsyscall` 準備回到 Go 時，如果拿不到 `P`，排程器 goroutine 就會被迫停下來等、甚至在不同 `M` 之間被換手。這會造成一個對 kernel scheduler 非常致命的現象：**明明只是單次排程迴圈（Drain -> SelectCPU -> Dispatch），卻在每次跨 C 呼叫時不斷交出 `P`、喚醒其他 `M` 與 goroutine 穿插執行，整趟排程被切得支離破碎**。
+>
+> 因此，我們的最佳化核心思路是：
+> 1. **在排程主迴圈加上 `runtime.LockOSThread()`**（[`internal/scheduler/dispatch_loop.go`](./internal/scheduler/dispatch_loop.go)）：將負責排程決策的 goroutine 死死綁在同一個固定的 OS thread（`M`）上，避免它在阻塞與恢復之間漂移到別的執行緒。
+> 2. **移除 `main.go` 裡的 `runtime.GOMAXPROCS(1)`**（[`main.go`](./main.go)）：不再把整個 Go 行程硬鎖在單一 `P` 上，讓監控、API、GC 等其他 goroutine 有自己的 `P` 可以跑，不必跟核心排程迴圈搶同一個 `P`。
+> 3. **熱路徑改用 `runtime.asmcgocall`**（[`qumun/internal/schedbridge/bridge.go`](./qumun/internal/schedbridge/bridge.go)）：直接切換到當前 `M` 的 `g0` stack 執行短平快的 C 函式，**完全不經過 `entersyscall` / `exitsyscall`，也不會把當前的 `P` 讓給新的 `M`**，確保從取任務、選 CPU 到派發的整趟排程 loop 都在同一個 goroutine、同一個 `M` 與同一個 `P` 上一氣呵成。
 
 在混合架構的排程器裡，每一筆非直接派發的任務都要走過這趟旅程：
 
@@ -49,7 +60,7 @@ Task 變成 runnable
 確認 `asmcgocall` 無罪後，我們順著 BPF 與 Go 的狀態機往下挖，找出了真正讓任務卡住或頻繁觸發警告的四個底層問題（見 [`qumun/ebpf/main.bpf.c`](./qumun/ebpf/main.bpf.c) 與 [`Makefile`](./Makefile)）：
 
 ### 1. BPF `running` / `stopping` / `tick` 的排程器執行緒過濾不一致
-Go 排程器是一個多執行緒程序（同一個 TGID 下有多個 M/執行緒）。原本 BPF 在 `goland_stopping` 會排除整個排程器程序（`is_belong_usersched_task`，比對 TGID），但在 `goland_running` 與 `goland_tick` 卻只排除了主執行緒（比對 `usersched_pid`）。
+當我們移除了 `GOMAXPROCS(1)` 並把主迴圈 `LockOSThread()` 之後，Go runtime 更常讓同一個 TGID 下的多個 `M`（OS thread）同時上 CPU 分擔工作，這也剛好暴露出原本 BPF 過濾條件潛藏的不對稱：原本 BPF 在 `goland_stopping` 會排除整個排程器程序（`is_belong_usersched_task`，比對 TGID），但在 `goland_running` 與 `goland_tick` 卻只排除了主執行緒（比對 `usersched_pid`）。
 這導致兩個後果：
 - 非主執行緒的 Go runtime worker 每次上下 CPU，只有 `running` 把 `nr_running` 加一，`stopping` 卻不減，使 `nr_running` 無限膨脹。
 - 這些 worker 執行緒沒有寫入 `tctx->start_ts`，卻在 `goland_tick` 被拿去跟 `scx_bpf_now()` 相減，誤觸 500ms 的 `max_time_watchdog` 狂發搶佔與 `printk`。
