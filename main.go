@@ -8,14 +8,11 @@ package main
 import (
 	"log/slog"
 	"os"
-	"runtime"
 
 	"github.com/Gthulhu/Gthulhu/internal/app"
 )
 
 func main() {
-	runtime.GOMAXPROCS(1)
-
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
