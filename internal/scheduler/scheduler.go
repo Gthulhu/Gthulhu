@@ -37,6 +37,9 @@ func Run(args []string) error {
 	configFile := fs.String("config", "", "Path to YAML configuration file")
 	showHelper := fs.Bool("help", false, "Show help message")
 	showExplain := fs.Bool("explain", false, "Explain configuration options")
+	traceLoop := fs.Bool("trace-scheduler-loop", false, "Report scheduler call timings and active call every second (adds overhead)")
+	traceCPU := fs.Bool("trace-scheduler-cpu", false, "Measure SelectCPU thread CPU time (implies loop tracing; adds two clock syscalls per selection)")
+	preemptLoop := fs.Bool("usersched-preempt", false, "Experimentally preempt for pending scheduler-loop wakeups, at most once per millisecond")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -54,6 +57,9 @@ func Run(args []string) error {
 	cfg, err := config.LoadConfig(*configFile)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+	if *preemptLoop && (cfg.Scheduler.KernelMode || !cfg.IsSchedulerEnabled() || cfg.Scheduler.Mode == "scx") {
+		return fmt.Errorf("-usersched-preempt requires the user-space scheduler")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -105,6 +111,12 @@ func Run(args []string) error {
 	defer bpfModule.Close()
 
 	bpfModule.SetPlugin(p)
+	if !cfg.Scheduler.KernelMode {
+		bpfModule.EnableAdaptiveWakeup()
+		bpfModule.SetDefaultSlice(sliceNsMin)
+		slog.Info("adaptive wakeups enabled",
+			"queue_reader", "direct", "backend_slice_ns", sliceNsMin)
+	}
 
 	if cfg.IsDebugEnabled() {
 		slog.Info("Debug mode enabled")
@@ -288,7 +300,7 @@ func Run(args []string) error {
 		}
 	}
 
-	if err = runSchedulerLoop(ctx, bpfModule, sliceNsDefault, sliceNsMin); err != nil {
+	if err = runSchedulerLoop(ctx, bpfModule, sliceNsDefault, sliceNsMin, *traceLoop || *traceCPU, *traceCPU, *preemptLoop); err != nil {
 		slog.Info("Scheduler loop exited with error", "error", err)
 		uei, err := bpfModule.GetUeiData()
 		if err == nil {

@@ -92,7 +92,8 @@ STATIC=
 
 .PHONY: build
 build: clean $(BPF_OBJ) libbpf libbpf-uapi wrapper monitor-bpf
-	$(CGOFLAG) go build -ldflags "-w -s" main.go
+	# Cgo does not track changes to the external wrapper archive and skeleton.
+	$(CGOFLAG) go build -a -ldflags "-w -s -checklinkname=0" main.go
 
 # Build monitor eBPF object (sched_monitor.bpf.o)
 .PHONY: monitor-bpf
@@ -240,10 +241,12 @@ $(BPF_OBJ): %.o: %.c
 		-Wno-compare-distinct-pointer-types \
 		-c $< -o $@
 
-wrapper:
-	bpftool/src/bpftool gen skeleton qumun/ebpf/main.bpf.o > main.skeleton.h
+.PHONY: wrapper
+wrapper: $(BPF_OBJ)
+	bpftool/src/bpftool gen skeleton $(BPF_OBJ) > qumun/main.skeleton.h
 	$(CGO_CC) -g -O2 -Wall -fPIC -I ./ -c qumun/wrapper.c -o wrapper.o
-	ar rcs libwrapper.a wrapper.o
+	$(CGO_CC) -g -O2 -Wall -fPIC -c qumun/hotpath.c -o hotpath.o
+	ar rcs libwrapper.a wrapper.o hotpath.o
 
 clean:
 	rm -rf output || true

@@ -233,11 +233,164 @@ docker run --privileged=true --pid host --rm ghcr.io/gthulhu/gthulhu:latest /gth
 
 ## Debugging
 
+See [Scheduler optimization notes](./SCHEDULER-OPTIMIZATION.md) for the cgo
+hot-path design, adaptive-priority investigation, measured results, and
+reproduction commands.
+
+### Adaptive wakeups (default in user-space scheduling)
+
+Application wakeup preemption is enabled by default in user-space scheduling;
+the former `-adaptive-wakeup` flag has been removed. Kernel mode is unchanged.
+Every task still goes through Go. A wakeup qualifies only if its known previous
+full runnable burst and its final execution segment are both positive and at
+most 1 ms. BPF reports the previous full burst through
+`exec_runtime` on wakeups, rather than the newly reset current burst. Reenqueues
+retain current-burst runtime reporting.
+
+Go reduces a qualifying task's dispatch deadline by one default slice, flooring
+nonzero deadlines at 1 and preserving explicit priority 0. This adjustment occurs
+after selection from the plugin heap; it does not change the heap's ordering.
+BPF only preempts an ordinary task still running on the selected CPU if its
+deadline is later. Scheduler-process threads remain protected. There is no
+minimum-current-runtime gate: rejecting a one-shot request on that basis had no
+retry and could delay an eligible wakeup until a later scheduling event.
+Single-CPU tasks retain their allowed CPU when idle selection returns ANY; all
+dispatches still undergo affinity validation.
+
+The scheduling loop uses direct, nonblocking ringbuffer
+consumption instead of a polling goroutine and channel handoff. Completed Go
+dispatches are drained by BPF before scheduling additional policy work. Once the
+Go pool is empty, the loop uses Linux `sched_yield` to hand the CPU back to the
+BPF dispatcher; it does not spin while holding a Go P or block inside
+`asmcgocall`. The BPF fallback/scheduler slice uses `scheduler.slice_ns_min`
+in this mode, while `slice_ns_default` remains the Go fairness/deadline budget.
+Kernel mode retains its existing queue and slice behavior.
+
+Before becoming the default, with both experimental flags, `builtin_idle: false`, and diagnostics
+disabled, three repeated `schtest --filter adaptive_priority` runs measured final
+nonzero ratios **0.24, 0.22, and 0.21**, below the required 0.50. Each run also
+measured a sub-0.50 ratio in its >=5-second batch; this is not based solely on the
+test runner's zero-valued convergence return. These are host-specific results,
+not a latency guarantee. Validate fairness and
+throughput on the target workload.
+
+Repeating with the repository's monitor-enabled configuration measured 0.21,
+0.22, and 0.22. The `fairness` test also passed with the experiment enabled
+(0.98) and disabled (0.96).
+
+After making adaptive wakeups the default, three monitor-enabled runs with
+**neither** experimental flag measured final nonzero ratios 0.22, 0.19, and 0.21;
+their >=5-second batches also remained below 0.50. Default-mode `fairness` passed
+at 0.98. `-usersched-preempt` is not required for these results.
+
+```bash
+sudo ./main scheduler -config config/config.yaml
+sudo schtest/target/debug/schtest --filter adaptive_priority
+```
+
+### Experimental scheduler-loop wakeup preemption
+
+```bash
+sudo ./main scheduler -config config/config.yaml -usersched-preempt -trace-scheduler-cpu
+```
+
+`-usersched-preempt` is off by default and only applies to the user-space
+scheduler. The pinned loop registers its Linux TID after attachment and clears
+it on exit. When that thread wakes with pending work and no idle CPU is found,
+BPF can head-insert it on its assigned, affinity-allowed CPU and request
+preemption, globally limited to once per millisecond. Other scheduler-process
+threads and slice-expiry reenqueues retain the existing policy; throttled
+wakeups fall back to SCHED_DSQ. The idle-CPU path is unchanged. This is not a
+latency guarantee: higher scheduling classes and runtime waits can still delay
+the loop. The early startup window before TID registration also uses the old
+policy.
+
+Compare runs with/without this flag under the same workload and diagnostic
+settings. Measure kernel runnable-to-running delay, slow-call frequency, and
+application throughput/latency; a lower scheduler delay alone is not a win if
+application performance regresses. CPU-time tracing itself adds overhead.
+
 ```bash
 sudo bpftool prog list
 sudo bpftool map list
 sudo cat /sys/kernel/debug/tracing/trace_pipe
 ```
+
+To diagnose user-space scheduling stalls without changing the cgo bridge:
+
+```bash
+sudo ./main scheduler -config config/config.yaml -trace-scheduler-loop
+```
+
+This opt-in diagnostic reports each call's cumulative count, average, maximum,
+and count taking at least 1 ms every second, plus the active call and its elapsed
+time. `p50_le`, `p99_le`, and `p999_le` are cumulative histogram percentile
+upper bounds (power-of-two nanosecond buckets), not exact percentiles.
+Like `max`, they cover the entire run, not just the previous second.
+It adds timing/atomic overhead; leave it off for performance comparisons.
+Durations include time descheduled, GC pauses, and lock waits, not just CPU time.
+`BlockTilReadyForDequeue` can legitimately wait while idle; a long wait alone
+does not prove a deadlock. Correlate it with queued work and a goroutine dump
+(pprof is available on port 6060 when `debug: true`).
+The reporter is a Go goroutine: missing reports can indicate runtime or system
+starvation and cannot identify the blocked call by themselves. This diagnostic
+does not measure BPF dispatch latency or replace kernel tracing.
+
+For SelectCPU CPU-time attribution, enable the more intrusive diagnostic:
+
+```bash
+sudo ./main scheduler -config config/config.yaml -trace-scheduler-cpu
+```
+
+This implies loop tracing and adds two `CLOCK_THREAD_CPUTIME_ID` clock syscalls
+per selection. The startup log includes the pinned loop's Linux `tid`.
+`SelectCPU_thread` reports average thread CPU time and a paired sample for the
+largest wall-time measurement: `worst_wall`, `worst_cpu`, and
+`worst_non_cpu_estimate`. A large wall time with small CPU time points toward
+descheduling or blocking, not CPU-intensive selection. The difference is an
+estimate because the wall/CPU clock boundaries differ and include diagnostic
+overhead. CPU time includes user and kernel execution on this thread; it does
+not isolate BPF execution or distinguish GC, lock waits, and OS scheduling.
+Only the slowest sample is retained; there is no per-call logging.
+
+To correlate GC/runtime scheduling, set `debug: true` and capture a short trace
+from the local pprof endpoint while reproducing the workload:
+
+```bash
+curl --fail 'http://127.0.0.1:6060/debug/pprof/trace?seconds=10' -o /tmp/gthulhu-runtime.trace
+go tool trace /tmp/gthulhu-runtime.trace
+```
+
+For kernel scheduling evidence, substitute the logged numeric TID below:
+
+```bash
+sudo perf sched record -t <tid> -- sleep 10
+sudo perf sched timehist -t <tid>
+```
+
+Runtime tracing does not fully describe syscalls made via bare `asmcgocall`;
+use kernel scheduling evidence to verify off-CPU attribution. These captures
+add overhead and should be short; neither is enabled by default.
+
+After changing BPF callbacks, rebuild with `make build`. The wrapper includes
+`qumun/main.skeleton.h`, so the root build generates the skeleton there (not in
+the repository root) and forces a Go rebuild to avoid cached external C
+archive/header contents. A successful Go link alone does not establish that
+the updated BPF program was embedded.
+
+Queued tasks must be counted before `bpf_ringbuf_submit` publishes them. The
+current plugin checks `nr_queued` after dequeuing a record; publishing first
+can make it consume and discard a task while the counter is still zero,
+leaving a stranded count after the producer increments it.
+`TestQueuePublicationOrder` reproduces this interleaving with the actual plugin
+without requiring BPF privileges.
+
+The qumun test
+`TestBlockTilReadyForDequeueRequeueBlocksWithWaitingProducer` reproduces the
+current channel requeue deadlock without loading BPF: a waiting producer fills
+the slot released by the receive, so requeueing blocks even after cancellation.
+It is a diagnostic reproduction, not a fix or proof that a particular watchdog
+exit was caused by this path.
 
 ## Related repositories
 
