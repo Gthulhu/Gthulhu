@@ -5,6 +5,9 @@ kind: ClusterRole
 metadata:
   name: gthulhu-manager-crd
 rules:
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims", "resourceslices"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["gthulhu.io"]
     resources: ["schedulingstrategies", "schedulingintents"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
