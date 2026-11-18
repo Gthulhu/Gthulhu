@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/Gthulhu/api/config"
 	"github.com/Gthulhu/api/manager/client"
 	"github.com/Gthulhu/api/manager/domain"
@@ -46,11 +48,19 @@ func ConfigModule(cfg config.ManageConfig) (fx.Option, error) {
 // AdapterModule creates an Fx module that provides the K8S adapter and Decision Maker client
 func AdapterModule() (fx.Option, error) {
 	return fx.Options(
-		fx.Provide(func(k8sConfig config.K8SConfig) (domain.K8SAdapter, error) {
-			return k8sadapter.NewAdapter(k8sadapter.Options{
+		fx.Provide(func(lifecycle fx.Lifecycle, k8sConfig config.K8SConfig) (domain.K8SAdapter, error) {
+			adapter, err := k8sadapter.NewAdapter(k8sadapter.Options{
 				KubeConfigPath: k8sConfig.KubeConfigPath,
 				InCluster:      k8sConfig.IsInCluster,
 			})
+			if err != nil {
+				return nil, err
+			}
+			lifecycle.Append(fx.Hook{OnStop: func(context.Context) error {
+				adapter.StopPodWatcher()
+				return nil
+			}})
+			return adapter, nil
 		}),
 		fx.Provide(func(k8sConfig config.K8SConfig) (dynamic.Interface, error) {
 			return k8sadapter.NewDynamicClient(k8sadapter.Options{

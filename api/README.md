@@ -60,6 +60,44 @@ This API Server adopts a dual-mode architecture, consisting of two independent s
 
 **Default Port**: `:8081`
 
+#### Read-only Claim2Core allocation bindings
+
+The manager Kubernetes adapter observes `resource.k8s.io/v1` ResourceClaims
+and ResourceSlices using list/watch informers and shares its existing Pod
+informer. Its separate `domain.ClaimBindingReader` interface exposes
+`QueryClaimDeviceBindings(podUID)`; an empty UID selects all pods. Queries
+return detached, sorted cached snapshots without Kubernetes requests.
+The boolean result indicates initial Pod/claim cache synchronization.
+`StopPodWatcher` stops all three informers and clears the binding snapshot.
+
+Bindings join namespaced Pod `spec.resourceClaims` references (including
+template-generated names from `status.resourceClaimStatuses`, verified against
+the claim's Pod controller owner UID) to
+`status.allocation.devices.results`. Only assigned, non-terminal,
+non-deleting Pods and non-deleting claims are included. Shared claims produce
+one binding per referencing Pod and allocation result. Node identity is the
+Pod's `spec.nodeName`, not a guess from inventory or an allocation selector.
+Every reconciliation replaces the snapshot, including claim UID/generation,
+so deletion, deallocation, reallocation and same-name recreation remove old
+bindings. Watch reconnect/relist is handled by client-go.
+
+ResourceSlices only enrich exact driver/pool/device matches, never establish
+allocation identity. Topology uses v1 device `attributes`: `numaNode` (nonnegative
+integer), `pcieRoot` and `pciBusID` (strings), qualified by
+`resource.kubernetes.io/`, then the allocating driver, then unqualified
+(driver-local) names. These are optional metadata conventions, not mandatory
+attributes for DRA drivers. Slice UID/generation and pool generation preserve
+provenance. Only the newest complete pool generation is used. Missing,
+ambiguous, node-mismatched or node-selector-only inventory leaves topology
+unresolved without removing the binding.
+
+The manager service account needs read-only `get/list/watch` on claims and
+slices, as included in the chart and manager RBAC manifest. Clusters without
+the v1 DRA API still support existing manager operations; claim synchronization
+remains false while client-go retries. This observer is eventually consistent,
+does not match tasks/TIDs, does not alter scheduling decisions, and has no
+sched_ext/BPF write path.
+
 ### Decision Maker Mode
 
 **Purpose**: Deployed on each Kubernetes node (as DaemonSet), responsible for receiving scheduling intents and interacting with the local sched_ext scheduler.

@@ -70,6 +70,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["resource.k8s.io"]
+    resources: ["resourceclaims", "resourceslices"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["gthulhu.io"]
     resources: ["schedulingstrategies", "schedulingintents", "podschedulingmetrics"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -90,4 +93,3 @@ subjects:
     name: {{ include "gthulhu.fullname" . }}-manager
     namespace: {{ .Release.Namespace }}
 {{- end }}
-

@@ -39,6 +39,7 @@ type Adapter struct {
 	startWatcher   sync.Once
 	stopWatcher    sync.Once
 	cacheHasSynced atomic.Bool
+	claimObserver  *claimObserver
 }
 
 func NewAdapter(opt Options) (*Adapter, error) {
@@ -97,6 +98,12 @@ func (a *Adapter) startPodWatcher() {
 	a.startWatcher.Do(func() {
 		informerFactory := informers.NewSharedInformerFactory(a.client, 0)
 		podInformer := informerFactory.Core().V1().Pods().Informer()
+		if a.dynamicClient != nil {
+			observer, factory := newClaimObserver(podInformer, a.dynamicClient)
+			a.claimObserver = observer
+			factory.Start(a.stopCh)
+			go observer.run(a.stopCh)
+		}
 
 		podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
