@@ -71,7 +71,8 @@ The boolean result indicates initial Pod/claim cache synchronization.
 `StopPodWatcher` stops all three informers and clears the binding snapshot.
 
 Bindings join namespaced Pod `spec.resourceClaims` references (including
-template-generated names from `status.resourceClaimStatuses`) to
+template-generated names from `status.resourceClaimStatuses`, verified against
+the claim's Pod controller owner UID) to
 `status.allocation.devices.results`. Only assigned, non-terminal,
 non-deleting Pods and non-deleting claims are included. Shared claims produce
 one binding per referencing Pod and allocation result. Node identity is the

@@ -204,9 +204,11 @@ func TestClaimBindingsPodReferences(t *testing.T) {
 	unscheduled.Spec.NodeName = ""
 	terminal := bindingPod("terminal", "claim")
 	terminal.Status.Phase = corev1.PodSucceeded
+	generatedClaim := allocatedClaim("generated-claim")
+	generatedClaim.SetOwnerReferences([]metav1.OwnerReference{*metav1.NewControllerRef(generated, corev1.SchemeGroupVersion.WithKind("Pod"))})
 	a, client, _ := bindingAdapter(t,
 		[]*corev1.Pod{bindingPod("pod", "claim"), shared, generated, crossNamespace, unscheduled, terminal},
-		allocatedClaim("claim"), allocatedClaim("generated-claim"), allocatedClaim("unreferenced"))
+		allocatedClaim("claim"), generatedClaim, allocatedClaim("unreferenced"))
 	got := awaitBindings(t, a, func(b []domain.ClaimDeviceBinding) bool { return len(b) == 3 })
 	assert.Equal(t, []types.UID{"generated", "pod", "shared"}, []types.UID{got[0].PodUID, got[1].PodUID, got[2].PodUID})
 	assert.Equal(t, "generated-claim", got[0].ClaimName)
@@ -275,4 +277,38 @@ func TestClaimBindingWatchReceivesNewClaims(t *testing.T) {
 	_, err := dyn.Resource(resourceClaimV1GVR).Namespace("ns").Create(context.Background(), allocatedClaim("claim"), metav1.CreateOptions{})
 	require.NoError(t, err)
 	awaitBindings(t, a, func(b []domain.ClaimDeviceBinding) bool { return len(b) == 1 })
+}
+
+func TestTemplateClaimBindingRequiresPodOwnership(t *testing.T) {
+	pod := bindingPod("pod", "claim")
+	template, claimName := "template", "claim"
+	pod.Spec.ResourceClaims[0].ResourceClaimName = nil
+	pod.Spec.ResourceClaims[0].ResourceClaimTemplateName = &template
+	pod.Status.ResourceClaimStatuses = []corev1.PodResourceClaimStatus{{Name: "gpu", ResourceClaimName: &claimName}}
+	claim := allocatedClaim("claim")
+	a, _, dyn := bindingAdapter(t, []*corev1.Pod{pod}, claim)
+	awaitBindings(t, a, func(b []domain.ClaimDeviceBinding) bool { return len(b) == 0 })
+
+	claim.SetOwnerReferences([]metav1.OwnerReference{*metav1.NewControllerRef(pod, corev1.SchemeGroupVersion.WithKind("Pod"))})
+	require.NoError(t, dyn.Tracker().Update(resourceClaimV1GVR, claim, "ns"))
+	awaitBindings(t, a, func(b []domain.ClaimDeviceBinding) bool { return len(b) == 1 })
+
+	// A replacement claim at the cached name may belong to a different Pod,
+	// even one with the same name. The Pod UID must still match.
+	require.NoError(t, dyn.Tracker().Delete(resourceClaimV1GVR, "ns", "claim"))
+	awaitBindings(t, a, func(b []domain.ClaimDeviceBinding) bool { return len(b) == 0 })
+	claim.SetUID("replacement-claim")
+	otherPod := pod.DeepCopy()
+	otherPod.UID = "replacement-pod"
+	claim.SetOwnerReferences([]metav1.OwnerReference{*metav1.NewControllerRef(otherPod, corev1.SchemeGroupVersion.WithKind("Pod"))})
+	require.NoError(t, dyn.Tracker().Create(resourceClaimV1GVR, claim, "ns"))
+	// Wait for the replacement to reach the informer before checking absence.
+	require.Eventually(t, func() bool {
+		obj, exists, _ := a.claimObserver.claims.GetStore().GetByKey("ns/claim")
+		return exists && obj.(*unstructured.Unstructured).GetUID() == "replacement-claim"
+	}, time.Second, 10*time.Millisecond)
+	a.claimObserver.reconcile()
+	got, synced := a.QueryClaimDeviceBindings("")
+	require.True(t, synced)
+	assert.Empty(t, got)
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/Gthulhu/api/manager/domain"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -120,6 +121,9 @@ func (o *claimObserver) reconcile() {
 			}
 			claim := obj.(*unstructured.Unstructured)
 			if claim.GetUID() == "" || claim.GetDeletionTimestamp() != nil {
+				continue
+			}
+			if ref.ResourceClaimName == nil && !metav1.IsControlledBy(claim, pod) {
 				continue
 			}
 			results, _, _ := unstructured.NestedSlice(claim.Object, "status", "allocation", "devices", "results")
