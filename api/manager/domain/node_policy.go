@@ -1,6 +1,7 @@
 package domain
 
 import (
+	dmdomain "github.com/Gthulhu/api/decisionmaker/domain"
 	"github.com/Gthulhu/api/pkg/util"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -25,6 +26,7 @@ type DRASelector struct {
 // is no Pod/K8sNamespace concept here.
 type NodeSchedulingPolicy struct {
 	BaseEntity    `bson:",inline"`
+	Generation    int64           `bson:"generation,omitempty"`
 	NodeSelectors []LabelSelector `bson:"nodeSelectors,omitempty"`
 	NodeNames     []string        `bson:"nodeNames,omitempty"`
 	DRASelectors  []DRASelector   `bson:"draSelectors,omitempty"`
@@ -39,6 +41,7 @@ type NodeSchedulingPolicy struct {
 type NodeSchedulingIntent struct {
 	BaseEntity    `bson:",inline"`
 	PolicyID      bson.ObjectID `bson:"policyID,omitempty"`
+	Generation    int64         `bson:"generation,omitempty"`
 	NodeID        string        `bson:"nodeID,omitempty"`
 	CommandRegex  string        `bson:"commandRegex,omitempty"`
 	Priority      int           `bson:"priority,omitempty"`
@@ -50,10 +53,19 @@ func NewNodeSchedulingIntent(policy *NodeSchedulingPolicy, node *Node) NodeSched
 	return NodeSchedulingIntent{
 		BaseEntity:    NewBaseEntity(util.Ptr(policy.CreatorID), util.Ptr(policy.UpdaterID)),
 		PolicyID:      policy.ID,
+		Generation:    policy.Generation,
 		NodeID:        node.Name,
 		CommandRegex:  policy.CommandRegex,
 		Priority:      policy.Priority,
 		ExecutionTime: policy.ExecutionTime,
 		State:         IntentStateInitialized,
 	}
+}
+
+type NodeSchedulingPolicyPreview struct {
+	Policy       *NodeSchedulingPolicy         `json:"-"`
+	MatchedNodes []string                      `json:"matchedNodes"`
+	MatchedTasks []dmdomain.TaskInfo           `json:"matchedTasks"`
+	Conflicts    []dmdomain.NodePolicyConflict `json:"conflicts"`
+	Warnings     []dmdomain.NodePolicyWarning  `json:"warnings"`
 }

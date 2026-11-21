@@ -7,6 +7,7 @@ package domain
 import (
 	"context"
 
+	"github.com/Gthulhu/api/decisionmaker/domain"
 	mock "github.com/stretchr/testify/mock"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
@@ -3464,6 +3465,86 @@ func (_c *MockService_LogoutAll_Call) RunAndReturn(run func(ctx context.Context,
 	return _c
 }
 
+// PreviewNodeSchedulingPolicy provides a mock function for the type MockService
+func (_mock *MockService) PreviewNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) (*NodeSchedulingPolicyPreview, error) {
+	ret := _mock.Called(ctx, operator, policyID, policy)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PreviewNodeSchedulingPolicy")
+	}
+
+	var r0 *NodeSchedulingPolicyPreview
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string, *NodeSchedulingPolicy) (*NodeSchedulingPolicyPreview, error)); ok {
+		return returnFunc(ctx, operator, policyID, policy)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *Claims, string, *NodeSchedulingPolicy) *NodeSchedulingPolicyPreview); ok {
+		r0 = returnFunc(ctx, operator, policyID, policy)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*NodeSchedulingPolicyPreview)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *Claims, string, *NodeSchedulingPolicy) error); ok {
+		r1 = returnFunc(ctx, operator, policyID, policy)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_PreviewNodeSchedulingPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PreviewNodeSchedulingPolicy'
+type MockService_PreviewNodeSchedulingPolicy_Call struct {
+	*mock.Call
+}
+
+// PreviewNodeSchedulingPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - operator *Claims
+//   - policyID string
+//   - policy *NodeSchedulingPolicy
+func (_e *MockService_Expecter) PreviewNodeSchedulingPolicy(ctx interface{}, operator interface{}, policyID interface{}, policy interface{}) *MockService_PreviewNodeSchedulingPolicy_Call {
+	return &MockService_PreviewNodeSchedulingPolicy_Call{Call: _e.mock.On("PreviewNodeSchedulingPolicy", ctx, operator, policyID, policy)}
+}
+
+func (_c *MockService_PreviewNodeSchedulingPolicy_Call) Run(run func(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy)) *MockService_PreviewNodeSchedulingPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *Claims
+		if args[1] != nil {
+			arg1 = args[1].(*Claims)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *NodeSchedulingPolicy
+		if args[3] != nil {
+			arg3 = args[3].(*NodeSchedulingPolicy)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_PreviewNodeSchedulingPolicy_Call) Return(nodeSchedulingPolicyPreview *NodeSchedulingPolicyPreview, err error) *MockService_PreviewNodeSchedulingPolicy_Call {
+	_c.Call.Return(nodeSchedulingPolicyPreview, err)
+	return _c
+}
+
+func (_c *MockService_PreviewNodeSchedulingPolicy_Call) RunAndReturn(run func(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) (*NodeSchedulingPolicyPreview, error)) *MockService_PreviewNodeSchedulingPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // QueryPermissions provides a mock function for the type MockService
 func (_mock *MockService) QueryPermissions(ctx context.Context, opt *QueryPermissionOptions) error {
 	ret := _mock.Called(ctx, opt)
@@ -5022,6 +5103,80 @@ func (_c *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call) Return(pod
 }
 
 func (_c *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)) *MockDecisionMakerAdapter_GetPodSchedulingMetricValues_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// PreviewNodeSchedulingPolicy provides a mock function for the type MockDecisionMakerAdapter
+func (_mock *MockDecisionMakerAdapter) PreviewNodeSchedulingPolicy(ctx context.Context, decisionMaker *DecisionMakerPod, req domain.NodePolicyPreviewRequest) (*domain.NodePolicyPreview, error) {
+	ret := _mock.Called(ctx, decisionMaker, req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PreviewNodeSchedulingPolicy")
+	}
+
+	var r0 *domain.NodePolicyPreview
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod, domain.NodePolicyPreviewRequest) (*domain.NodePolicyPreview, error)); ok {
+		return returnFunc(ctx, decisionMaker, req)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *DecisionMakerPod, domain.NodePolicyPreviewRequest) *domain.NodePolicyPreview); ok {
+		r0 = returnFunc(ctx, decisionMaker, req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*domain.NodePolicyPreview)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *DecisionMakerPod, domain.NodePolicyPreviewRequest) error); ok {
+		r1 = returnFunc(ctx, decisionMaker, req)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PreviewNodeSchedulingPolicy'
+type MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call struct {
+	*mock.Call
+}
+
+// PreviewNodeSchedulingPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - decisionMaker *DecisionMakerPod
+//   - req domain.NodePolicyPreviewRequest
+func (_e *MockDecisionMakerAdapter_Expecter) PreviewNodeSchedulingPolicy(ctx interface{}, decisionMaker interface{}, req interface{}) *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call {
+	return &MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call{Call: _e.mock.On("PreviewNodeSchedulingPolicy", ctx, decisionMaker, req)}
+}
+
+func (_c *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call) Run(run func(ctx context.Context, decisionMaker *DecisionMakerPod, req domain.NodePolicyPreviewRequest)) *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *DecisionMakerPod
+		if args[1] != nil {
+			arg1 = args[1].(*DecisionMakerPod)
+		}
+		var arg2 domain.NodePolicyPreviewRequest
+		if args[2] != nil {
+			arg2 = args[2].(domain.NodePolicyPreviewRequest)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call) Return(nodePolicyPreview *domain.NodePolicyPreview, err error) *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call {
+	_c.Call.Return(nodePolicyPreview, err)
+	return _c
+}
+
+func (_c *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call) RunAndReturn(run func(ctx context.Context, decisionMaker *DecisionMakerPod, req domain.NodePolicyPreviewRequest) (*domain.NodePolicyPreview, error)) *MockDecisionMakerAdapter_PreviewNodeSchedulingPolicy_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -7,12 +7,14 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/Gthulhu/api/config"
+	dmdomain "github.com/Gthulhu/api/decisionmaker/domain"
 	dmrest "github.com/Gthulhu/api/decisionmaker/rest"
 	"github.com/Gthulhu/api/manager/domain"
 	"github.com/Gthulhu/api/pkg/logger"
@@ -168,7 +170,7 @@ func (dm *DecisionMakerClient) GetToken(ctx context.Context, decisionMaker *doma
 	if err != nil {
 		return "", err
 	}
-	endpoint := dm.scheme() + "://" + decisionMaker.Host + ":" + strconv.Itoa(decisionMaker.Port) + "/api/v1/auth/token"
+	endpoint := dm.scheme() + "://" + net.JoinHostPort(decisionMaker.Host, strconv.Itoa(decisionMaker.Port)) + "/api/v1/auth/token"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", err
@@ -187,6 +189,9 @@ func (dm *DecisionMakerClient) GetToken(ctx context.Context, decisionMaker *doma
 	err = decoder.Decode(&tokenResp)
 	if err != nil {
 		return "", err
+	}
+	if tokenResp.Data == nil || tokenResp.Data.Token == "" {
+		return "", fmt.Errorf("decision maker %s returned no token", decisionMaker)
 	}
 
 	ttl := time.Now().Unix() - tokenResp.Data.ExpiredAt - 60
@@ -274,6 +279,8 @@ func (dm *DecisionMakerClient) SendNodeSchedulingPolicies(ctx context.Context, d
 		reqPayload.Policies = append(reqPayload.Policies, dmrest.NodePolicy{
 			PolicyID:      intent.PolicyID.Hex(),
 			NodeID:        intent.NodeID,
+			Node:          intent.NodeID, // Manager uses the Kubernetes node name as its node ID.
+			Generation:    intent.Generation,
 			CommandRegex:  intent.CommandRegex,
 			Priority:      intent.Priority,
 			ExecutionTime: intent.ExecutionTime,
@@ -300,6 +307,42 @@ func (dm *DecisionMakerClient) SendNodeSchedulingPolicies(ctx context.Context, d
 		return fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
 	}
 	return nil
+}
+
+func (dm *DecisionMakerClient) PreviewNodeSchedulingPolicy(ctx context.Context, decisionMaker *domain.DecisionMakerPod, payload dmdomain.NodePolicyPreviewRequest) (*dmdomain.NodePolicyPreview, error) {
+	token, err := dm.GetToken(ctx, decisionMaker)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	endpoint := dm.scheme() + "://" + net.JoinHostPort(decisionMaker.Host, strconv.Itoa(decisionMaker.Port)) + "/api/v1/node-scheduling-policies/preview"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := dm.Client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("decision maker %s returned non-OK status: %s", decisionMaker, resp.Status)
+	}
+
+	var result dmrest.SuccessResponse[dmdomain.NodePolicyPreview]
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	if !result.Success || result.Data == nil {
+		return nil, fmt.Errorf("decision maker %s returned no successful preview", decisionMaker)
+	}
+	return result.Data, nil
 }
 
 func (dm *DecisionMakerClient) GetNodePolicyMerkleRoot(ctx context.Context, decisionMaker *domain.DecisionMakerPod) (string, error) {

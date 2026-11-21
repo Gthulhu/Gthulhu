@@ -54,11 +54,12 @@ func (h *Handler) HandleIntents(w http.ResponseWriter, r *http.Request) {
 
 // SchedulingStrategy represents a strategy for process scheduling
 type SchedulingIntents struct {
-	Priority      int             `json:"priority"`                // Priority value; higher value means higher priority
-	ExecutionTime uint64          `json:"execution_time"`          // Time slice for this process in nanoseconds
-	PID           int             `json:"pid,omitempty"`           // Process ID to apply this strategy to
-	Selectors     []LabelSelector `json:"selectors,omitempty"`     // Label selectors to match pods
-	CommandRegex  string          `json:"command_regex,omitempty"` // Regex to match process command
+	Priority        int                     `json:"priority"`                // Priority value; higher value means higher priority
+	ExecutionTime   uint64                  `json:"execution_time"`          // Time slice for this process in nanoseconds
+	PID             int                     `json:"pid,omitempty"`           // Process ID to apply this strategy to
+	Selectors       []LabelSelector         `json:"selectors,omitempty"`     // Label selectors to match pods
+	CommandRegex    string                  `json:"command_regex,omitempty"` // Regex to match process command
+	NodePolicyMatch *domain.NodePolicyMatch `json:"nodePolicyMatch,omitempty"`
 }
 
 // LabelSelector represents a key-value pair for pod label selection
@@ -85,11 +86,12 @@ func (h *Handler) ListIntents(w http.ResponseWriter, r *http.Request) {
 	schedulingIntents := make([]*SchedulingIntents, 0, len(intents))
 	for _, intent := range intents {
 		schedulingIntents = append(schedulingIntents, &SchedulingIntents{
-			Priority:      intent.Priority,
-			ExecutionTime: intent.ExecutionTime,
-			PID:           intent.PID,
-			Selectors:     convertMapToLabelSelectors(intent.Selectors),
-			CommandRegex:  intent.CommandRegex,
+			Priority:        intent.Priority,
+			ExecutionTime:   intent.ExecutionTime,
+			PID:             intent.PID,
+			Selectors:       convertMapToLabelSelectors(intent.Selectors),
+			CommandRegex:    intent.CommandRegex,
+			NodePolicyMatch: intent.NodePolicyMatch,
 		})
 	}
 

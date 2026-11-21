@@ -52,6 +52,7 @@ func (h *Handler) SetupRoutes(engine *echo.Echo) {
 
 		// node scheduling policy routes
 		apiV1.POST("/node-scheduling-policies", h.echoHandler(h.CreateNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyCreate)))
+		apiV1.POST("/node-scheduling-policies/preview", h.echoHandler(h.PreviewNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyRead)))
 		apiV1.PUT("/node-scheduling-policies", h.echoHandler(h.UpdateNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyUpdate)))
 		apiV1.GET("/node-scheduling-policies/self", h.echoHandler(h.ListSelfNodeSchedulingPolicies), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyRead)))
 		apiV1.DELETE("/node-scheduling-policies", h.echoHandler(h.DeleteNodeSchedulingPolicy), echo.WrapMiddleware(h.GetAuthMiddleware(domain.NodeSchedulingPolicyDelete)))

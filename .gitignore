@@ -9,3 +9,6 @@ main
 libwrapper.a
 gthulhu-cli
 monitor/bpf/vmlinux.h
+go-build[0-9]*/
+/.manager-test-scratch/
+/.scheduler-go-work/

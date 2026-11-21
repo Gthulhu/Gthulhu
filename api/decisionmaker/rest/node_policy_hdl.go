@@ -1,9 +1,11 @@
 package rest
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/Gthulhu/api/decisionmaker/domain"
+	"github.com/Gthulhu/api/decisionmaker/service"
 )
 
 // HandleNodePoliciesRequest is the payload the Manager sends when pushing
@@ -13,13 +15,7 @@ type HandleNodePoliciesRequest struct {
 }
 
 // NodePolicy mirrors domain.NodePolicy over the wire.
-type NodePolicy struct {
-	PolicyID      string `json:"policyID,omitempty"`
-	NodeID        string `json:"nodeID,omitempty"`
-	CommandRegex  string `json:"commandRegex,omitempty"`
-	Priority      int    `json:"priority,omitempty"`
-	ExecutionTime int64  `json:"executionTime,omitempty"`
-}
+type NodePolicy = domain.NodePolicy
 
 // HandleNodePolicies receives node-level scheduling policies from the
 // Manager and stores them so that resolveNodeSchedulingIntents can match
@@ -33,14 +29,8 @@ func (h *Handler) HandleNodePolicies(w http.ResponseWriter, r *http.Request) {
 	}
 
 	policies := make([]*domain.NodePolicy, 0, len(req.Policies))
-	for _, policy := range req.Policies {
-		policies = append(policies, &domain.NodePolicy{
-			PolicyID:      policy.PolicyID,
-			NodeID:        policy.NodeID,
-			CommandRegex:  policy.CommandRegex,
-			Priority:      policy.Priority,
-			ExecutionTime: policy.ExecutionTime,
-		})
+	for i := range req.Policies {
+		policies = append(policies, &req.Policies[i])
 	}
 
 	if err := h.Service.ProcessNodePolicies(ctx, policies); err != nil {
@@ -48,6 +38,29 @@ func (h *Handler) HandleNodePolicies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse[EmptyResponse](nil))
+}
+
+func (h *Handler) PreviewNodePolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	var req domain.NodePolicyPreviewRequest
+	if err := h.JSONBind(r, &req); err != nil {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "Invalid request payload", err)
+		return
+	}
+	if (req.Policy == nil) == (req.PolicyID == "") {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "Specify exactly one of policy or policyID", nil)
+		return
+	}
+	result, err := h.Service.PreviewNodePolicy(ctx, req)
+	if errors.Is(err, service.ErrNodePolicyNotFound) {
+		h.ErrorResponse(ctx, w, http.StatusNotFound, err.Error(), nil)
+		return
+	}
+	if err != nil {
+		h.ErrorResponse(ctx, w, http.StatusInternalServerError, "Failed to preview node policy", err)
+		return
+	}
+	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(result))
 }
 
 // GetNodePolicyMerkleRoot returns the merkle root hash of the currently

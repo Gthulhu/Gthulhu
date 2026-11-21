@@ -61,6 +61,7 @@ func (r *repo) InsertNodePolicyAndIntents(ctx context.Context, policy *domain.No
 	if id, e := bson.ObjectIDFromHex(created.GetName()); e == nil {
 		policy.ID = id
 	}
+	policy.Generation = created.GetGeneration()
 
 	createdIntentNames := make([]string, 0, len(intents))
 	for _, intent := range intents {
@@ -68,6 +69,7 @@ func (r *repo) InsertNodePolicyAndIntents(ctx context.Context, policy *domain.No
 			intent.ID = bson.NewObjectID()
 		}
 		intent.PolicyID = policy.ID
+		intent.Generation = policy.Generation
 		if intent.CreatedTime == 0 {
 			intent.CreatedTime = now
 		}
@@ -262,8 +264,12 @@ func (r *repo) UpdateNodePolicy(ctx context.Context, policy *domain.NodeScheduli
 	}
 	obj.SetResourceVersion(existing.GetResourceVersion())
 
-	_, err = r.k8sDynamic.Resource(nodePolicyGVR).Namespace(r.crNamespace).Update(ctx, obj, metav1.UpdateOptions{})
-	return err
+	updated, err := r.k8sDynamic.Resource(nodePolicyGVR).Namespace(r.crNamespace).Update(ctx, obj, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	policy.Generation = updated.GetGeneration()
+	return nil
 }
 
 func (r *repo) DeleteNodePolicy(ctx context.Context, policyID bson.ObjectID) error {
@@ -375,6 +381,7 @@ func unstructuredToDomainNodePolicy(obj *unstructured.Unstructured) (*domain.Nod
 			CreatedTime: getInt64(spec, "createdTime"),
 			UpdatedTime: getInt64(spec, "updatedTime"),
 		},
+		Generation:    obj.GetGeneration(),
 		CommandRegex:  getStr(spec, "commandRegex"),
 		Priority:      int(getInt64(spec, "priority")),
 		ExecutionTime: getInt64(spec, "executionTime"),
@@ -460,6 +467,7 @@ func domainNodeIntentToUnstructured(intent *domain.NodeSchedulingIntent, namespa
 			},
 			"spec": map[string]interface{}{
 				"policyID":      intent.PolicyID.Hex(),
+				"generation":    intent.Generation,
 				"nodeID":        intent.NodeID,
 				"commandRegex":  intent.CommandRegex,
 				"priority":      int64(intent.Priority),
@@ -491,6 +499,7 @@ func unstructuredToDomainNodeIntent(obj *unstructured.Unstructured) (*domain.Nod
 			CreatedTime: getInt64(spec, "createdTime"),
 			UpdatedTime: getInt64(spec, "updatedTime"),
 		},
+		Generation:    getInt64(spec, "generation"),
 		NodeID:        getStr(spec, "nodeID"),
 		CommandRegex:  getStr(spec, "commandRegex"),
 		Priority:      int(getInt64(spec, "priority")),

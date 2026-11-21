@@ -31,6 +31,16 @@ type UpdateNodeSchedulingPolicyRequest struct {
 	ExecutionTime int64                `json:"executionTime,omitempty"`
 }
 
+type PreviewNodeSchedulingPolicyRequest struct {
+	PolicyID string                             `json:"policyId,omitempty"`
+	Policy   *CreateNodeSchedulingPolicyRequest `json:"policy,omitempty"`
+}
+
+type PreviewNodeSchedulingPolicyResponse struct {
+	Policy *NodeSchedulingPolicyResponse `json:"policy"`
+	*domain.NodeSchedulingPolicyPreview
+}
+
 func convertRequestDRASelectorsToDomain(selectors []DRASelectorPayload) []domain.DRASelector {
 	result := make([]domain.DRASelector, len(selectors))
 	for i, s := range selectors {
@@ -51,6 +61,45 @@ func convertRequestLabelSelectorsToDomain(selectors []LabelSelector) []domain.La
 		result[i] = domain.LabelSelector{Key: s.Key, Value: s.Value}
 	}
 	return result
+}
+
+func (req CreateNodeSchedulingPolicyRequest) toDomain() *domain.NodeSchedulingPolicy {
+	return &domain.NodeSchedulingPolicy{
+		NodeSelectors: convertRequestLabelSelectorsToDomain(req.NodeSelectors),
+		NodeNames:     req.NodeNames,
+		DRASelectors:  convertRequestDRASelectorsToDomain(req.DRASelectors),
+		CommandRegex:  req.CommandRegex,
+		Priority:      req.Priority,
+		ExecutionTime: req.ExecutionTime,
+	}
+}
+
+func (h *Handler) PreviewNodeSchedulingPolicy(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	claims, ok := h.GetClaimsFromContext(ctx)
+	if !ok {
+		h.ErrorResponse(ctx, w, http.StatusUnauthorized, "Unauthorized", nil)
+		return
+	}
+
+	var req PreviewNodeSchedulingPolicyRequest
+	if err := h.JSONBind(r, &req); err != nil {
+		h.ErrorResponse(ctx, w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	var policy *domain.NodeSchedulingPolicy
+	if req.Policy != nil {
+		policy = req.Policy.toDomain()
+	}
+	preview, err := h.Svc.PreviewNodeSchedulingPolicy(ctx, &claims, req.PolicyID, policy)
+	if err != nil {
+		h.HandleError(ctx, w, err)
+		return
+	}
+	h.JSONResponse(ctx, w, http.StatusOK, NewSuccessResponse(&PreviewNodeSchedulingPolicyResponse{
+		Policy:                      convertDomainNodePolicyToResponse(preview.Policy),
+		NodeSchedulingPolicyPreview: preview,
+	}))
 }
 
 // CreateNodeSchedulingPolicy godoc
@@ -76,14 +125,7 @@ func (h *Handler) CreateNodeSchedulingPolicy(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	policy := &domain.NodeSchedulingPolicy{
-		NodeSelectors: convertRequestLabelSelectorsToDomain(req.NodeSelectors),
-		NodeNames:     req.NodeNames,
-		DRASelectors:  convertRequestDRASelectorsToDomain(req.DRASelectors),
-		CommandRegex:  req.CommandRegex,
-		Priority:      req.Priority,
-		ExecutionTime: req.ExecutionTime,
-	}
+	policy := req.toDomain()
 
 	claims, ok := h.GetClaimsFromContext(ctx)
 	if !ok {
@@ -153,6 +195,7 @@ func (h *Handler) UpdateNodeSchedulingPolicy(w http.ResponseWriter, r *http.Requ
 
 type NodeSchedulingPolicyResponse struct {
 	ID            bson.ObjectID        `json:"id"`
+	Generation    int64                `json:"generation"`
 	NodeSelectors []LabelSelector      `json:"nodeSelectors,omitempty"`
 	NodeNames     []string             `json:"nodeNames,omitempty"`
 	DRASelectors  []DRASelectorPayload `json:"draSelectors,omitempty"`
@@ -171,6 +214,7 @@ func convertDomainNodePolicyToResponse(p *domain.NodeSchedulingPolicy) *NodeSche
 	}
 	return &NodeSchedulingPolicyResponse{
 		ID:            p.ID,
+		Generation:    p.Generation,
 		NodeSelectors: convertDomainLabelSelectorsToResponseLabelSelectors(p.NodeSelectors),
 		NodeNames:     p.NodeNames,
 		DRASelectors:  attrs,
@@ -232,6 +276,7 @@ func (h *Handler) ListSelfNodeSchedulingPolicies(w http.ResponseWriter, r *http.
 type NodeSchedulingIntentResponse struct {
 	ID            bson.ObjectID      `json:"id"`
 	PolicyID      bson.ObjectID      `json:"policyId"`
+	Generation    int64              `json:"generation"`
 	NodeID        string             `json:"nodeId"`
 	CommandRegex  string             `json:"commandRegex,omitempty"`
 	Priority      int                `json:"priority,omitempty"`
@@ -285,6 +330,7 @@ func (h *Handler) ListSelfNodeSchedulingIntents(w http.ResponseWriter, r *http.R
 		resp.Intents[i] = &NodeSchedulingIntentResponse{
 			ID:            in.ID,
 			PolicyID:      in.PolicyID,
+			Generation:    in.Generation,
 			NodeID:        in.NodeID,
 			CommandRegex:  in.CommandRegex,
 			Priority:      in.Priority,
