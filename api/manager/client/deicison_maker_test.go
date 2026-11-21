@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"math/big"
 	"net"
@@ -20,10 +21,50 @@ import (
 
 	cache "github.com/Code-Hex/go-generics-cache"
 	"github.com/Gthulhu/api/config"
+	dmdomain "github.com/Gthulhu/api/decisionmaker/domain"
 	"github.com/Gthulhu/api/manager/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/v2/bson"
 )
+
+func TestNodePolicyPreviewAndPushSendGeneration(t *testing.T) {
+	const cachedToken = "cached-token"
+	id := bson.NewObjectID()
+	want := dmdomain.NodePolicy{PolicyID: id.Hex(), Node: "node-a", NodeID: "node-a", Generation: 15, CommandRegex: "^worker$"}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "Bearer "+cachedToken, r.Header.Get("Authorization"))
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		switch r.URL.Path {
+		case "/api/v1/node-scheduling-policies/preview":
+			var payload dmdomain.NodePolicyPreviewRequest
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			assert.Equal(t, &want, payload.Policy)
+			_, _ = w.Write([]byte(`{"success":true,"data":{"matchedTasks":[{"node":"node-a","tid":4,"startTime":10}],"warnings":[{"code":"sampleWarning"}]}}`))
+		case "/api/v1/node-intents":
+			var payload struct {
+				Policies []dmdomain.NodePolicy `json:"policies"`
+			}
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+			assert.Equal(t, []dmdomain.NodePolicy{want}, payload.Policies)
+			w.WriteHeader(http.StatusOK)
+		default:
+			assert.Fail(t, "unexpected path", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	dm := newDecisionMakerPodFromServerURL(t, server.URL)
+	client := newDecisionMakerClientWithCachedToken(dm.NodeID, cachedToken, server.Client())
+	preview, err := client.PreviewNodeSchedulingPolicy(context.Background(), dm, dmdomain.NodePolicyPreviewRequest{Policy: &want})
+	require.NoError(t, err)
+	assert.Equal(t, []dmdomain.TaskInfo{{Node: "node-a", TID: 4, StartTime: 10}}, preview.MatchedTasks)
+	assert.Equal(t, []dmdomain.NodePolicyWarning{{Code: "sampleWarning"}}, preview.Warnings)
+	require.NoError(t, client.SendNodeSchedulingPolicies(context.Background(), dm, []*domain.NodeSchedulingIntent{
+		{PolicyID: id, NodeID: "node-a", Generation: 15, CommandRegex: "^worker$"},
+	}))
+}
 
 func TestGetIntentMerkleRootSuccess(t *testing.T) {
 	const cachedToken = "cached-token"

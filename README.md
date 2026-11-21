@@ -87,6 +87,20 @@ This matters for workloads where the critical work happens in named worker threa
 
 A node policy resolved to a worker thread is keyed by **TID**, so the scheduler can target the entity Linux actually dispatches.
 
+#### Preview and verify node policies
+
+Send an authenticated `POST /api/v1/node-scheduling-policies/preview` to the Manager with an inline rule, for example:
+
+```json
+{"policy":{"nodeNames":["gx10"],"commandRegex":"^EngineCore(_DP[0-9]+)?$","priority":5,"executionTime":20000000}}
+```
+
+Alternatively, send `{"policyId":"<existing policy ID>"}`. The Manager resolves the same node selectors as policy creation and asks each matching node's Decision Maker to scan its live task table. The response `data` includes the rule, `matchedNodes`, `matchedTasks`, `conflicts`, and `warnings`. An unavailable node produces a warning, so an empty match list does not necessarily mean every node was scanned. Decision Makers also expose this endpoint directly for a single-node preview.
+
+Each match includes the node, TGID, TID, `comm`, per-task `startTime` (clock ticks since boot), raw `cgroupPath`, and `podUID` if discovered. Conflicts list the contenders and the winner for the evaluated set. An inline rule has no persisted ID or generation, so previewing a saved policy by ID gives more reliable precedence information. Preview does not change policies, scheduler state, or BPF maps.
+
+To record benchmark provenance, save the preview and the matching `nodePolicyMatch` records from the Decision Maker's `GET /api/v1/scheduling/strategies`. The latter identifies the winning rule and generation and its intended BPF key. In kernel mode, collect the daemon's `node_policy_apply` and `node_policy_remove` logs for the same policy ID, generation, node, TID, and start time. A verified apply confirms the key and values were read back from the priority maps; a verified removal confirms the key was absent from both maps. These are point-in-time observations of map state, not proof that the task received CPU time. A replacement strategy can keep the same TID in the maps, so do not treat replacement as key removal.
+
 ### Priority semantics across scheduler modes
 
 A strategy with `Priority > 0` is a boost. `Priority == 0` is non-boosting.

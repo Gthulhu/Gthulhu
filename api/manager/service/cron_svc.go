@@ -345,23 +345,25 @@ func (svc *Service) refreshStaleNodeIntents(ctx context.Context) error {
 		for _, node := range currentNodes {
 			currentNodeNames[node.Name] = node
 		}
-		existingIntentNodeIDs := make(map[string]*domain.NodeSchedulingIntent, len(intentOpt.Result))
-		for _, intent := range intentOpt.Result {
-			existingIntentNodeIDs[intent.NodeID] = intent
-		}
-
-		// Delete stale intents (node no longer matches the policy)
+		existingIntentNodeIDs := make(map[string]struct{}, len(intentOpt.Result))
+		// Replace old generations as well as removing nodes that no longer match.
 		staleIntentIDs := make([]bson.ObjectID, 0)
 		staleIntents := make([]*domain.NodeSchedulingIntent, 0)
 		for _, intent := range intentOpt.Result {
-			if _, exists := currentNodeNames[intent.NodeID]; !exists {
+			_, matches := currentNodeNames[intent.NodeID]
+			if !matches || intent.Generation != policy.Generation {
 				staleIntentIDs = append(staleIntentIDs, intent.ID)
-				staleIntents = append(staleIntents, intent)
+				if !matches {
+					staleIntents = append(staleIntents, intent)
+				}
+			} else {
+				existingIntentNodeIDs[intent.NodeID] = struct{}{}
 			}
 		}
 		if len(staleIntentIDs) > 0 {
 			if err := svc.Repo.DeleteNodeIntents(ctx, staleIntentIDs); err != nil {
 				logger.Logger(ctx).Warn().Err(err).Msgf("failed to delete stale node intents for policy %s", policy.ID.Hex())
+				continue
 			} else {
 				logger.Logger(ctx).Info().Msgf("deleted %d stale node intents for policy %s", len(staleIntentIDs), policy.ID.Hex())
 			}
@@ -486,6 +488,12 @@ func sortNodeIntentsByKey(intents []*domain.NodeSchedulingIntent) []*domain.Node
 		}
 	}
 	sort.Slice(results, func(i, j int) bool {
+		if results[i].PolicyID != results[j].PolicyID {
+			return results[i].PolicyID.Hex()+"|" < results[j].PolicyID.Hex()+"|"
+		}
+		if results[i].Generation != results[j].Generation {
+			return results[i].Generation < results[j].Generation
+		}
 		return nodeIntentSortKey(results[i]) < nodeIntentSortKey(results[j])
 	})
 	return results
@@ -493,8 +501,8 @@ func sortNodeIntentsByKey(intents []*domain.NodeSchedulingIntent) []*domain.Node
 
 func nodeIntentSortKey(intent *domain.NodeSchedulingIntent) string {
 	return strings.Join([]string{
-		intent.NodeID,
 		intent.PolicyID.Hex(),
+		intent.NodeID,
 		intent.CommandRegex,
 		strconv.Itoa(intent.Priority),
 		strconv.FormatInt(intent.ExecutionTime, 10),
@@ -503,12 +511,15 @@ func nodeIntentSortKey(intent *domain.NodeSchedulingIntent) string {
 
 func hashNodeSchedulingIntent(intent *domain.NodeSchedulingIntent) string {
 	serialized := strings.Join([]string{
-		"nodeID=" + intent.NodeID,
 		"policyID=" + intent.PolicyID.Hex(),
+		"nodeID=" + intent.NodeID,
 		"commandRegex=" + intent.CommandRegex,
 		"priority=" + strconv.Itoa(intent.Priority),
 		"executionTime=" + strconv.FormatInt(intent.ExecutionTime, 10),
 	}, "|")
+	if intent.Generation != 0 {
+		serialized += "|generation=" + strconv.FormatInt(intent.Generation, 10)
+	}
 	return util.HashStringSHA256Hex(serialized)
 }
 

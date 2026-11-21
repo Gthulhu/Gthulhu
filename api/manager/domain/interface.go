@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 
+	dmdomain "github.com/Gthulhu/api/decisionmaker/domain"
 	"go.mongodb.org/mongo-driver/v2/bson"
 )
 
@@ -139,6 +140,7 @@ type Service interface {
 	DeletePodSchedulingMetrics(ctx context.Context, operator *Claims, name string) error
 
 	CreateNodeSchedulingPolicy(ctx context.Context, operator *Claims, policy *NodeSchedulingPolicy) error
+	PreviewNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) (*NodeSchedulingPolicyPreview, error)
 	ListNodeSchedulingPolicies(ctx context.Context, filterOpts *QueryNodePolicyOptions) error
 	ListNodeSchedulingIntents(ctx context.Context, filterOpts *QueryNodeIntentOptions) error
 	UpdateNodeSchedulingPolicy(ctx context.Context, operator *Claims, policyID string, policy *NodeSchedulingPolicy) error
@@ -187,6 +189,7 @@ type DecisionMakerAdapter interface {
 	GetPodSchedulingMetricValues(ctx context.Context, decisionMaker *DecisionMakerPod) ([]*PodSchedulingMetricValue, error)
 
 	SendNodeSchedulingPolicies(ctx context.Context, decisionMaker *DecisionMakerPod, intents []*NodeSchedulingIntent) error
+	PreviewNodeSchedulingPolicy(ctx context.Context, decisionMaker *DecisionMakerPod, req dmdomain.NodePolicyPreviewRequest) (*dmdomain.NodePolicyPreview, error)
 	GetNodePolicyMerkleRoot(ctx context.Context, decisionMaker *DecisionMakerPod) (string, error)
 	DeleteNodeSchedulingIntents(ctx context.Context, decisionMaker *DecisionMakerPod, req *DeleteNodeIntentsRequest) error
 }

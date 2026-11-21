@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -101,10 +102,37 @@ func Run(args []string) error {
 	sliceNsDefault = cfg.Scheduler.SliceNsDefault
 	sliceNsMin = cfg.Scheduler.SliceNsMin
 	slog.Info("Scheduler configuration", "SliceNsDefault", sliceNsDefault, "SliceNsMin", sliceNsMin)
+	cfg.Api.Interval = policy.NormalizeAPIInterval(cfg.Api.Interval, cfg.Api.Enabled)
 	pluginConfig := buildPluginConfig(cfg)
+	var strategyClient *gthulhu.JWTClient
+	if cfg.Scheduler.KernelMode && pluginConfig.Mode == "gthulhu" {
+		// The pinned plugin's API conversion drops node-policy provenance.
+		// Own the kernel-mode fetch, but keep the plugin's metrics behavior.
+		apiConfig := pluginConfig.APIConfig
+		pluginConfig.APIConfig.Enabled = false
+		if apiConfig.Enabled && apiConfig.PublicKeyPath != "" && apiConfig.BaseURL != "" {
+			strategyClient, err = gthulhu.NewJWTClient(apiConfig.PublicKeyPath, apiConfig.BaseURL, apiConfig.AuthEnabled, apiConfig.MTLS)
+			if err != nil {
+				return fmt.Errorf("failed to create kernel strategies client: %w", err)
+			}
+		}
+	}
 	p, err = pluginFactory.New(ctx, pluginConfig)
 	if err != nil {
 		return fmt.Errorf("failed to create plugin: %w", err)
+	}
+	if strategyClient != nil {
+		// The JWT client holds mutable token state, so give metrics its own.
+		g, ok := p.(*gthulhu.GthulhuPlugin)
+		if !ok {
+			return fmt.Errorf("expected Gthulhu plugin for kernel strategies, got %T", p)
+		}
+		if err := g.InitJWTClient(cfg.Api.PublicKeyPath, cfg.Api.Url, cfg.Api.AuthEnabled, pluginConfig.APIConfig.MTLS); err != nil {
+			return fmt.Errorf("failed to create metrics JWT client: %w", err)
+		}
+		if err := g.InitMetricsClient(cfg.Api.Url); err != nil {
+			return fmt.Errorf("failed to create metrics client: %w", err)
+		}
 	}
 
 	bpfModule := core.LoadSched("main.bpf.o")
@@ -176,7 +204,6 @@ func Run(args []string) error {
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
-	cfg.Api.Interval = policy.NormalizeAPIInterval(cfg.Api.Interval, cfg.Api.Enabled)
 	oldBss, err := bpfModule.GetBssData()
 	if err != nil {
 		slog.Warn("GetBssData failed", "error", err)
@@ -251,34 +278,28 @@ func Run(args []string) error {
 	}
 
 	if cfg.Scheduler.KernelMode {
+		var latest atomic.Pointer[[]kernelStrategy]
+		if strategyClient != nil {
+			go pollKernelStrategies(ctx, strategyClient, cfg.Api.Url, time.Duration(cfg.Api.Interval)*time.Second, &latest)
+		}
+		priorities := kernelPriorityTasks{writer: bpfModule, lookup: readPriorityTask, logger: slog.Default()}
 		for {
-			changed, removed := p.GetChangedStrategies()
-			if len(changed) > 0 || len(removed) > 0 {
+			if strategyClient != nil {
+				if snapshot := latest.Swap(nil); snapshot != nil {
+					priorities.reconcile(*snapshot)
+				}
+			} else {
+				changed, removed := p.GetChangedStrategies()
 				for _, strategy := range changed {
+					item := kernelStrategy{PID: strategy.PID, Priority: strategy.Priority, ExecutionTime: strategy.ExecutionTime}
 					if strategy.Priority <= 0 {
-						// qumun treats priority 0 as the highest, preemptive level
-						// and has no slice-only state, so a non-boosting rule must
-						// not be inserted (that would promote the task, the opposite
-						// of user-space). Drop any stale entry instead.
-						if rmErr := bpfModule.RemovePriorityTask(uint32(strategy.PID)); rmErr != nil {
-							slog.Warn("RemovePriorityTask (non-positive priority) failed", "error", rmErr, "pid", strategy.PID)
-						}
-						continue
-					}
-					err = bpfModule.UpdatePriorityTaskWithPrio(uint32(strategy.PID), strategy.ExecutionTime, uint32(strategy.Priority))
-					if err != nil {
-						slog.Warn("UpdatePriorityTaskWithPrio failed", "error", err, "pid", strategy.PID)
+						priorities.remove(item, "non_positive_priority")
 					} else {
-						slog.Info("Updated priority task", "pid", strategy.PID, "executionTime", strategy.ExecutionTime, "priority", strategy.Priority)
+						priorities.apply(item, kernelStrategy{})
 					}
 				}
 				for _, strategy := range removed {
-					err = bpfModule.RemovePriorityTask(uint32(strategy.PID))
-					if err != nil {
-						slog.Warn("RemovePriorityTask failed", "error", err, "pid", strategy.PID)
-					} else {
-						slog.Info("Removed priority task", "pid", strategy.PID)
-					}
+					priorities.remove(kernelStrategy{PID: strategy.PID}, "strategy_removed")
 				}
 			}
 			if bpfModule.Stopped() {

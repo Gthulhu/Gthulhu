@@ -1,5 +1,7 @@
 {{- $existingCrd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "nodeschedulingintents.gthulhu.io" }}
-{{- if not $existingCrd }}
+{{- $annotations := dig "metadata" "annotations" (dict) $existingCrd }}
+{{- $owned := and (eq (get $annotations "meta.helm.sh/release-name") .Release.Name) (eq (get $annotations "meta.helm.sh/release-namespace") .Release.Namespace) }}
+{{- if or (not $existingCrd) $owned }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -21,6 +23,9 @@ spec:
               properties:
                 policyID:
                   type: string
+                generation:
+                  type: integer
+                  format: int64
                 nodeID:
                   type: string
                 commandRegex:

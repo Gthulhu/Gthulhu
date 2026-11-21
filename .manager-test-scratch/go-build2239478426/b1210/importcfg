@@ -1,0 +1,8 @@
+# import config
+packagefile os=/home/runner/.cache/go-build/32/3261f0b825152ea832d1c40216311066f385e1679d995ab5054d9170e824ab19-d
+packagefile reflect=/home/runner/.cache/go-build/69/6919381bbc0c5a6115e700b7cbaa7ab2c56795bacfeffe527437084f1799d80e-d
+packagefile testing=/home/runner/.cache/go-build/f8/f87ffe0fb2049f0f6804aef00709db87a064a6ca8efe6b1da5f6c4ec63d49692-d
+packagefile testing/internal/testdeps=/home/runner/.cache/go-build/d3/d367bb38e2dd6fe0b134182e25ab4a449ea91fd7e71db06635e7da32b7c10410-d
+packagefile runtime=/home/runner/.cache/go-build/be/bed50f430a127efe659d402f5d624c2ec5abab68581bc45912c94534f86bcbac-d
+packagefile github.com/Gthulhu/api/manager/rest=/home/runner/.cache/go-build/b0/b09d955bec0809990315ac987450b36d843679748c1cf5e3ad631d6ed96183ba-d
+packagefile github.com/Gthulhu/api/manager/rest_test=/home/runner/.cache/go-build/57/57c671027425a3ee8f5b69c23375c9c60613395a25e8518cbb83bea96663694e-d
