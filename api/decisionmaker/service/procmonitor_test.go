@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -20,6 +21,8 @@ func writeTask(t *testing.T, root string, tgid, tid int, comm string) {
 	dir := filepath.Join(root, strconv.Itoa(tgid), "task", strconv.Itoa(tid))
 	require.NoError(t, os.MkdirAll(dir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "comm"), []byte(comm+"\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "stat"), fmt.Appendf(nil, "%d (%s) S 1 2 3 4 5 0 0 0 0 0 0 0 0 0 0 0 0 0 182736123 0\n", tid, comm), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "cgroup"), []byte("0::/\n"), 0o644))
 }
 
 func TestProcTaskSourceEnumeratesNonLeaderThreads(t *testing.T) {

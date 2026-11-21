@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -49,10 +50,7 @@ func (svc *Service) ProcessNodePolicies(ctx context.Context, policies []*domain.
 // is emitted per TID, so two decision makers holding the same policy set (hence
 // the same root) resolve to the same result regardless of push order.
 func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain.SchedulingIntents, error) {
-	svc.nodePolicyCacheMu.RLock()
-	policies := svc.nodePolicyCache
-	svc.nodePolicyCacheMu.RUnlock()
-
+	policies := svc.cachedNodePolicies()
 	if len(policies) == 0 {
 		return nil, nil
 	}
@@ -65,48 +63,92 @@ func (svc *Service) resolveNodeSchedulingIntents(ctx context.Context) ([]*domain
 		return nil, fmt.Errorf("snapshot tasks: %w", err)
 	}
 
-	byTID := make(map[int]*domain.SchedulingIntents)
-	for _, policy := range sortNodePoliciesByKey(normalizeNodePolicyInputs(policies)) {
+	compiled := compileNodePolicies(policies, func(policy domain.NodePolicy, err error) {
+		logger.Logger(ctx).Warn().Err(err).Msgf("invalid commandRegex %q in node policy %s", policy.CommandRegex, policy.PolicyID)
+	})
+	var results []*domain.SchedulingIntents
+	node := localNodeName()
+	err = matchNodePolicies(ctx, tasks, compiled, func(task domain.TaskInfo, matches []*domain.NodePolicy) {
+		policy := *matches[len(matches)-1]
+		if len(matches) > 1 {
+			logger.Logger(ctx).Warn().Msgf("overlapping node policies match tid %d (comm %q); policy %s wins (last in canonical order)", task.TID, task.Comm, policy.PolicyID)
+		}
+		task.Node = policyNode(policy, node)
+		results = append(results, &domain.SchedulingIntents{
+			Priority: policy.Priority, ExecutionTime: uint64(policy.ExecutionTime), PID: task.TID,
+			CommandRegex:    policy.CommandRegex,
+			NodePolicyMatch: &domain.NodePolicyMatch{Policy: policy, Task: task, IntendedKey: task.TID},
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].PID < results[j].PID })
+	return results, nil
+}
+
+func (svc *Service) cachedNodePolicies() []*domain.NodePolicy {
+	svc.nodePolicyCacheMu.RLock()
+	defer svc.nodePolicyCacheMu.RUnlock()
+	return svc.nodePolicyCache
+}
+
+type compiledNodePolicy struct {
+	policy *domain.NodePolicy
+	regex  *regexp.Regexp
+}
+
+func compileNodePolicies(policies []*domain.NodePolicy, invalid func(domain.NodePolicy, error)) []compiledNodePolicy {
+	var compiled []compiledNodePolicy
+	for _, policy := range sortNodePoliciesByKey(policies) {
 		if policy.CommandRegex == "" {
 			continue
 		}
 		re, err := regexp.Compile(policy.CommandRegex)
 		if err != nil {
-			logger.Logger(ctx).Warn().Err(err).Msgf("invalid commandRegex %q in node policy %s", policy.CommandRegex, policy.PolicyID)
+			invalid(*policy, err)
 			continue
 		}
-		for _, task := range tasks {
-			if task.Comm == pauseCommand {
-				continue
-			}
-			if !re.MatchString(task.Comm) {
-				continue
-			}
-			if _, ok := byTID[task.TID]; ok {
-				logger.Logger(ctx).Warn().Msgf("overlapping node policies match tid %d (comm %q); policy %s wins (last in canonical order)", task.TID, task.Comm, policy.PolicyID)
-			}
-			byTID[task.TID] = &domain.SchedulingIntents{
-				Priority:      policy.Priority,
-				ExecutionTime: uint64(policy.ExecutionTime),
-				PID:           task.TID,
-				CommandRegex:  policy.CommandRegex,
+		compiled = append(compiled, compiledNodePolicy{policy, re})
+	}
+	return compiled
+}
+
+func matchNodePolicies(ctx context.Context, tasks []domain.TaskInfo, policies []compiledNodePolicy, matched func(domain.TaskInfo, []*domain.NodePolicy)) error {
+	matches := make([]*domain.NodePolicy, 0, len(policies))
+	for _, task := range tasks {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if task.Comm == pauseCommand {
+			continue
+		}
+		matches = matches[:0]
+		for _, policy := range policies {
+			if policy.regex.MatchString(task.Comm) {
+				matches = append(matches, policy.policy)
 			}
 		}
+		if len(matches) > 0 {
+			matched(task, matches)
+		}
 	}
+	return nil
+}
 
-	if len(byTID) == 0 {
-		return nil, nil
+func localNodeName() string {
+	if node := os.Getenv("NODE_NAME"); node != "" {
+		return node
 	}
-	tids := make([]int, 0, len(byTID))
-	for tid := range byTID {
-		tids = append(tids, tid)
+	node, _ := os.Hostname()
+	return node
+}
+
+func policyNode(policy domain.NodePolicy, fallback string) string {
+	if policy.Node != "" {
+		return policy.Node
 	}
-	sort.Ints(tids)
-	results := make([]*domain.SchedulingIntents, 0, len(byTID))
-	for _, tid := range tids {
-		results = append(results, byTID[tid])
-	}
-	return results, nil
+	return fallback
 }
 
 // DeleteNodePolicyByID removes a single node policy from the cache by ID.
@@ -179,6 +221,12 @@ func sortNodePoliciesByKey(policies []*domain.NodePolicy) []*domain.NodePolicy {
 	results := make([]*domain.NodePolicy, 0, len(policies))
 	results = append(results, policies...)
 	sort.Slice(results, func(i, j int) bool {
+		if results[i].PolicyID != results[j].PolicyID {
+			return results[i].PolicyID+"|" < results[j].PolicyID+"|"
+		}
+		if results[i].Generation != results[j].Generation {
+			return results[i].Generation < results[j].Generation
+		}
 		return nodePolicySortKey(results[i]) < nodePolicySortKey(results[j])
 	})
 	return results
@@ -202,5 +250,8 @@ func hashNodePolicy(policy *domain.NodePolicy) string {
 		"priority=" + strconv.Itoa(policy.Priority),
 		"executionTime=" + strconv.FormatInt(policy.ExecutionTime, 10),
 	}, "|")
+	if policy.Generation != 0 {
+		serialized += "|generation=" + strconv.FormatInt(policy.Generation, 10)
+	}
 	return util.HashStringSHA256Hex(serialized)
 }

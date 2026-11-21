@@ -81,19 +81,14 @@ func (p *procTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error
 			if err != nil {
 				continue
 			}
-			commPath := p.rootDir + "/" + strconv.Itoa(tgid) + "/task/" + strconv.Itoa(tid) + "/comm"
-			data, err := os.ReadFile(commPath)
+			task, err := readTask(taskDir+"/"+tidEntry.Name(), tgid, tid)
 			if err != nil {
 				if isTransientProcError(err) {
 					continue // the thread exited between readdir and read
 				}
-				return nil, fmt.Errorf("read comm for tid %d: %w", tid, err)
+				return nil, fmt.Errorf("read metadata for tid %d: %w", tid, err)
 			}
-			tasks = append(tasks, domain.TaskInfo{
-				TGID: tgid,
-				TID:  tid,
-				Comm: strings.TrimSpace(string(data)),
-			})
+			tasks = append(tasks, task)
 		}
 	}
 
@@ -101,6 +96,57 @@ func (p *procTaskSource) Snapshot(ctx context.Context) ([]domain.TaskInfo, error
 		return cmp.Compare(a.TID, b.TID)
 	})
 	return tasks, nil
+}
+
+func readTask(dir string, tgid, tid int) (task domain.TaskInfo, err error) {
+	comm, err := os.ReadFile(dir + "/comm")
+	if err != nil {
+		return task, err
+	}
+	stat, err := os.ReadFile(dir + "/stat")
+	if err != nil {
+		return task, err
+	}
+	// comm in stat can contain spaces and parentheses. Fields 3 onward
+	// start after the last ')' delimiting comm.
+	end := strings.LastIndexByte(string(stat), ')')
+	fields := strings.Fields(string(stat[end+1:]))
+	if end < 0 || len(fields) < 20 {
+		return task, fmt.Errorf("invalid task stat")
+	}
+	flags, err := strconv.ParseUint(fields[6], 10, 64) // field 9
+	if err != nil {
+		return task, err
+	}
+	startTime, err := strconv.ParseUint(fields[19], 10, 64) // field 22
+	if err != nil {
+		return task, err
+	}
+	cgroups, err := os.ReadFile(dir + "/cgroup")
+	if err != nil {
+		return task, err
+	}
+	task = domain.TaskInfo{
+		TGID: tgid, TID: tid, Comm: strings.TrimSuffix(string(comm), "\n"),
+		StartTime: startTime, KernelThread: flags&0x00200000 != 0, // PF_KTHREAD
+	}
+	// Prefer a hierarchy with a pod UID; otherwise use the unified (v2)
+	// hierarchy or the first path on legacy (v1) machines.
+	for line := range strings.SplitSeq(string(cgroups), "\n") {
+		parts := strings.SplitN(line, ":", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		if match := podRegex.FindStringSubmatch(parts[2]); match != nil {
+			task.CgroupPath = parts[2]
+			task.PodUID = strings.ReplaceAll(match[1], "_", "-")
+			break
+		}
+		if task.CgroupPath == "" || parts[0] == "0" && parts[1] == "" {
+			task.CgroupPath = parts[2]
+		}
+	}
+	return task, nil
 }
 
 // isTransientProcError reports whether err is a task that vanished mid-scan
